@@ -49,6 +49,12 @@ class PlayerScreen extends ConsumerWidget {
 }
 
 // ── Top Bar ───────────────────────────────────────────────────────────────────
+// FIX: Переписан на Stack(alignment: Alignment.center), чтобы элементы
+// не "наезжали" друг на друга ни на сложенном, ни на разложенном экране.
+//
+// Слой 1 (Positioned left:8)  — кнопка «Назад», только если canPop
+// Слой 2 (центр, без Positioned) — надпись «PROTOGENIX»
+// Слой 3 (Positioned right:16) — иконка текстов (если трек загружен)
 
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.track});
@@ -56,10 +62,34 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-      child: Row(
+    return SizedBox(
+      height: 48,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
+          // Кнопка «Назад» — слева, только если есть куда возвращаться
+          if (Navigator.canPop(context))
+            Positioned(
+              left: 8,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  width:  36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withAlpha(15),
+                  ),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white70,
+                    size:  24,
+                  ),
+                ),
+              ),
+            ),
+
+          // Логотип строго по центру
           const Text(
             'PROTOGENIX',
             style: TextStyle(
@@ -69,9 +99,13 @@ class _TopBar extends StatelessWidget {
               letterSpacing: 2.5,
             ),
           ),
-          const Spacer(),
+
+          // Иконка текстов — справа
           if (track != null)
-            const Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
+            const Positioned(
+              right: 16,
+              child: Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
+            ),
         ],
       ),
     );

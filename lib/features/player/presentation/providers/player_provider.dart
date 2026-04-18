@@ -1,7 +1,10 @@
 // lib/features/player/presentation/providers/player_provider.dart
 //
-// v4 — чистый провайдер без VisualizerEngine.
-// Убраны: импорт visualizer_engine, вызов visualizer.attachPlayer().
+// v4.1 — Smooth Fade Out при паузе.
+// Добавлен приватный _fadeVolume() и переопределён pause():
+//   1. Плавно снижаем громкость 1.0 → 0.0 за 300 мс (10 шагов × 30 мс)
+//   2. Реально ставим трек на паузу (_handler.pause())
+//   3. Бесшумно возвращаем громкость в 1.0, чтобы resume звучал нормально
 
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
@@ -136,16 +139,50 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     if (mounted) state = state.copyWith(isLoading: false);
   }
 
+  // ── Плавное изменение громкости ───────────────────────────────────────────
+  //
+  // Используется для Fade Out перед паузой.
+  //   from      — начальная громкость (обычно 1.0)
+  //   to        — конечная громкость  (обычно 0.0)
+  //   steps     — количество шагов   (по умолчанию 10)
+  //   intervalMs — интервал между шагами в мс (по умолчанию 30)
+  //
+  // Итого при дефолтных значениях: 10 × 30 мс = 300 мс затухания.
+  Future<void> _fadeVolume({
+    required double from,
+    required double to,
+    int steps      = 10,
+    int intervalMs = 30,
+  }) async {
+    for (int i = 1; i <= steps; i++) {
+      final vol = (from + (to - from) * i / steps).clamp(0.0, 1.0);
+      await _player.setVolume(vol);
+      await Future.delayed(Duration(milliseconds: intervalMs));
+    }
+  }
+
+  // ── Управление воспроизведением ───────────────────────────────────────────
+
   Future<void> playPause() async {
     if (_player.playing) {
-      await _handler.pause();
+      await pause();
     } else {
       await _handler.play();
     }
   }
 
-  Future<void> play()  async => _handler.play();
-  Future<void> pause() async => _handler.pause();
+  Future<void> play() async => _handler.play();
+
+  /// Плавная пауза с Fade Out:
+  ///   1. Снижаем громкость 1.0 → 0.0 за 300 мс
+  ///   2. Останавливаем воспроизведение
+  ///   3. Возвращаем громкость в 1.0 — при следующем play() звук не «хлопнет»
+  Future<void> pause() async {
+    await _fadeVolume(from: 1.0, to: 0.0);
+    await _handler.pause();
+    // Восстанавливаем громкость без звука — трек уже на паузе
+    await _player.setVolume(1.0);
+  }
 
   Future<void> next() async {
     if (state.hasNext) await _handler.skipToNext();

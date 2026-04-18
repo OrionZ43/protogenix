@@ -11,6 +11,14 @@
 //   NavigationRail слева + контент справа
 //   MiniPlayer встроен в нижнюю часть Rail
 //   Тап мини-плеера → ExpandedPlayerScreen через Navigator.push (НЕ modal)
+//
+// ── Исправленные баги ──────────────────────────────────────────────────────
+//   Bug 2: Убрана дублирующая кнопка «вниз» из _FullPlayerSheet.
+//          Теперь _TopBar в PlayerScreen единолично отвечает за закрытие.
+//   Bug 3: useSafeArea: true — контент не заползает под статус-бар.
+//   Bug 4: _CompactShell стал StatefulWidget и следит за шириной экрана.
+//          При складывании/раскладывании в планшетный режим открытый
+//          модальный плеер принудительно закрывается.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,22 +70,54 @@ class AppShell extends ConsumerWidget {
 // COMPACT — телефон
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CompactShell extends ConsumerWidget {
+/// Bug 4 fix: StatefulWidget вместо StatelessWidget.
+/// didChangeDependencies() отслеживает ширину экрана.
+/// При переходе compact→expanded принудительно закрывает модальный плеер.
+class _CompactShell extends ConsumerStatefulWidget {
   const _CompactShell();
 
-  /// Компактный плеер открывается как fullscreen modal снизу.
+  @override
+  ConsumerState<_CompactShell> createState() => _CompactShellState();
+}
+
+class _CompactShellState extends ConsumerState<_CompactShell> {
+  // Ширина экрана на прошлом вызове didChangeDependencies
+  double _prevWidth = 0.0;
+
+  /// Bug 3 fix: useSafeArea: true — BottomSheet не заползает под статус-бар.
+  /// Bug 2 fix: _FullPlayerSheet больше не добавляет Positioned-кнопку «вниз»,
+  ///            т.к. PlayerScreen._TopBar теперь сам обрабатывает навигацию.
   void _openPlayer(BuildContext context) {
     showModalBottomSheet(
       context:            context,
       isScrollControlled: true,
       backgroundColor:    Colors.transparent,
-      useSafeArea:        false,
-      builder: (_) => const _FullPlayerSheet(),
+      useSafeArea:        true,   // ← Bug 3: было false
+      builder:            (_) => const _FullPlayerSheet(),
     );
   }
 
+  /// Bug 4 fix: при разложении телефона в планшетный режим (compact→expanded)
+  /// закрываем открытый модальный плеер через addPostFrameCallback.
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final width = MediaQuery.sizeOf(context).width;
+    if (_prevWidth > 0 &&
+        _prevWidth < kFoldBreakpoint &&
+        width >= kFoldBreakpoint) {
+      // Экран пересёк порог — закрываем модалку в следующем кадре
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
+    }
+    _prevWidth = width;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final tabIndex = ref.watch(_tabIndexProvider);
     final hasTrack = ref.watch(
       playerProvider.select((s) => s.currentTrack != null),
@@ -320,8 +360,8 @@ class _RailIcon extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final _TabItem tab;
-  final bool     selected;
+  final _TabItem     tab;
+  final bool         selected;
   final VoidCallback onTap;
 
   @override
@@ -357,41 +397,17 @@ class _RailIcon extends StatelessWidget {
 // FULL PLAYER SHEET — только для compact, 100% высоты modal
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Bug 2 fix: убрана дублирующая кнопка «вниз» из Stack.
+/// PlayerScreen теперь сам содержит кнопку закрытия в _TopBar.
+/// Это устраняет наложение кнопок друг на друга на складных экранах.
 class _FullPlayerSheet extends StatelessWidget {
   const _FullPlayerSheet();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height,
-      child: Stack(
-        children: [
-          const PlayerScreen(),
-
-          // Кнопка "вниз"
-          Positioned(
-            top:  MediaQuery.of(context).padding.top + 8,
-            left: 16,
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                width:  36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withAlpha(18),
-                ),
-                child: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: Colors.white70,
-                  size:  24,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    // Просто возвращаем PlayerScreen — без дополнительных Positioned-слоёв.
+    // SafeArea внутри PlayerScreen корректно обрабатывает отступы.
+    return const PlayerScreen();
   }
 }
 

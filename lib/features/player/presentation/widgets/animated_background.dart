@@ -5,6 +5,14 @@
 //   • Скорость орбиты и размер блобов постоянны
 //   • Vignette статична, нет никаких пульсаций от звука
 //   • Убраны: visualizer, bass, highs, beatDrop, spring-реакции
+//
+// ── Bug 1 fix ──────────────────────────────────────────────────────────────
+//   БЫЛО:   _onTick → setState(() {}) → пересобирает ВЕСЬ стек включая
+//           widget.child (интерфейс плеера) — 60 fps jank.
+//   СТАЛО:  _onTick → _blobTick.value++ (ValueNotifier) → пересобирает
+//           ТОЛЬКО Positioned.fill(ListenableBuilder → CustomPaint).
+//           widget.child НЕ входит в поддерево AnimatedBuilder и потому
+//           не пересобирается от тиков фона вообще.
 
 import 'dart:math' as math;
 
@@ -38,6 +46,10 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
 
   late final List<_BlobState> _blobs;
 
+  /// Bug 1 fix: уведомляем ТОЛЬКО слой блобов, а не весь виджет.
+  /// Инкремент целого числа дешевле, чем создание нового объекта-состояния.
+  final _blobTick = ValueNotifier<int>(0);
+
   @override
   void initState() {
     super.initState();
@@ -52,11 +64,11 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
       return _BlobState(
         initialAngle: angleBase + rng.nextDouble() * 0.5,
         orbitRadius:  0.25 + rng.nextDouble() * 0.20,
-        speed:        0.06 + rng.nextDouble() * 0.04, // медленнее
+        speed:        0.06 + rng.nextDouble() * 0.04,
         sizeRatio:    0.55 + rng.nextDouble() * 0.35,
         phaseOffset:  rng.nextDouble() * math.pi * 2,
-        breathPeriod: 3.0 + rng.nextDouble() * 4.0,   // период «дыхания» 3–7 с
-        breathAmp:    0.04 + rng.nextDouble() * 0.06,  // амплитуда дыхания ±4–10%
+        breathPeriod: 3.0 + rng.nextDouble() * 4.0,
+        breathAmp:    0.04 + rng.nextDouble() * 0.06,
       );
     });
   }
@@ -64,6 +76,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
   @override
   void dispose() {
     _ticker.dispose();
+    _blobTick.dispose();
     super.dispose();
   }
 
@@ -77,7 +90,10 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
       blob.tick(dt, _time);
     }
 
-    if (mounted) setState(() {});
+    // Bug 1 fix: НЕ вызываем setState(). Только дёргаем нотификатор блобов.
+    // build() на _AnimatedBackgroundState теперь вызывается ТОЛЬКО при смене
+    // цветов палитры (т.е. при загрузке нового трека), а не 60 fps.
+    if (mounted) _blobTick.value++;
   }
 
   Color get _baseBg =>
@@ -92,24 +108,34 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
+    // ── Bug 1 fix ────────────────────────────────────────────────────────────
+    // build() вызывается только при смене цветов (widget.primaryColor и др.).
+    // widget.child (весь UI плеера) находится СНАРУЖИ ListenableBuilder
+    // и НЕ пересобирается при тиках анимации блобов.
     return ColoredBox(
       color: _baseBg,
       child: Stack(
         children: [
-          // Blobs
-          RepaintBoundary(
-            child: CustomPaint(
-              size: size,
-              painter: _BlobPainter(
-                blobs:  _blobs,
-                colors: _blobColors,
+          // ── Блобы: перерисовываются только здесь, 60 fps ──────────────────
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: ListenableBuilder(
+                listenable: _blobTick,
+                builder: (ctx, _) {
+                  final size = MediaQuery.sizeOf(ctx);
+                  return CustomPaint(
+                    size: size,
+                    painter: _BlobPainter(
+                      blobs:  _blobs,
+                      colors: _blobColors,
+                    ),
+                  );
+                },
               ),
             ),
           ),
 
-          // Статичная vignette
+          // ── Статичная vignette — никогда не пересобирается от тиков ───────
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -125,6 +151,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
             ),
           ),
 
+          // ── Дочерний UI — НЕ ТРОГАЕТСЯ при анимации блобов ────────────────
           widget.child,
         ],
       ),
@@ -150,20 +177,18 @@ class _BlobState {
   final double speed;
   final double sizeRatio;
   final double phaseOffset;
-  final double breathPeriod; // период автономного «дыхания»
-  final double breathAmp;    // амплитуда дыхания
+  final double breathPeriod;
+  final double breathAmp;
 
   double nx    = 0.5;
   double ny    = 0.5;
   double scale = 1.0;
 
   void tick(double dt, double t) {
-    // Медленная орбита — скорость постоянна
     final angle = initialAngle + (t + phaseOffset) * speed;
     nx = 0.5 + math.cos(angle) * orbitRadius;
     ny = 0.5 + math.sin(angle * 0.7 + phaseOffset) * orbitRadius;
 
-    // Автономное «дыхание» — синусоида без привязки к аудио
     scale = 1.0 + math.sin(t * (math.pi * 2 / breathPeriod) + phaseOffset)
         * breathAmp;
   }

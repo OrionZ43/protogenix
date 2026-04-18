@@ -17,6 +17,15 @@
 // ║  _EmphasizedSyllable: каждая буква получает свой слот времени,          ║
 // ║  собственные пружины и ту же машину состояний → stagger-прыжок.         ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
+//
+// CHANGELOG v3.1:
+//   FIX   Убран Wrap(spacing) + вложенные Row-по-словам. Вместо этого
+//         используется плоский Wrap по allSyllables. Последний слог каждого
+//         слова (!syl.isPartOfWord) получает Padding(right: 10) — это
+//         сохраняет идеальный baseline и убирает визуальный мусор.
+//   FEAT  Interactive Lyrics Seeking: при _userScrolling текст разблюривается,
+//         каждая строка оборачивается в GestureDetector — тап перематывает
+//         воспроизведение к этой строке.
 
 import 'dart:math' as math;
 import 'dart:ui';
@@ -193,18 +202,24 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
               itemBuilder: (context, index) {
                 final isCurrent  = index == activeIndex;
                 final distance   = (index - activeIndex).abs();
-                final blurAmount = isCurrent
+
+                // FEAT Interactive Seeking: снимаем блюр со всех строк,
+                // пока пользователь скроллит — текст становится читаемым.
+                final blurAmount = _userScrolling
                     ? 0.0
-                    : (distance / _kDistanceToMaxBlur).clamp(0.0, 1.0) *
-                    _kBlurScale * 8.0;
+                    : isCurrent
+                        ? 0.0
+                        : (distance / _kDistanceToMaxBlur).clamp(0.0, 1.0) *
+                            _kBlurScale * 8.0;
 
                 return _LineItem(
-                  key:        ValueKey('line_$index'),
-                  line:       karaoke.lines[index],
-                  isCurrent:  isCurrent,
-                  distance:   distance,
-                  blurAmount: blurAmount,
-                  palette:    palette,
+                  key:           ValueKey('line_$index'),
+                  line:          karaoke.lines[index],
+                  isCurrent:     isCurrent,
+                  distance:      distance,
+                  blurAmount:    blurAmount,
+                  palette:       palette,
+                  userScrolling: _userScrolling,
                 );
               },
             ),
@@ -278,6 +293,7 @@ class _LineItem extends ConsumerWidget {
     required this.distance,
     required this.blurAmount,
     required this.palette,
+    required this.userScrolling,
   });
 
   final LyricLine    line;
@@ -285,6 +301,7 @@ class _LineItem extends ConsumerWidget {
   final int          distance;
   final double       blurAmount;
   final PaletteState palette;
+  final bool         userScrolling;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -317,11 +334,26 @@ class _LineItem extends ConsumerWidget {
       );
     }
 
+    // FEAT Interactive Seeking: когда пользователь скроллит, строки
+    // становятся кликабельными — тап перематывает трек к этой строке.
+    if (userScrolling) {
+      content = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => ref.read(playerProvider.notifier).seekTo(
+          Duration(milliseconds: line.startMs),
+        ),
+        child: content,
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.only(bottom: isCurrent ? 32 : 20),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 400),
-        opacity:  isCurrent     ? 1.0
+        // При пользовательском скролле все строки становятся более заметными
+        opacity: userScrolling
+            ? (isCurrent ? 1.0 : 0.65)
+            : isCurrent     ? 1.0
             : distance == 1 ? 0.48
             : distance == 2 ? 0.28
             : 0.14,
@@ -453,36 +485,46 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
 
   @override
   Widget build(BuildContext context) {
-    // Wrap → Row → _LetterWidget / _EmphasizedSyllable
+    // FIX: Плоский Wrap по allSyllables вместо Wrap(spacing) + Row-по-словам.
+    // Расстояние между словами задаётся через Padding(right: 10) на последнем
+    // слоге каждого слова (!syl.isPartOfWord). Это сохраняет идеальный baseline
+    // шрифта и убирает визуальный мусор, который давал SizedBox/Wrap.spacing.
     return Wrap(
-      spacing:    6,
       runSpacing: 8,
-      children: widget.line.words.map((word) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: word.syllables.map((syl) {
-            // Emphasized: длинный слог (≥800ms) с несколькими символами
-            if (syl.isEmphasized) {
-              return _EmphasizedSyllable(
-                key:       ValueKey('emph_${syl.startMs}'),
-                syllable:  syl,
-                currentMs: widget.currentMs,
-                palette:   widget.palette,
-              );
-            }
+      children: _allSyls.map((syl) {
+        Widget child;
 
-            final vals = _vals[syl] ??
-                (scale: _kWaitingScale, yOffset: _kWaitingYOffset, glow: _kWaitingGlow);
+        // Emphasized: длинный слог (≥800ms) с несколькими символами
+        if (syl.isEmphasized) {
+          child = _EmphasizedSyllable(
+            key:       ValueKey('emph_${syl.startMs}'),
+            syllable:  syl,
+            currentMs: widget.currentMs,
+            palette:   widget.palette,
+          );
+        } else {
+          final vals = _vals[syl] ??
+              (scale: _kWaitingScale, yOffset: _kWaitingYOffset, glow: _kWaitingGlow);
 
-            return _LetterWidget(
-              text:    syl.text,
-              scale:   vals.scale,
-              yOffset: vals.yOffset,
-              glow:    vals.glow,
-              palette: widget.palette,
-            );
-          }).toList(),
-        );
+          child = _LetterWidget(
+            text:    syl.text,
+            scale:   vals.scale,
+            yOffset: vals.yOffset,
+            glow:    vals.glow,
+            palette: widget.palette,
+          );
+        }
+
+        // Конец слова: добавляем правый отступ вместо SizedBox/Wrap.spacing.
+        // !isPartOfWord == последний слог в слове (см. _groupSyllablesIntoWords).
+        if (!syl.isPartOfWord) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 10.0),
+            child: child,
+          );
+        }
+
+        return child;
       }).toList(),
     );
   }
