@@ -56,10 +56,32 @@ class LibraryDatabase {
     );
   }
 
+  /// Обновляет только путь к .lrc файлу — без перезаписи всего трека.
+  Future<void> updateLrcPath(String id, String lrcPath) async {
+    final database = await db;
+    await database.update(
+      'tracks',
+      {'lrcPath': lrcPath},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<List<LibraryTrack>> getAllTracks() async {
     final database = await db;
     final maps = await database.query('tracks', orderBy: 'addedAt DESC');
     return maps.map(LibraryTrack.fromMap).toList();
+  }
+
+  Future<LibraryTrack?> getTrackById(String id) async {
+    final database = await db;
+    final maps = await database.query(
+      'tracks',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return maps.isEmpty ? null : LibraryTrack.fromMap(maps.first);
   }
 
   Future<void> deleteTrack(String id) async {

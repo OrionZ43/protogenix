@@ -1,10 +1,8 @@
 // lib/features/player/presentation/widgets/music_visualizer_controls.dart
 //
-// MusicVisualizerControls v4 — чистый UI без привязки к аудио.
-//   • _FullLayout:    обложка + контролы вертикально центрированы
-//   • _CompactLayout: капсульные кнопки внизу через [onAddTrack] / [onChangeLyrics]
-//   • Обложка и кнопки статичны — без скейла от bass/beatDrop
-//   • Убраны: VisualizerEngine, VisualizerSnapshot, bass, highs, beatDrop, Ticker-реакции
+// MusicVisualizerControls v5 — добавлена кнопка «Избранное» (сердечко).
+//   • showFavorite: true → сердечко слева от названия трека
+//   • Реактивно через isFavoriteProvider — мгновенный отклик без перезагрузки
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +11,7 @@ import '../../domain/track_model.dart';
 import '../../domain/player_state.dart' as ps;
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
+import '../../../library/presentation/playlist_provider.dart';
 import 'waveform_progress_bar.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -23,11 +22,14 @@ class MusicVisualizerControls extends ConsumerWidget {
   const MusicVisualizerControls({
     super.key,
     this.compact        = false,
+    this.showFavorite   = false,
     this.onAddTrack,
     this.onChangeLyrics,
   });
 
   final bool          compact;
+  /// Показывать ли кнопку «Избранное» рядом с названием трека
+  final bool          showFavorite;
   final VoidCallback? onAddTrack;
   final VoidCallback? onChangeLyrics;
 
@@ -46,16 +48,18 @@ class MusicVisualizerControls extends ConsumerWidget {
         player:         player,
         notifier:       notifier,
         palette:        palette,
+        showFavorite:   showFavorite,
         onAddTrack:     onAddTrack,
         onChangeLyrics: onChangeLyrics,
       );
     }
 
     return _FullLayout(
-      track:    track,
-      player:   player,
-      notifier: notifier,
-      palette:  palette,
+      track:        track,
+      player:       player,
+      notifier:     notifier,
+      palette:      palette,
+      showFavorite: showFavorite,
     );
   }
 }
@@ -70,12 +74,14 @@ class _FullLayout extends StatelessWidget {
     required this.player,
     required this.notifier,
     required this.palette,
+    required this.showFavorite,
   });
 
   final TrackModel               track;
   final ps.ProtogenixPlayerState player;
   final PlayerNotifier           notifier;
   final PaletteState             palette;
+  final bool                     showFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +92,7 @@ class _FullLayout extends StatelessWidget {
         children: [
           _CoverArt(track: track),
           const SizedBox(height: 28),
-          _TrackInfo(track: track, palette: palette),
+          _TrackInfo(track: track, palette: palette, showFavorite: showFavorite),
           const SizedBox(height: 20),
           LiveWaveformProgressBar(
             progress:    player.progress,
@@ -113,6 +119,7 @@ class _CompactLayout extends StatelessWidget {
     required this.player,
     required this.notifier,
     required this.palette,
+    required this.showFavorite,
     this.onAddTrack,
     this.onChangeLyrics,
   });
@@ -121,6 +128,7 @@ class _CompactLayout extends StatelessWidget {
   final ps.ProtogenixPlayerState player;
   final PlayerNotifier           notifier;
   final PaletteState             palette;
+  final bool                     showFavorite;
   final VoidCallback?            onAddTrack;
   final VoidCallback?            onChangeLyrics;
 
@@ -138,7 +146,12 @@ class _CompactLayout extends StatelessWidget {
               children: [
                 _CoverArt(track: track, size: 200),
                 const SizedBox(height: 16),
-                _TrackInfo(track: track, palette: palette, compact: true),
+                _TrackInfo(
+                  track:        track,
+                  palette:      palette,
+                  compact:      true,
+                  showFavorite: showFavorite,
+                ),
                 const SizedBox(height: 16),
                 LiveWaveformProgressBar(
                   progress:    player.progress,
@@ -220,7 +233,7 @@ class _CapsuleButton extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COVER ART — статичная, без реакции на bass
+// COVER ART
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _CoverArt extends StatelessWidget {
@@ -264,49 +277,100 @@ class _CoverArt extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TRACK INFO
+// TRACK INFO  — ConsumerWidget, чтобы напрямую читать favoritesProvider
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _TrackInfo extends StatelessWidget {
+class _TrackInfo extends ConsumerWidget {
   const _TrackInfo({
     required this.track,
     required this.palette,
-    this.compact = false,
+    this.compact      = false,
+    this.showFavorite = false,
   });
-  final TrackModel track;
+  final TrackModel   track;
   final PaletteState palette;
-  final bool compact;
+  final bool         compact;
+  final bool         showFavorite;
 
   @override
-  Widget build(BuildContext context) => Column(children: [
-    Text(
-      track.title,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        color:       Colors.white,
-        fontSize:    compact ? 18 : 22,
-        fontWeight:  FontWeight.w700,
-        letterSpacing: -0.3,
-      ),
-    ),
-    const SizedBox(height: 4),
-    Text(
-      track.artist,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        color:    Colors.white60,
-        fontSize: compact ? 13 : 15,
-      ),
-    ),
-  ]);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isFav = showFavorite
+        ? ref.watch(isFavoriteProvider(track.id))
+        : false;
+
+    final titleStyle = TextStyle(
+      color:         Colors.white,
+      fontSize:      compact ? 18 : 22,
+      fontWeight:    FontWeight.w700,
+      letterSpacing: -0.3,
+    );
+    final artistStyle = TextStyle(
+      color:    Colors.white60,
+      fontSize: compact ? 13 : 15,
+    );
+
+    return Row(
+      children: [
+        // Сердечко слева (занимает 40px → текст остаётся по центру)
+        if (showFavorite)
+          SizedBox(
+            width: 40,
+            child: GestureDetector(
+              onTap: () =>
+                  ref.read(favoritesProvider.notifier).toggle(track.id),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, anim) => ScaleTransition(
+                  scale: anim,
+                  child: child,
+                ),
+                child: Icon(
+                  isFav
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_outline_rounded,
+                  key:   ValueKey(isFav),
+                  color: isFav ? Colors.redAccent : Colors.white38,
+                  size:  22,
+                ),
+              ),
+            ),
+          )
+        else
+          const SizedBox(width: 40),
+
+        // Название + артист — центрированы
+        Expanded(
+          child: Column(
+            children: [
+              Text(
+                track.title,
+                maxLines:  1,
+                overflow:  TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style:     titleStyle,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                track.artist,
+                maxLines:  1,
+                overflow:  TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style:     artistStyle,
+              ),
+            ],
+          ),
+        ),
+
+        // Правый балансировочный спейсер (40px)
+        const SizedBox(width: 40),
+      ],
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONTROLS ROW — статичные кнопки, без Ticker и реакции на аудио
+// CONTROLS ROW
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _Controls extends StatelessWidget {
@@ -344,7 +408,6 @@ class _Controls extends StatelessWidget {
         ),
         const SizedBox(width: 16),
 
-        // Play/Pause — фиксированный размер, без scale от bass
         GestureDetector(
           onTap: notifier.playPause,
           child: Container(

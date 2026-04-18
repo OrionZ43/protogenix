@@ -1,13 +1,15 @@
 // lib/features/player/presentation/screens/player_screen.dart
-// v4 — капсульные кнопки в _BottomRow, unused imports removed
+// Компактный плеер (телефон / узкий режим)
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/track_model.dart';
 import '../providers/player_provider.dart';
+import '../providers/karaoke_provider.dart';
 import '../widgets/protogenix_background.dart';
 import '../widgets/music_visualizer_controls.dart';
+import '../widgets/lyrics_search_sheet.dart';
 import '../../../importer/presentation/importer_sheet.dart';
 
 class PlayerScreen extends ConsumerWidget {
@@ -21,17 +23,22 @@ class PlayerScreen extends ConsumerWidget {
       return const _EmptyLibraryScreen();
     }
 
+    final track = player.currentTrack as TrackModel?;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: ProtogenixBackground(
         child: SafeArea(
           child: Column(
             children: [
-              _TopBar(track: player.currentTrack as TrackModel?),
-              const Expanded(
-                child: MusicVisualizerControls(compact: false),
+              _TopBar(track: track),
+              Expanded(
+                child: MusicVisualizerControls(
+                  compact:      false,
+                  showFavorite: true,   // ← сердечко рядом с названием
+                ),
               ),
-              const _BottomRow(),
+              _BottomRow(track: track),
               const SizedBox(height: 8),
             ],
           ),
@@ -71,10 +78,11 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// ── Bottom Row ────────────────────────────────────────────────────────────────
+// ── Bottom Row — кнопки «Добавить трек» и «Текст» ────────────────────────────
 
 class _BottomRow extends ConsumerWidget {
-  const _BottomRow();
+  const _BottomRow({required this.track});
+  final TrackModel? track;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -89,9 +97,12 @@ class _BottomRow extends ConsumerWidget {
             onTap: () => showImporterSheet(context),
           ),
           _CapsuleBtn(
-            icon:  Icons.lyrics_outlined,
+            icon:  Icons.manage_search_rounded,
             label: 'Текст',
-            onTap: () {},
+            // Открывает ручной поиск текста (ранее был пустой () {})
+            onTap: track != null
+                ? () => showLyricsSearchSheet(context, ref, track!)
+                : null,
           ),
         ],
       ),
@@ -100,26 +111,35 @@ class _BottomRow extends ConsumerWidget {
 }
 
 class _CapsuleBtn extends StatelessWidget {
-  const _CapsuleBtn({required this.icon, required this.label, required this.onTap});
-  final IconData icon; final String label; final VoidCallback onTap;
+  const _CapsuleBtn({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData     icon;
+  final String       label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color:  Colors.white.withAlpha(12),
-        border: Border.all(color: Colors.white.withAlpha(25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white60, size: 15),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
-        ],
+    child: Opacity(
+      opacity: onTap != null ? 1.0 : 0.4,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color:  Colors.white.withAlpha(12),
+          border: Border.all(color: Colors.white.withAlpha(25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white60, size: 15),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+          ],
+        ),
       ),
     ),
   );
@@ -140,7 +160,8 @@ class _EmptyLibraryScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.library_music_rounded, size: 80, color: Colors.white24),
+                const Icon(Icons.library_music_rounded,
+                    size: 80, color: Colors.white24),
                 const SizedBox(height: 24),
                 const Text('Библиотека пуста',
                     style: TextStyle(color: Colors.white70, fontSize: 22,
@@ -152,7 +173,8 @@ class _EmptyLibraryScreen extends ConsumerWidget {
                 GestureDetector(
                   onTap: () => showImporterSheet(context),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 28, vertical: 14),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       color:  Colors.white.withAlpha(20),
@@ -164,7 +186,8 @@ class _EmptyLibraryScreen extends ConsumerWidget {
                         Icon(Icons.add_rounded, color: Colors.white70),
                         SizedBox(width: 8),
                         Text('Добавить трек',
-                            style: TextStyle(color: Colors.white70, fontSize: 16)),
+                            style: TextStyle(
+                                color: Colors.white70, fontSize: 16)),
                       ],
                     ),
                   ),

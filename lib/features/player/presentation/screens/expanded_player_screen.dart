@@ -6,11 +6,8 @@
 //   [← кнопка назад]
 //   ┌─────────────── 42% ─────────────────┬──────────── 58% ──────────────┐
 //   │  MusicVisualizerControls            │  BeautifulLyricsView          │
-//   │  (обложка + кнопки + волна)         │  (текст песни / karaoke)      │
+//   │  (обложка + сердечко + кнопки)      │  (текст / karaoke)            │
 //   └─────────────────────────────────────┴───────────────────────────────┘
-//
-// Открывается через Navigator.push — занимает всю ширину экрана,
-// без чёрных полей по бокам (в отличие от showModalBottomSheet).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,24 +42,24 @@ class ExpandedPlayerScreen extends ConsumerWidget {
               // ── Топ-бар с кнопкой "назад" ─────────────────────────────────
               _TopBar(track: track),
 
-              // ── Основной контент: левая + правая панели ───────────────────
+              // ── Основной контент ──────────────────────────────────────────
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Левая колонка — плеер (42%)
+                    // Левая колонка — плеер (42%), сердечко включено
                     Expanded(
                       flex: 42,
                       child: MusicVisualizerControls(
-                        compact:    true,
-                        onAddTrack: () => showImporterSheet(context),
+                        compact:      true,
+                        showFavorite: true,    // ← сердечко рядом с названием
+                        onAddTrack:   () => showImporterSheet(context),
                         onChangeLyrics: track != null
                             ? () => showLyricsSearchSheet(context, ref, track)
                             : null,
                       ),
                     ),
 
-                    // Разделитель
                     VerticalDivider(
                       color:     Colors.white.withAlpha(18),
                       width:     1,
@@ -132,7 +129,7 @@ class _TopBar extends StatelessWidget {
             ),
           ),
 
-          // Метка трека справа (если есть текущий трек)
+          // Название трека справа
           if (track != null)
             Positioned(
               right: 16,

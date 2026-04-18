@@ -1,8 +1,11 @@
 // lib/features/player/presentation/widgets/lyrics_search_sheet.dart
 //
-// Ручной поиск текста (фикс #5).
-// Пользователь вводит название и артиста — получает список вариантов —
-// выбирает нужный — текст применяется к текущему треку.
+// Ручной поиск текста.
+// После выбора результата:
+//   1. Применяет текст к karaokeProvider (мгновенно)
+//   2. Сохраняет .lrc файл через LyricsService.saveLrc()
+//   3. Обновляет lrcPath в LibraryDatabase через libraryProvider.updateLrcPath()
+//      → при следующем запуске поиск не запускается заново
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +15,7 @@ import '../providers/karaoke_provider.dart';
 import '../../../../features/library/data/lyrics_service.dart';
 import '../../../../features/library/domain/lyrics_models.dart';
 import '../../../../features/player/domain/advanced_lrc_parser.dart';
+import '../../../../features/library/presentation/library_provider.dart';
 
 /// Открыть шторку ручного поиска текста
 void showLyricsSearchSheet(
@@ -20,9 +24,9 @@ void showLyricsSearchSheet(
     TrackModel track,
     ) {
   showModalBottomSheet(
-    context:             context,
-    isScrollControlled:  true,
-    backgroundColor:     Colors.transparent,
+    context:            context,
+    isScrollControlled: true,
+    backgroundColor:    Colors.transparent,
     builder: (_) => UncontrolledProviderScope(
       container: ProviderScope.containerOf(context),
       child: LyricsSearchSheet(track: track),
@@ -83,7 +87,9 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
         setState(() {
           _results     = results;
           _isSearching = false;
-          if (results.isEmpty) _error = 'Ничего не найдено. Попробуй другой запрос.';
+          if (results.isEmpty) {
+            _error = 'Ничего не найдено. Попробуй другой запрос.';
+          }
         });
       }
     } catch (e) {
@@ -99,11 +105,23 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
   void _apply(ScoredLyric scored) {
     final parsed = AdvancedLrcParser.parse(scored.metadata.content);
 
-    // Сбрасываем кэш для текущего трека и загружаем новый текст
+    // 1. Мгновенно применяем к karaoke (UI обновляется сразу)
     ref.read(karaokeProvider.notifier).invalidateCache(widget.track.id);
     ref.read(karaokeProvider.notifier).setLyrics(parsed);
 
+    // 2. Захватываем нотифаер ДО pop, чтобы не потерять ref после unmount
+    final trackId        = widget.track.id;
+    final content        = scored.metadata.content;
+    final libraryNotifier = ref.read(libraryProvider.notifier);
+
     Navigator.of(context).pop();
+
+    // 3. Сохраняем .lrc файл и обновляем БД (fire-and-forget, UI не блокируется)
+    LyricsService.instance.saveLrc(content, trackId).then((lrcPath) {
+      libraryNotifier.updateLrcPath(trackId, lrcPath);
+    }).catchError((e) {
+      debugPrint('[LyricsSearch] Не удалось сохранить .lrc: $e');
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -129,7 +147,6 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
       ),
       child: Column(
         children: [
-          // Ручка
           Container(
             margin: const EdgeInsets.only(top: 12),
             width: 40, height: 4,
@@ -157,7 +174,10 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
                 const SizedBox(height: 4),
                 Text(
                   'Введи название и артиста, чтобы найти нужный текст',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                  style: TextStyle(
+                    color:    Colors.white.withValues(alpha: 0.5),
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -165,27 +185,25 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
 
           const SizedBox(height: 20),
 
-          // Поля ввода
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
                 _SearchField(
-                  controller: _titleCtrl,
-                  hint:       'Название песни',
-                  icon:       Icons.music_note_rounded,
+                  controller:  _titleCtrl,
+                  hint:        'Название песни',
+                  icon:        Icons.music_note_rounded,
                   onSubmitted: (_) => _search(),
                 ),
                 const SizedBox(height: 10),
                 _SearchField(
-                  controller: _artistCtrl,
-                  hint:       'Артист',
-                  icon:       Icons.person_rounded,
+                  controller:  _artistCtrl,
+                  hint:        'Артист',
+                  icon:        Icons.person_rounded,
                   onSubmitted: (_) => _search(),
                 ),
                 const SizedBox(height: 14),
 
-                // Кнопка поиска
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -216,7 +234,6 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
 
           const SizedBox(height: 8),
 
-          // Результаты
           Expanded(
             child: _error != null
                 ? Center(
@@ -236,8 +253,8 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
               itemBuilder: (context, i) {
                 final scored = _results[i];
                 return _LyricResultTile(
-                  scored:  scored,
-                  onTap:   () => _apply(scored),
+                  scored: scored,
+                  onTap:  () => _apply(scored),
                 ).animate().fadeIn(
                   duration: 200.ms,
                   delay:    (i * 40).ms,
@@ -281,10 +298,10 @@ class _SearchField extends StatelessWidget {
         onSubmitted: onSubmitted,
         style: const TextStyle(color: Colors.white, fontSize: 15),
         decoration: InputDecoration(
-          hintText:     hint,
-          hintStyle:    TextStyle(color: Colors.white.withAlpha(50)),
-          prefixIcon:   Icon(icon, color: Colors.white38, size: 20),
-          border:       InputBorder.none,
+          hintText:  hint,
+          hintStyle: TextStyle(color: Colors.white.withAlpha(50)),
+          prefixIcon: Icon(icon, color: Colors.white38, size: 20),
+          border:     InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16, vertical: 14,
           ),
@@ -321,7 +338,7 @@ class _LyricResultTile extends StatelessWidget {
     };
 
     return ListTile(
-      onTap: onTap,
+      onTap:          onTap,
       contentPadding: EdgeInsets.zero,
       title: Text(
         meta.trackName,
@@ -349,12 +366,14 @@ class _LyricResultTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(6),
-              color: typeColor.withAlpha(30),
+              color:  typeColor.withAlpha(30),
               border: Border.all(color: typeColor.withAlpha(80)),
             ),
             child: Text(
               typeLabel,
-              style: TextStyle(color: typeColor, fontSize: 11, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: typeColor, fontSize: 11, fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -363,7 +382,11 @@ class _LyricResultTile extends StatelessWidget {
             style: const TextStyle(color: Colors.white38, fontSize: 12),
           ),
           const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 20),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.white24,
+            size:  20,
+          ),
         ],
       ),
     );
