@@ -1,9 +1,16 @@
 // lib/features/player/presentation/screens/expanded_player_screen.dart
 //
-// ExpandedPlayerScreen v3:
-//   • Левая колонка центрирована (Expanded + mainAxisAlignment.center внутри)
-//   • Кнопки «Добавить трек» / «Другой текст» — капсулы ВНИЗУ левой панели
-//   • Тот же визуализатор баса что на PlayerScreen (DRY через MusicVisualizerControls)
+// Полноэкранный плеер для Fold / планшета.
+//
+// Макет:
+//   [← кнопка назад]
+//   ┌─────────────── 42% ─────────────────┬──────────── 58% ──────────────┐
+//   │  MusicVisualizerControls            │  BeautifulLyricsView          │
+//   │  (обложка + кнопки + волна)         │  (текст песни / karaoke)      │
+//   └─────────────────────────────────────┴───────────────────────────────┘
+//
+// Открывается через Navigator.push — занимает всю ширину экрана,
+// без чёрных полей по бокам (в отличие от showModalBottomSheet).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,34 +40,113 @@ class ExpandedPlayerScreen extends ConsumerWidget {
       backgroundColor: Colors.black,
       body: ProtogenixBackground(
         child: SafeArea(
-          child: Row(
+          child: Column(
             children: [
-              // ── Левая колонка — плеер (42%) ─────────────────────────────
+              // ── Топ-бар с кнопкой "назад" ─────────────────────────────────
+              _TopBar(track: track),
+
+              // ── Основной контент: левая + правая панели ───────────────────
               Expanded(
-                flex: 42,
-                child: MusicVisualizerControls(
-                  compact:    true,
-                  onAddTrack: () => showImporterSheet(context),
-                  onChangeLyrics: track != null
-                      ? () => showLyricsSearchSheet(context, ref, track)
-                      : null,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Левая колонка — плеер (42%)
+                    Expanded(
+                      flex: 42,
+                      child: MusicVisualizerControls(
+                        compact:    true,
+                        onAddTrack: () => showImporterSheet(context),
+                        onChangeLyrics: track != null
+                            ? () => showLyricsSearchSheet(context, ref, track)
+                            : null,
+                      ),
+                    ),
+
+                    // Разделитель
+                    VerticalDivider(
+                      color:     Colors.white.withAlpha(18),
+                      width:     1,
+                      thickness: 1,
+                    ),
+
+                    // Правая колонка — текст песни (58%)
+                    const Expanded(
+                      flex: 58,
+                      child: BeautifulLyricsView(),
+                    ),
+                  ],
                 ),
-              ),
-
-              VerticalDivider(
-                color: Colors.white.withAlpha(18),
-                width: 1,
-                thickness: 1,
-              ),
-
-              // ── Правая колонка — текст (58%) ─────────────────────────────
-              const Expanded(
-                flex: 58,
-                child: BeautifulLyricsView(),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOP BAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.track});
+  final TrackModel? track;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Кнопка "назад" — слева
+          Positioned(
+            left: 8,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width:  36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withAlpha(15),
+                ),
+                child: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Colors.white70,
+                  size:  24,
+                ),
+              ),
+            ),
+          ),
+
+          // Название приложения по центру
+          const Text(
+            'PROTOGENIX',
+            style: TextStyle(
+              color:         Colors.white38,
+              fontSize:      11,
+              fontWeight:    FontWeight.w600,
+              letterSpacing: 2.5,
+            ),
+          ),
+
+          // Метка трека справа (если есть текущий трек)
+          if (track != null)
+            Positioned(
+              right: 16,
+              child: Text(
+                track!.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color:    Colors.white38,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
