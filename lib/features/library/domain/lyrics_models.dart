@@ -2,10 +2,13 @@
 enum LyricsType {
   /// Послоговая синхронизация (YRC формат NetEase) — наивысший приоритет
   syllable,
+
   /// Пословная синхронизация (Enhanced LRC, теги <mm:ss.xx>) — высокий
   enhanced,
+
   /// Построчная синхронизация (Synced LRC, теги [mm:ss.xx]) — средний
   synced,
+
   /// Обычный текст без таймингов — низший
   plain,
 }
@@ -13,11 +16,11 @@ enum LyricsType {
 extension LyricsTypeExt on LyricsType {
   /// Человекочитаемое название для UI
   String get label => switch (this) {
-    LyricsType.syllable => 'Syllable',
-    LyricsType.enhanced => 'Word-by-Word',
-    LyricsType.synced   => 'Synced',
-    LyricsType.plain    => 'Plain',
-  };
+        LyricsType.syllable => 'Syllable',
+        LyricsType.enhanced => 'Word-by-Word',
+        LyricsType.synced => 'Synced',
+        LyricsType.plain => 'Plain',
+      };
 
   /// Является ли текст синхронизированным (любого уровня)
   bool get isSynced => this != LyricsType.plain;
@@ -25,11 +28,11 @@ extension LyricsTypeExt on LyricsType {
 
 /// Полные метаданные найденного текста песни
 class LyricsMetadata {
-  final String     id;
-  final String     trackName;
-  final String     artistName;
-  final int?       durationMs;
-  final String     content;
+  final String id;
+  final String trackName;
+  final String artistName;
+  final int? durationMs;
+  final String content;
   final LyricsType type;
 
   /// Источник: "lrclib.net", "netease", "local"
@@ -53,7 +56,7 @@ class LyricsMetadata {
 /// Результат с баллом уверенности алгоритма [0.0 … 100.0]
 class ScoredLyric {
   final LyricsMetadata metadata;
-  final double         score;
+  final double score;
 
   const ScoredLyric({required this.metadata, required this.score});
 

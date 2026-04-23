@@ -33,7 +33,8 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
 
   Future<void> rename(String id, String newName) async {
     await PlaylistDatabase.instance.renamePlaylist(id, newName);
-    state = state.map((p) => p.id == id ? p.copyWith(name: newName) : p).toList();
+    state =
+        state.map((p) => p.id == id ? p.copyWith(name: newName) : p).toList();
   }
 
   Future<void> delete(String id) async {
@@ -45,7 +46,7 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
 }
 
 final playlistsProvider =
-StateNotifierProvider<PlaylistsNotifier, List<Playlist>>((ref) {
+    StateNotifierProvider<PlaylistsNotifier, List<Playlist>>((ref) {
   return PlaylistsNotifier();
 });
 
@@ -54,16 +55,18 @@ StateNotifierProvider<PlaylistsNotifier, List<Playlist>>((ref) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Треки конкретного плейлиста (как полные LibraryTrack объекты)
-final playlistTracksProvider = FutureProvider.family<List<LibraryTrack>, String>(
-      (ref, playlistId) async {
-    final ids    = await PlaylistDatabase.instance.getTrackIdsForPlaylist(playlistId);
-    final db     = LibraryDatabase.instance;
+final playlistTracksProvider =
+    FutureProvider.family<List<LibraryTrack>, String>(
+  (ref, playlistId) async {
+    final ids =
+        await PlaylistDatabase.instance.getTrackIdsForPlaylist(playlistId);
+    final db = LibraryDatabase.instance;
     final result = <LibraryTrack>[];
 
     for (final id in ids) {
       // Получаем трек из библиотеки по id
       final tracks = await db.getAllTracks();
-      final match  = tracks.where((t) => t.id == id).toList();
+      final match = tracks.where((t) => t.id == id).toList();
       if (match.isNotEmpty) result.add(match.first);
     }
     return result;
@@ -101,7 +104,7 @@ class FavoritesNotifier extends StateNotifier<Set<String>> {
 }
 
 final favoritesProvider =
-StateNotifierProvider<FavoritesNotifier, Set<String>>((ref) {
+    StateNotifierProvider<FavoritesNotifier, Set<String>>((ref) {
   return FavoritesNotifier();
 });
 

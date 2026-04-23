@@ -52,15 +52,15 @@ class _EmptyState extends StatelessWidget {
           children: [
             const Icon(
               Icons.library_music_rounded,
-              size:  80,
+              size: 80,
               color: Colors.white12,
             ),
             const SizedBox(height: 24),
             const Text(
               'Библиотека пуста',
               style: TextStyle(
-                color:      Colors.white70,
-                fontSize:   22,
+                color: Colors.white70,
+                fontSize: 22,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -90,7 +90,7 @@ class _ImportButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color:  Colors.white.withAlpha(20),
+          color: Colors.white.withAlpha(20),
           border: Border.all(color: Colors.white24),
         ),
         child: const Row(
@@ -132,8 +132,8 @@ class _TrackList extends ConsumerWidget {
                   const Text(
                     'Треки',
                     style: TextStyle(
-                      color:      Colors.white,
-                      fontSize:   26,
+                      color: Colors.white,
+                      fontSize: 26,
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.5,
                     ),
@@ -142,7 +142,7 @@ class _TrackList extends ConsumerWidget {
                   Text(
                     '${tracks.length}',
                     style: const TextStyle(
-                      color:    Colors.white38,
+                      color: Colors.white38,
                       fontSize: 16,
                     ),
                   ),
@@ -155,13 +155,12 @@ class _TrackList extends ConsumerWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white.withAlpha(15),
-                        border:
-                            Border.all(color: Colors.white.withAlpha(30)),
+                        border: Border.all(color: Colors.white.withAlpha(30)),
                       ),
                       child: const Icon(
                         Icons.add_rounded,
                         color: Colors.white70,
-                        size:  20,
+                        size: 20,
                       ),
                     ),
                   ),
@@ -174,8 +173,8 @@ class _TrackList extends ConsumerWidget {
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) => _TrackTile(
-                track:  tracks[index],
-                index:  index,
+                track: tracks[index],
+                index: index,
                 tracks: tracks,
               ),
               childCount: tracks.length,
@@ -201,13 +200,13 @@ class _TrackTile extends ConsumerWidget {
     required this.tracks,
   });
 
-  final LibraryTrack       track;
-  final int                index;
+  final LibraryTrack track;
+  final int index;
   final List<LibraryTrack> tracks;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player    = ref.watch(playerProvider);
+    final player = ref.watch(playerProvider);
     final isPlaying = player.currentTrack?.id == track.id;
 
     return InkWell(
@@ -229,9 +228,7 @@ class _TrackTile extends ConsumerWidget {
                   ),
                 )
               : null,
-          color: isPlaying
-              ? Colors.white.withAlpha(8)
-              : Colors.transparent,
+          color: isPlaying ? Colors.white.withAlpha(8) : Colors.transparent,
         ),
         child: Row(
           children: [
@@ -245,14 +242,14 @@ class _TrackTile extends ConsumerWidget {
                     image: track.coverPath != null
                         ? FileImage(File(track.coverPath!)) as ImageProvider
                         : const AssetImage('assets/images/mock_cover.jpg'),
-                    width:  50,
+                    width: 50,
                     height: 50,
-                    fit:    BoxFit.cover,
+                    fit: BoxFit.cover,
                   ),
                 ),
                 if (isPlaying)
                   Container(
-                    width:  50,
+                    width: 50,
                     height: 50,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
@@ -261,7 +258,7 @@ class _TrackTile extends ConsumerWidget {
                     child: const Icon(
                       Icons.volume_up_rounded,
                       color: Colors.white,
-                      size:  22,
+                      size: 22,
                     ),
                   ),
               ],
@@ -279,10 +276,9 @@ class _TrackTile extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color:      isPlaying ? Colors.white : Colors.white,
-                      fontSize:   15,
-                      fontWeight:
-                          isPlaying ? FontWeight.w600 : FontWeight.w500,
+                      color: isPlaying ? Colors.white : Colors.white,
+                      fontSize: 15,
+                      fontWeight: isPlaying ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -291,7 +287,7 @@ class _TrackTile extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color:    Colors.white54,
+                      color: Colors.white54,
                       fontSize: 12,
                     ),
                   ),
@@ -303,7 +299,7 @@ class _TrackTile extends ConsumerWidget {
             Text(
               _fmtDuration(track.duration),
               style: const TextStyle(
-                color:    Colors.white38,
+                color: Colors.white38,
                 fontSize: 12,
               ),
             ),

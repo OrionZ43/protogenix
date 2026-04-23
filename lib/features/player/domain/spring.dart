@@ -5,17 +5,17 @@
 
 import 'dart:math' as math;
 
-const double _epsilon  = 1e-4;
-const double _tau      = math.pi * 2;
+const double _epsilon = 1e-4;
+const double _tau = math.pi * 2;
 const double _sleepEps = 0.1;
 
 /// Затухающий гармонический осциллятор.
 /// Используется для анимации scale, yOffset, glow каждого слога.
 class LyricSpring {
-  double _velocity     = 0;
+  double _velocity = 0;
   final double _dampingRatio;
   final double _frequency;
-  bool   _sleeping     = true;
+  bool _sleeping = true;
 
   double position;
   double goal;
@@ -24,27 +24,29 @@ class LyricSpring {
     required double initial,
     required double dampingRatio,
     required double frequency,
-  })  : position      = initial,
-        goal          = initial,
+  })  : position = initial,
+        goal = initial,
         _dampingRatio = dampingRatio,
-        _frequency    = frequency {
+        _frequency = frequency {
     assert(dampingRatio * frequency >= 0,
-    'Spring does not converge: dampingRatio=$dampingRatio frequency=$frequency');
+        'Spring does not converge: dampingRatio=$dampingRatio frequency=$frequency');
   }
 
   /// Шаг симуляции на [dt] секунд. Возвращает новую позицию.
   double update(double dt) {
     final radialFreq = _frequency * _tau;
-    final offset     = position - goal;
-    final d          = _dampingRatio;
-    final decay      = math.exp(-d * radialFreq * dt);
+    final offset = position - goal;
+    final d = _dampingRatio;
+    final decay = math.exp(-d * radialFreq * dt);
 
     double newPos, newVel;
 
     if (d == 1.0) {
-      newPos = ((offset * (1 + radialFreq * dt) + _velocity * dt) * decay) + goal;
+      newPos =
+          ((offset * (1 + radialFreq * dt) + _velocity * dt) * decay) + goal;
       newVel = ((_velocity * (1 - radialFreq * dt) -
-          offset * (radialFreq * radialFreq * dt)) * decay);
+              offset * (radialFreq * radialFreq * dt)) *
+          decay);
     } else if (d < 1.0) {
       final c = math.sqrt(1 - d * d);
       final i = math.cos(radialFreq * c * dt);
@@ -54,9 +56,11 @@ class LyricSpring {
       if (c > _epsilon) {
         z = j / c;
       } else {
-        final a        = dt * radialFreq;
+        final a = dt * radialFreq;
         final cSquared = c * c;
-        z = a + ((((a * a * cSquared * cSquared / 20) - cSquared) * (a * a * a)) / 6);
+        z = a +
+            ((((a * a * cSquared * cSquared / 20) - cSquared) * (a * a * a)) /
+                6);
       }
 
       final double y;
@@ -71,18 +75,18 @@ class LyricSpring {
       newPos = (((offset * (i + d * z) + _velocity * y) * decay) + goal);
       newVel = ((_velocity * (i - z * d) - offset * (z * radialFreq)) * decay);
     } else {
-      final c  = math.sqrt(d * d - 1);
+      final c = math.sqrt(d * d - 1);
       final r1 = -radialFreq * (d - c);
       final r2 = -radialFreq * (d + c);
       final co2 = (_velocity - offset * r1) / (2 * radialFreq * c);
       final co1 = offset - co2;
-      final e1  = co1 * math.exp(r1 * dt);
-      final e2  = co2 * math.exp(r2 * dt);
+      final e1 = co1 * math.exp(r1 * dt);
+      final e2 = co2 * math.exp(r2 * dt);
       newPos = e1 + e2 + goal;
       newVel = e1 * r1 + e2 * r2;
     }
 
-    position  = newPos;
+    position = newPos;
     _velocity = newVel;
     _sleeping = (newPos - goal).abs() <= _sleepEps;
 
@@ -92,13 +96,13 @@ class LyricSpring {
   /// Мгновенно добавить импульс скорости (удар пружины).
   void kick({required double velocity}) {
     _velocity += velocity;
-    _sleeping  = false;
+    _sleeping = false;
   }
 
   /// Моментально установить позицию и цель.
   void set(double value) {
-    position  = value;
-    goal      = value;
+    position = value;
+    goal = value;
     _velocity = 0;
     _sleeping = true;
   }
@@ -108,17 +112,20 @@ class LyricSpring {
 
 /// Набор пружин для одного слога (Scale + YOffset + Glow).
 class SyllableSprings {
-  final LyricSpring scale   = LyricSpring(initial: 0, dampingRatio: 0.6,  frequency: 0.7);
-  final LyricSpring yOffset = LyricSpring(initial: 0, dampingRatio: 0.4,  frequency: 1.25);
-  final LyricSpring glow    = LyricSpring(initial: 0, dampingRatio: 0.5,  frequency: 1.0);
+  final LyricSpring scale =
+      LyricSpring(initial: 0, dampingRatio: 0.6, frequency: 0.7);
+  final LyricSpring yOffset =
+      LyricSpring(initial: 0, dampingRatio: 0.4, frequency: 1.25);
+  final LyricSpring glow =
+      LyricSpring(initial: 0, dampingRatio: 0.5, frequency: 1.0);
 
   bool get isSleeping =>
       scale.isSleeping && yOffset.isSleeping && glow.isSleeping;
 
   void setAll(double s, double y, double g) {
-    scale.goal   = s;
+    scale.goal = s;
     yOffset.goal = y;
-    glow.goal    = g;
+    glow.goal = g;
   }
 
   void setAllImmediate(double s, double y, double g) {
