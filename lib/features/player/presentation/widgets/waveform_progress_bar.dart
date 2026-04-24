@@ -7,6 +7,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import '../../../../core/utils/haptic_patterns.dart';
 
 typedef WaveformProgressBar = LiveWaveformProgressBar;
 
@@ -75,12 +76,24 @@ class _LiveWaveformProgressBarState extends State<LiveWaveformProgressBar>
     }
   }
 
+  DateTime? _lastHapticTime;
+
   void _onTick(Duration elapsed) {
     final t = elapsed.inMicroseconds / 1e6;
     final dt = _lastTime < 0 ? 0.016 : (t - _lastTime).clamp(0.0, 0.1);
     _lastTime = t;
     _time = t;
     if (dt > 0 && mounted) _tickNotifier.value++;
+  }
+
+  void _triggerSeekHaptic() {
+    final now = DateTime.now();
+    // Rate limit to max 1 haptic feedback every 30ms to prevent overwhelming the device
+    if (_lastHapticTime == null ||
+        now.difference(_lastHapticTime!) > const Duration(milliseconds: 30)) {
+      HapticPatterns.seek();
+      _lastHapticTime = now;
+    }
   }
 
   @override
@@ -105,6 +118,7 @@ class _LiveWaveformProgressBarState extends State<LiveWaveformProgressBar>
           onTapUp: (d) {
             final box = context.findRenderObject() as RenderBox?;
             if (box != null) {
+              _triggerSeekHaptic();
               widget.onSeek(
                 (d.localPosition.dx / box.size.width).clamp(0.0, 1.0),
               );
@@ -113,6 +127,7 @@ class _LiveWaveformProgressBarState extends State<LiveWaveformProgressBar>
           onHorizontalDragUpdate: (d) {
             final box = context.findRenderObject() as RenderBox?;
             if (box != null) {
+              _triggerSeekHaptic();
               widget.onSeek(
                 (d.localPosition.dx / box.size.width).clamp(0.0, 1.0),
               );

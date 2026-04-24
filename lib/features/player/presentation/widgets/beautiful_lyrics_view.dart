@@ -79,6 +79,16 @@ _SylState _stateFor(double currentMs, double startMs, double endMs) {
 // BEAUTIFUL LYRICS VIEW
 // ═══════════════════════════════════════════════════════════════════════════
 
+class _SpringCurve extends Curve {
+  const _SpringCurve();
+
+  @override
+  double transformInternal(double t) {
+    // Встроенный spring-эффект (elasticOut) с параметрами для мягкого отскока.
+    return Curves.elasticOut.transform(t);
+  }
+}
+
 class BeautifulLyricsView extends ConsumerStatefulWidget {
   const BeautifulLyricsView({super.key});
 
@@ -323,7 +333,7 @@ class _LineItem extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     Widget content;
 
-    if (isCurrent) {
+    if (isCurrent || distance <= 1) {
       final posMs = ref.watch(
         playerProvider.select((s) => s.position.inMilliseconds.toDouble()),
       );
