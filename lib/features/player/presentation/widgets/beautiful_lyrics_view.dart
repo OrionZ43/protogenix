@@ -136,8 +136,8 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
     try {
       await _scroll.scrollTo(
         index: index,
-        duration: const Duration(milliseconds: 700),
-        curve: const _SpringCurve(),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
         alignment: 0.5,
       );
     } catch (_) {}
@@ -228,14 +228,18 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
                             _kBlurScale *
                             8.0;
 
-                return _LineItem(
-                  key: ValueKey('line_$index'),
-                  line: karaoke.lines[index],
-                  isCurrent: isCurrent,
-                  distance: distance,
-                  blurAmount: blurAmount,
-                  palette: palette,
-                  userScrolling: _userScrolling,
+                // Обернем в RepaintBoundary, чтобы перерисовка отдельной
+                // строки (когда она поется) не вызывала перерисовку всего скролла.
+                return RepaintBoundary(
+                  child: _LineItem(
+                    key: ValueKey('line_$index'),
+                    line: karaoke.lines[index],
+                    isCurrent: isCurrent,
+                    distance: distance,
+                    blurAmount: blurAmount,
+                    palette: palette,
+                    userScrolling: _userScrolling,
+                  ),
                 );
               },
             ),
