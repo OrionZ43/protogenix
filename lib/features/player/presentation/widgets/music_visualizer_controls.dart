@@ -14,6 +14,7 @@ import '../../domain/player_state.dart' as ps;
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
 import '../../../library/presentation/playlist_provider.dart';
+import '../../../../core/utils/haptic_patterns.dart';
 import 'waveform_progress_bar.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -430,7 +431,7 @@ class _Controls extends StatelessWidget {
         const SizedBox(width: 16),
         GestureDetector(
           onTap: () {
-            HapticFeedback.mediumImpact();
+            HapticPatterns.playPause();
             notifier.playPause();
           },
           child: Container(
