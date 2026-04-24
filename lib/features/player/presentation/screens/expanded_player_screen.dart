@@ -27,7 +27,7 @@ class ExpandedPlayerScreen extends ConsumerWidget {
   const ExpandedPlayerScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) { // Добавили WidgetRef ref
     final player = ref.watch(playerProvider);
     ref.watch(karaokeProvider);
     ref.watch(paletteProvider);

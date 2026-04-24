@@ -12,6 +12,13 @@
 // → "Twenty " сигнализирует конец слова, "racks," — начало следующего.
 // Никогда не вызывай .trim() на всей строке до детектирования границы!
 // ──────────────────────────────────────────────────────────────────────────
+//
+// ─── WHISPER EFFECT (бэк-вокал / ад-либы) ──────────────────────────────────
+// Слова/слоги, обёрнутые в круглые ( ) или квадратные [ ] скобки,
+// помечаются флагом isBackground = true.
+// Скобки удаляются из отображаемого текста.
+// Если ВСЕ слова строки являются фоновыми — LyricLine.isBackgroundLine = true.
+// ──────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/foundation.dart';
 
@@ -23,11 +30,11 @@ enum LyricsFormat { yrc, enhancedLrc, syncedLrc, plain }
 
 extension LyricsFormatExt on LyricsFormat {
   String get label => switch (this) {
-        LyricsFormat.yrc => 'YRC (Syllable)',
-        LyricsFormat.enhancedLrc => 'Enhanced LRC (Word)',
-        LyricsFormat.syncedLrc => 'Synced LRC (Line)',
-        LyricsFormat.plain => 'Plain',
-      };
+    LyricsFormat.yrc => 'YRC (Syllable)',
+    LyricsFormat.enhancedLrc => 'Enhanced LRC (Word)',
+    LyricsFormat.syncedLrc => 'Synced LRC (Line)',
+    LyricsFormat.plain => 'Plain',
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,11 +47,16 @@ class LyricSyllable {
   final int durationMs;
   final bool isPartOfWord;
 
+  /// true — слог является частью бэк-вокала / ад-либа (был в скобках).
+  /// Отображается меньшим шрифтом, курсивом, сниженной непрозрачностью.
+  final bool isBackground;
+
   const LyricSyllable({
     required this.text,
     required this.startMs,
     required this.durationMs,
     required this.isPartOfWord,
+    this.isBackground = false,
   });
 
   int get endMs => startMs + durationMs;
@@ -54,12 +66,20 @@ class LyricSyllable {
   bool get isEmphasized => durationMs >= 800 && text.length > 1;
 
   @override
-  String toString() => 'Syl("$text" @$startMs +$durationMs)';
+  String toString() =>
+      'Syl("$text" @$startMs +$durationMs${isBackground ? ' [bg]' : ''})';
 }
 
 class LyricWord {
   final List<LyricSyllable> syllables;
-  const LyricWord({required this.syllables});
+
+  /// true если ВСЕ слоги слова являются фоновыми.
+  final bool isBackground;
+
+  const LyricWord({
+    required this.syllables,
+    this.isBackground = false,
+  });
 
   String get text => syllables.map((s) => s.text).join();
   int get startMs => syllables.first.startMs;
@@ -72,11 +92,16 @@ class LyricLine {
   final List<LyricWord> words;
   final bool isOpposite;
 
+  /// true если ВСЕ слова строки являются бэк-вокалом.
+  /// Вся строка рендерится в «фоновом» стиле.
+  final bool isBackgroundLine;
+
   const LyricLine({
     required this.startMs,
     required this.endMs,
     required this.words,
     this.isOpposite = false,
+    this.isBackgroundLine = false,
   });
 
   int get durationMs => endMs - startMs;
@@ -92,11 +117,12 @@ class LyricLine {
       words.isNotEmpty && words.any((w) => w.syllables.isNotEmpty);
 
   LyricLine copyWith({int? endMs}) => LyricLine(
-        startMs: startMs,
-        endMs: endMs ?? this.endMs,
-        words: words,
-        isOpposite: isOpposite,
-      );
+    startMs: startMs,
+    endMs: endMs ?? this.endMs,
+    words: words,
+    isOpposite: isOpposite,
+    isBackgroundLine: isBackgroundLine,
+  );
 }
 
 class ParsedLyrics {
@@ -132,7 +158,7 @@ class AdvancedLrcParser {
 
   /// Enhanced LRC тег слова: <mm:ss.xx>text
   static final _enhancedWordRx =
-      RegExp(r'<(\d{1,2}):(\d{2})\.(\d{2,3})>([^<]*)');
+  RegExp(r'<(\d{1,2}):(\d{2})\.(\d{2,3})>([^<]*)');
 
   /// LRC метатег: [ti:Title]
   static final _metaTagRx = RegExp(r'^\[([a-zA-Z]+):(.+)\]$');
@@ -146,11 +172,17 @@ class AdvancedLrcParser {
   /// Китайские метаданные (作词/作曲) — строки с ними пропускаем
   static final _cnMetaRx = RegExp(r'作词|作曲|编曲|制作人|出品|录音|混音|母带');
 
+  /// Бэк-вокал: текст целиком в круглых или квадратных скобках
+  /// Захватывает содержимое без скобок в группе 1.
+  /// Примеры: "(yeah)", "[oh oh]", "(back vocals here)"
+  static final _bgRoundRx = RegExp(r'^\((.+)\)$');
+  static final _bgSquareRx = RegExp(r'^\[(.+)\]$');
+
   // ── Определение формата ──────────────────────────────────────────────────
 
   static LyricsFormat _detectFormat(String content) {
     final lines =
-        content.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty);
+    content.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty);
 
     int yrcCount = 0;
     int lrcCount = 0;
@@ -165,10 +197,20 @@ class AdvancedLrcParser {
       }
     }
 
-    if (yrcCount > 0) return LyricsFormat.yrc;
-    if (enhancedCount > 0) return LyricsFormat.enhancedLrc;
-    if (lrcCount > 0) return LyricsFormat.syncedLrc;
-    return LyricsFormat.plain;
+    final format = yrcCount > 0
+        ? LyricsFormat.yrc
+        : enhancedCount > 0
+        ? LyricsFormat.enhancedLrc
+        : lrcCount > 0
+        ? LyricsFormat.syncedLrc
+        : LyricsFormat.plain;
+
+    // ── DEBUG: итог детекции ──────────────────────────────────────────────
+    debugPrint(
+      '[AdvancedLrcParser] detectFormat → ${format.label} '
+          '(yrc=$yrcCount lrc=$lrcCount enhanced=$enhancedCount)',
+    );
+    return format;
   }
 
   static bool _isYrcLine(String line) {
@@ -183,7 +225,11 @@ class AdvancedLrcParser {
       return const ParsedLyrics(lines: [], format: LyricsFormat.plain);
     }
     final format = _detectFormat(content);
-    debugPrint('[AdvancedLrcParser] Формат: ${format.label}');
+
+    // ── DEBUG: первые строки сырого контента ─────────────────────────────
+    final preview = content.split('\n').take(6).join(' | ');
+    debugPrint('[AdvancedLrcParser] parse() format=${format.label}');
+    debugPrint('[AdvancedLrcParser] preview: $preview');
 
     return switch (format) {
       LyricsFormat.yrc => _parseYrc(content),
@@ -195,7 +241,6 @@ class AdvancedLrcParser {
 
   // ──────────────────────────────────────────────────────────────────────────
   // YRC PARSER
-  // Реальный формат NetEase: [startMs,dur](startMs,dur,0)Twenty (startMs,dur,0)racks
   // ──────────────────────────────────────────────────────────────────────────
 
   static ParsedLyrics _parseYrc(String content) {
@@ -234,66 +279,71 @@ class AdvancedLrcParser {
     final sylMatches = _yrcSylRx.allMatches(rest).toList();
     if (sylMatches.isEmpty) return null;
 
-    // ─── СБОР СЫРЫХ СЛОГОВ ───────────────────────────────────────────────
-    // _cleanYrcText НЕ вызывает .trim() — trailing-пробел это граница слова!
-    final rawSyls = <({int start, int dur, String text})>[];
+    // ─── СБОР СЫРЫХ СЛОГОВ (потоковый stateful парсинг скобок) ─────────
+    // bgState переносится между слогами: "(Yeah" syl1 + "ay" syl2 + ")" syl3
+    // → все три помечаются isBackground=true, скобки удаляются из текста.
+    final rawSyls = <({int start, int dur, String text, bool isBackground})>[];
+    var bgState = false; // состояние фонового режима между слогами
+
     for (final m in sylMatches) {
       final start = int.parse(m.group(1)!);
       final dur = int.parse(m.group(2)!);
-      final text = _cleanYrcText(m.group(3) ?? '');
+      final rawText = _cleanYrcText(m.group(3) ?? '');
 
-      // Пропускаем пустые (только пробелы или пустую строку)
-      if (text.trim().isNotEmpty) {
-        rawSyls.add((start: start, dur: dur, text: text));
+      // Пробел-граница слова не содержит скобок → просто пробрасываем состояние
+      if (rawText.trim().isEmpty) continue;
+
+      final r = _processWithState(rawText, bgState);
+      bgState = r.nextState;
+
+      // Слоги с пустым текстом (только скобки) пропускаем
+      if (r.text.trim().isNotEmpty) {
+        rawSyls.add((start: start, dur: dur, text: r.text, isBackground: r.isBg));
       }
     }
 
     if (rawSyls.isEmpty) return null;
 
-    // Пропускаем строки с китайскими метаданными
     final allText = rawSyls.map((s) => s.text).join('');
     if (_cnMetaRx.hasMatch(allText) && rawSyls.length <= 3) return null;
 
-    // ─── КОНВЕРТИРУЕМ В LyricSyllable ────────────────────────────────────
-    // text СОХРАНЯЕМ С ПРОБЕЛАМИ — _groupSyllablesIntoWords использует их
-    // для определения границ слов, затем strip-ает при сохранении в модель.
     final syllables = rawSyls
         .map((s) => LyricSyllable(
-              text: s.text, // с trailing-пробелом если есть
-              startMs: s.start,
-              durationMs: s.dur > 0 ? s.dur : 100,
-              isPartOfWord: false, // определим в _groupSyllablesIntoWords
-            ))
+      text: s.text,
+      startMs: s.start,
+      durationMs: s.dur > 0 ? s.dur : 100,
+      isPartOfWord: false,
+      isBackground: s.isBackground,
+    ))
         .toList();
 
     final words = _groupSyllablesIntoWords(syllables);
+    final isBackgroundLine = words.isNotEmpty && words.every((w) => w.isBackground);
 
     debugPrint(
-      '[YRC] @$lineStartMs: ${words.map((w) => '"${w.text}"').join(' | ')}',
+      '[YRC] @$lineStartMs: ${words.map((w) => '"${w.text}"${w.isBackground ? '[bg]' : ''}').join(' | ')}',
     );
 
     return LyricLine(
       startMs: lineStartMs,
       endMs: lineEndMs,
       words: words,
+      isBackgroundLine: isBackgroundLine,
     );
   }
 
   /// Очищает текст слога от вложенных технических тегов.
   ///
   /// ⚠️  НЕ вызывает .trim() на результате!
-  /// Trailing-пробел ("Twenty ") — маркер границы слова в YRC.
-  /// Без него все слоги упадут в одно LyricWord.
   static String _cleanYrcText(String raw) {
     return raw
-        .replaceAll(RegExp(r'\(\d+,\d+,\d+\)'), '') // вложенные слоговые теги
-        .replaceAll(RegExp(r'\[\d+,\d+\]'), ''); // вложенные временны́е теги
+        .replaceAll(RegExp(r'\(\d+,\d+,\d+\)'), '')
+        .replaceAll(RegExp(r'\[\d+,\d+\]'), '');
     // .trim() — НАМЕРЕННО УБРАНО
   }
 
   // ──────────────────────────────────────────────────────────────────────────
   // ENHANCED LRC PARSER
-  // Формат: [mm:ss.xx] <mm:ss.xx>word <mm:ss.xx>word
   // ──────────────────────────────────────────────────────────────────────────
 
   static ParsedLyrics _parseEnhancedLrc(String content) {
@@ -333,34 +383,51 @@ class AdvancedLrcParser {
       if (wordMatches.isEmpty) continue;
 
       final words = <LyricWord>[];
+      var bgState = false; // состояние скобок сбрасывается на каждую строку
+
       for (var i = 0; i < wordMatches.length; i++) {
         final wm = wordMatches[i];
         final wStart = _lrcMs(wm.group(1)!, wm.group(2)!, wm.group(3)!);
-        final wText = wm.group(4)!.trim();
-        if (wText.isEmpty) continue;
+
+        // rawText может содержать ведущий/замыкающий пробел (граница слов),
+        // а также скобки в произвольной позиции
+        final rawWordText = wm.group(4)!;
+        final r = _processWithState(rawWordText, bgState);
+        bgState = r.nextState;
+
+        final cleanText = r.text.trim();
+        if (cleanText.isEmpty) continue;
 
         final wEnd = i + 1 < wordMatches.length
             ? _lrcMs(wordMatches[i + 1].group(1)!, wordMatches[i + 1].group(2)!,
-                wordMatches[i + 1].group(3)!)
+            wordMatches[i + 1].group(3)!)
             : wStart + 800;
 
-        words.add(LyricWord(syllables: [
-          LyricSyllable(
-            text: wText,
-            startMs: wStart,
-            durationMs: (wEnd - wStart).clamp(50, 10000),
-            isPartOfWord: false,
-          ),
-        ]));
+        final syl = LyricSyllable(
+          text: cleanText,
+          startMs: wStart,
+          durationMs: (wEnd - wStart).clamp(50, 10000),
+          isPartOfWord: false,
+          isBackground: r.isBg,
+        );
+
+        words.add(LyricWord(
+          syllables: [syl],
+          isBackground: r.isBg,
+        ));
       }
 
       if (words.isEmpty) continue;
+
+      final isBackgroundLine =
+          words.isNotEmpty && words.every((w) => w.isBackground);
 
       result.add(LyricLine(
         startMs: words.first.startMs,
         endMs: words.last.endMs,
         words: words,
         isOpposite: isOpposite,
+        isBackgroundLine: isBackgroundLine,
       ));
     }
 
@@ -372,9 +439,6 @@ class AdvancedLrcParser {
 
   // ──────────────────────────────────────────────────────────────────────────
   // SYNCED LRC PARSER
-  // Формат: [mm:ss.xx] text
-  // Для Beautiful Lyrics каждая строка разбивается на буквы
-  // с искусственными таймингами — эффект Apple Music.
   // ──────────────────────────────────────────────────────────────────────────
 
   static ParsedLyrics _parseSyncedLrc(String content) {
@@ -398,7 +462,7 @@ class AdvancedLrcParser {
       if (lrcMatch == null) continue;
 
       final startMs =
-          _lrcMs(lrcMatch.group(1)!, lrcMatch.group(2)!, lrcMatch.group(3)!);
+      _lrcMs(lrcMatch.group(1)!, lrcMatch.group(2)!, lrcMatch.group(3)!);
       var payload = lrcMatch.group(4)!;
 
       bool isOpposite = false;
@@ -414,18 +478,33 @@ class AdvancedLrcParser {
       final text = payload.trim();
       if (text.isEmpty) continue;
 
+      // Потоковый обход слов строки: каждое слово сканируется на скобки.
+      // bgState переносится между словами → поддерживаем сквозные скобки.
+      var bgState = false;
+      final parsedWords = <LyricWord>[];
+
+      for (final rawWord in text.split(' ')) {
+        if (rawWord.isEmpty) continue;
+        final r = _processWithState(rawWord, bgState);
+        bgState = r.nextState;
+        if (r.text.isEmpty) continue;
+        parsedWords.add(_plainWord(r.text, startMs, 4000, isBackground: r.isBg));
+      }
+
+      if (parsedWords.isEmpty) continue;
+
+      final isLineBackground = parsedWords.every((w) => w.isBackground);
+
       result.add(LyricLine(
         startMs: startMs,
-        endMs: startMs + 4000, // placeholder — уточним ниже
-        words: [_plainWord(text, startMs, 4000)],
+        endMs: startMs + 4000,
+        words: parsedWords,
         isOpposite: isOpposite,
+        isBackgroundLine: isLineBackground,
       ));
     }
 
-    // Уточняем endMs = startMs следующей строки
     _fixLineEndTimes(result);
-
-    // Разбиваем каждую строку на буквы с искусственными таймингами
     final expanded = result.map(_expandSyncedLine).toList();
 
     debugPrint('[AdvancedLrcParser] Synced LRC: ${expanded.length} строк');
@@ -434,45 +513,52 @@ class AdvancedLrcParser {
   }
 
   /// Разбивает синхронизированную строку на слова→буквы с временны́ми таймингами.
-  /// Каждая буква получает отдельный LyricSyllable — spring сработает на каждой.
+  ///
+  /// Использует `line.words` напрямую — флаги isBackground уже проставлены
+  /// потоковым парсером в `_parseSyncedLrc`. Повторного сканирования скобок нет.
   static LyricLine _expandSyncedLine(LyricLine line) {
-    final text = line.plainText;
-    final wordStrs = text.split(' ').where((w) => w.isNotEmpty).toList();
-    if (wordStrs.isEmpty) return line;
+    if (line.words.isEmpty) return line;
 
     final lineStartMs = line.startMs;
     final lineDurMs = (line.endMs - line.startMs).clamp(800, 15000);
+    final isBgLine = line.isBackgroundLine;
 
-    // Суммарный вес = буквы + пробелы (25% веса буквы)
     const spaceW = 0.25;
-    final totLetters = wordStrs.fold<int>(0, (s, w) => s + w.length);
-    final totalW = totLetters + (wordStrs.length - 1) * spaceW;
+    final totLetters = line.words.fold<int>(0, (s, w) => s + w.text.length);
+    if (totLetters == 0) return line;
+
+    final totalW = totLetters + (line.words.length - 1) * spaceW;
     final msPerW = lineDurMs / totalW;
 
     final words = <LyricWord>[];
     var curMs = lineStartMs;
 
-    for (var wi = 0; wi < wordStrs.length; wi++) {
-      final word = wordStrs[wi];
-      final wordDurMs = (word.length * msPerW).round();
-      final msBpL = wordDurMs / word.length;
+    for (var wi = 0; wi < line.words.length; wi++) {
+      final wordText = line.words[wi].text;
+      if (wordText.isEmpty) continue;
+
+      // Флаг isBg берётся из уже распарсенного word, _не_ сканируем заново
+      final isBg = isBgLine || line.words[wi].isBackground;
+
+      final wordDurMs = (wordText.length * msPerW).round();
+      final msBpL = wordDurMs / wordText.length;
       final syllables = <LyricSyllable>[];
 
-      for (var li = 0; li < word.length; li++) {
+      for (var li = 0; li < wordText.length; li++) {
         final letterDurMs = msBpL.round().clamp(40, 2000);
         syllables.add(LyricSyllable(
-          text: word[li],
+          text: wordText[li],
           startMs: curMs,
           durationMs: letterDurMs,
-          isPartOfWord: li < word.length - 1,
+          isPartOfWord: li < wordText.length - 1,
+          isBackground: isBg,
         ));
         curMs += letterDurMs;
       }
 
-      words.add(LyricWord(syllables: syllables));
+      words.add(LyricWord(syllables: List.unmodifiable(syllables), isBackground: isBg));
 
-      // Пауза между словами
-      if (wi < wordStrs.length - 1) {
+      if (wi < line.words.length - 1) {
         curMs += (msPerW * spaceW).round();
       }
     }
@@ -482,6 +568,7 @@ class AdvancedLrcParser {
       endMs: line.endMs,
       words: words,
       isOpposite: line.isOpposite,
+      isBackgroundLine: isBgLine,
     );
   }
 
@@ -490,20 +577,46 @@ class AdvancedLrcParser {
   // ──────────────────────────────────────────────────────────────────────────
 
   static ParsedLyrics _parsePlain(String content) {
-    final lines = content
+    final rawLines = content
         .split('\n')
         .map((l) => l.trim())
         .where((l) => l.isNotEmpty)
         .toList();
 
-    final result = lines
-        .map((text) => LyricLine(
-              startMs: 0,
-              endMs: 0,
-              words: [_plainWord(text, 0, 3000)],
-            ))
-        .toList();
+    final result = <LyricLine>[];
 
+    for (final rawLine in rawLines) {
+      // Потоковый обход слов — обнаруживаем inline-скобки.
+      // Пример: "Hello (yeah yeah) world" → Hello(main) yeah(bg) yeah(bg) world(main)
+      var bgState = false;
+      final parsedWords = <LyricWord>[];
+
+      for (final rawWord in rawLine.split(' ')) {
+        if (rawWord.isEmpty) continue;
+        final r = _processWithState(rawWord, bgState);
+        bgState = r.nextState;
+        if (r.text.isEmpty) continue;
+        parsedWords.add(_plainWord(r.text, 0, 3000, isBackground: r.isBg));
+      }
+
+      if (parsedWords.isEmpty) continue;
+
+      final isLineBackground = parsedWords.every((w) => w.isBackground);
+
+      debugPrint(
+        '[Plain] "${parsedWords.map((w) => '"${w.text}"${w.isBackground ? '[bg]' : ''}').join(' | ')}"'
+            '${isLineBackground ? ' → ALL-BG' : ''}',
+      );
+
+      result.add(LyricLine(
+        startMs: 0,
+        endMs: 0,
+        words: parsedWords,
+        isBackgroundLine: isLineBackground,
+      ));
+    }
+
+    debugPrint('[AdvancedLrcParser] Plain: ${result.length} строк');
     return ParsedLyrics(lines: result, format: LyricsFormat.plain);
   }
 
@@ -511,13 +624,65 @@ class AdvancedLrcParser {
   // HELPERS
   // ──────────────────────────────────────────────────────────────────────────
 
-  /// Группирует плоский список слогов в LyricWord по пробелам.
+  /// Потоковый (stateful) обработчик одного токена (слога/слова).
   ///
-  /// АЛГОРИТМ:
-  ///   1. Детектируем границу слова: trailing-пробел в тексте слога ИЛИ
-  ///      leading-пробел в следующем слоге.
-  ///   2. Сохраняем текст БЕЗ пробелов (trim) — они нужны только для детекции.
-  ///   3. Всё от текущей позиции до границы = один LyricWord.
+  /// Сканирует [rawText] символ за символом:
+  ///   • `(` / `[`  → переключает состояние в true  (не добавляется в вывод)
+  ///   • `)` / `]`  → переключает состояние в false (не добавляется в вывод)
+  ///   • любой другой символ → добавляется в буфер вывода
+  ///
+  /// [isBackground] — входящее состояние (из предыдущего токена).
+  ///
+  /// Возвращает:
+  ///   • [text]      — очищенный текст без скобок
+  ///   • [isBg]      — флаг для ЭТОГО токена (= состояние на первом реальном символе)
+  ///   • [nextState] — состояние для СЛЕДУЮЩЕГО токена
+  ///
+  /// Аллокации: только один StringBuffer на вызов; никаких RegExp.
+  static ({String text, bool isBg, bool nextState}) _processWithState(
+      String rawText,
+      bool isBackground,
+      ) {
+    final buf = StringBuffer();
+    bool? firstCharBg; // состояние в момент первого реального символа
+
+    for (var i = 0; i < rawText.length; i++) {
+      final ch = rawText[i];
+      // ASCII + полноширинные китайские скобки （U+FF08）(U+FF09)
+      if (ch == '(' || ch == '[' || ch == '\uFF08') {
+        isBackground = true;
+      } else if (ch == ')' || ch == ']' || ch == '\uFF09') {
+        isBackground = false;
+      } else {
+        firstCharBg ??= isBackground;
+        buf.write(ch);
+      }
+    }
+
+    return (
+    text: buf.toString(),
+    isBg: firstCharBg ?? isBackground,
+    nextState: isBackground,
+    );
+  }
+
+  /// Определяет, является ли вся строка фоновой (в скобках).
+  ///
+  /// Используется только для `_parsePlain`. Проверяет ПОЛНОЕ обрамление:
+  /// "(text)" или "[text]". Частичные скобки не считаются фоновыми.
+  static (String text, bool isBackground) _extractBackground(String raw) {
+    final trimmed = raw.trim();
+
+    final round = _bgRoundRx.firstMatch(trimmed);
+    if (round != null) return (round.group(1)!.trim(), true);
+
+    final square = _bgSquareRx.firstMatch(trimmed);
+    if (square != null) return (square.group(1)!.trim(), true);
+
+    return (raw, false);
+  }
+
+  /// Группирует плоский список слогов в LyricWord по пробелам.
   static List<LyricWord> _groupSyllablesIntoWords(
       List<LyricSyllable> syllables) {
     final words = <LyricWord>[];
@@ -526,44 +691,58 @@ class AdvancedLrcParser {
     for (var i = 0; i < syllables.length; i++) {
       final syl = syllables[i];
 
-      // Граница слова: этот слог заканчивается пробелом
-      //             ИЛИ следующий слог начинается с пробела
-      //             ИЛИ это последний слог
       final endsSpace = syl.text.endsWith(' ');
       final nextSpace =
           i + 1 < syllables.length && syllables[i + 1].text.startsWith(' ');
       final isWordEnd = endsSpace || nextSpace || i == syllables.length - 1;
 
-      // ✅ trim() только для ХРАНЕНИЯ — пробелы уже использованы для детекции
       current.add(LyricSyllable(
         text: syl.text.trim(),
         startMs: syl.startMs,
         durationMs: syl.durationMs,
         isPartOfWord: !isWordEnd,
+        isBackground: syl.isBackground,
       ));
 
       if (isWordEnd && current.isNotEmpty) {
-        words.add(LyricWord(syllables: List.unmodifiable(current)));
+        final isBg = current.every((s) => s.isBackground);
+        words.add(LyricWord(
+          syllables: List.unmodifiable(current),
+          isBackground: isBg,
+        ));
         current = [];
       }
     }
 
     if (current.isNotEmpty) {
-      words.add(LyricWord(syllables: List.unmodifiable(current)));
+      final isBg = current.every((s) => s.isBackground);
+      words.add(LyricWord(
+        syllables: List.unmodifiable(current),
+        isBackground: isBg,
+      ));
     }
 
     return words;
   }
 
-  static LyricWord _plainWord(String text, int startMs, int durationMs) {
-    return LyricWord(syllables: [
-      LyricSyllable(
-        text: text,
-        startMs: startMs,
-        durationMs: durationMs > 0 ? durationMs : 3000,
-        isPartOfWord: false,
-      ),
-    ]);
+  static LyricWord _plainWord(
+      String text,
+      int startMs,
+      int durationMs, {
+        bool isBackground = false,
+      }) {
+    return LyricWord(
+      syllables: [
+        LyricSyllable(
+          text: text,
+          startMs: startMs,
+          durationMs: durationMs > 0 ? durationMs : 3000,
+          isPartOfWord: false,
+          isBackground: isBackground,
+        ),
+      ],
+      isBackground: isBackground,
+    );
   }
 
   /// [mm:ss.xx] или [mm:ss.xxx] → миллисекунды
@@ -610,6 +789,6 @@ class AdvancedLrcParser {
   }
 
   static int currentLineIndexFromDuration(
-          List<LyricLine> lines, Duration position) =>
+      List<LyricLine> lines, Duration position) =>
       currentLineIndex(lines, position.inMilliseconds);
 }

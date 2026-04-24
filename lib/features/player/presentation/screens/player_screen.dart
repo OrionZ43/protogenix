@@ -49,7 +49,7 @@ class PlayerScreen extends ConsumerWidget {
       ),
     );
 
-    final isTabletop = hinge.state == DisplayFeatureState.halfOpened &&
+    final isTabletop = hinge.state == DisplayFeatureState.postureHalfOpened && // postureHalfOpened вместо halfOpened
         hinge.bounds.top > 0 &&
         hinge.bounds.left == 0;
 

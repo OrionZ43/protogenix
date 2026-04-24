@@ -29,7 +29,7 @@ class LyricSpring {
         _dampingRatio = dampingRatio,
         _frequency = frequency {
     assert(dampingRatio * frequency >= 0,
-        'Spring does not converge: dampingRatio=$dampingRatio frequency=$frequency');
+    'Spring does not converge: dampingRatio=$dampingRatio frequency=$frequency');
   }
 
   /// Шаг симуляции на [dt] секунд. Возвращает новую позицию.
@@ -45,7 +45,7 @@ class LyricSpring {
       newPos =
           ((offset * (1 + radialFreq * dt) + _velocity * dt) * decay) + goal;
       newVel = ((_velocity * (1 - radialFreq * dt) -
-              offset * (radialFreq * radialFreq * dt)) *
+          offset * (radialFreq * radialFreq * dt)) *
           decay);
     } else if (d < 1.0) {
       final c = math.sqrt(1 - d * d);
@@ -111,13 +111,42 @@ class LyricSpring {
 }
 
 /// Набор пружин для одного слога (Scale + YOffset + Glow).
+///
+/// Стандартный конструктор создаёт пружины для основного вокала.
+/// [SyllableSprings.withParams] позволяет задать произвольные параметры —
+/// используется для бэк-вокала / ад-либов (меньший overshoot).
 class SyllableSprings {
-  final LyricSpring scale =
-      LyricSpring(initial: 0, dampingRatio: 0.6, frequency: 0.7);
-  final LyricSpring yOffset =
-      LyricSpring(initial: 0, dampingRatio: 0.4, frequency: 1.25);
-  final LyricSpring glow =
-      LyricSpring(initial: 0, dampingRatio: 0.5, frequency: 1.0);
+  late final LyricSpring scale;
+  late final LyricSpring yOffset;
+  late final LyricSpring glow;
+
+  /// Стандартные пружины для основного вокала.
+  SyllableSprings()
+      : scale = LyricSpring(initial: 0, dampingRatio: 0.6, frequency: 0.7),
+        yOffset = LyricSpring(initial: 0, dampingRatio: 0.4, frequency: 1.25),
+        glow = LyricSpring(initial: 0, dampingRatio: 0.5, frequency: 1.0);
+
+  /// Пружины с произвольными параметрами.
+  ///
+  /// Для бэк-вокала рекомендуется высокий dampingRatio (0.80–0.90) и
+  /// низкая frequency (0.5–0.7) — плавное проявление без резкого «прыжка».
+  SyllableSprings.withParams({
+    required double scaleDamping,
+    required double scaleFrequency,
+    required double yOffsetDamping,
+    required double yOffsetFrequency,
+    required double glowDamping,
+    required double glowFrequency,
+  })  : scale = LyricSpring(
+      initial: 0,
+      dampingRatio: scaleDamping,
+      frequency: scaleFrequency),
+        yOffset = LyricSpring(
+            initial: 0,
+            dampingRatio: yOffsetDamping,
+            frequency: yOffsetFrequency),
+        glow = LyricSpring(
+            initial: 0, dampingRatio: glowDamping, frequency: glowFrequency);
 
   bool get isSleeping =>
       scale.isSleeping && yOffset.isSleeping && glow.isSleeping;
