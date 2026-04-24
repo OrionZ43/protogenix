@@ -106,7 +106,7 @@ class _PlayAllButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: () {
-        final models = tracks.map((t) => t.toTrackModel()).toList();
+        final models = tracks.map((t) => t.toTrackModel());
         ref.read(playerProvider.notifier).loadPlaylist(models);
       },
       child: Container(
@@ -193,7 +193,7 @@ class _FavoriteTile extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        final models = allTracks.map((t) => t.toTrackModel()).toList();
+        final models = allTracks.map((t) => t.toTrackModel());
         ref.read(playerProvider.notifier).loadPlaylist(
               models,
               initialIndex: index,

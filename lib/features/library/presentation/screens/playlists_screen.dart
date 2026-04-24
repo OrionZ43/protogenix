@@ -480,7 +480,7 @@ class _PlaylistContent extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: GestureDetector(
                 onTap: () {
-                  final models = tracks.map((t) => t.toTrackModel()).toList();
+                  final models = tracks.map((t) => t.toTrackModel());
                   ref.read(playerProvider.notifier).loadPlaylist(models);
                 },
                 child: Container(
@@ -560,7 +560,7 @@ class _PlaylistTrackTile extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        final models = allTracks.map((t) => t.toTrackModel()).toList();
+        final models = allTracks.map((t) => t.toTrackModel());
         ref.read(playerProvider.notifier).loadPlaylist(
               models,
               initialIndex: index,

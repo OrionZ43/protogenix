@@ -99,21 +99,28 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     }
   }
 
-  Future<void> loadPlaylist(List<TrackModel> tracks,
+  Future<void> loadPlaylist(Iterable<TrackModel> tracks,
       {int initialIndex = 0}) async {
+    state = state.copyWith(isLoading: true);
+
+    // Yield to the UI thread to prevent jank
+    await Future.microtask(() {});
+
+    // Lazy-mapping: converting to list only when needed for state
+    final tracksList = tracks is List<TrackModel> ? tracks : tracks.toList();
+
     state = state.copyWith(
-      queue:        tracks,
+      queue:        tracksList,
       currentIndex: initialIndex,
-      currentTrack: tracks.isNotEmpty ? tracks[initialIndex] : null,
-      isLoading:    true,
+      currentTrack: tracksList.isNotEmpty ? tracksList[initialIndex] : null,
     );
 
-    if (tracks.isEmpty) {
+    if (tracksList.isEmpty) {
       state = state.copyWith(isLoading: false);
       return;
     }
 
-    final mediaItems = tracks.map((t) => MediaItem(
+    final mediaItems = tracksList.map((t) => MediaItem(
       id:       t.id,
       title:    t.title,
       artist:   t.artist,
@@ -121,7 +128,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
       duration: t.duration,
     )).toList();
 
-    final audioSources = tracks.map((t) => t.toAudioSource()).toList();
+    final audioSources = tracksList.map((t) => t.toAudioSource()).toList();
 
     try {
       await _handler.loadPlaylist(
@@ -129,8 +136,8 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
         sources:      audioSources,
         initialIndex: initialIndex,
       );
-      if (tracks.isNotEmpty) {
-        _updatePalette(tracks[initialIndex]);
+      if (tracksList.isNotEmpty) {
+        _updatePalette(tracksList[initialIndex]);
       }
     } catch (e) {
       debugPrint('loadPlaylist error: $e');
