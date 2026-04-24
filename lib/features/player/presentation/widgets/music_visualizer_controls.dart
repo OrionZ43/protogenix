@@ -1,10 +1,12 @@
 // lib/features/player/presentation/widgets/music_visualizer_controls.dart
 //
-// MusicVisualizerControls v5 — добавлена кнопка «Избранное» (сердечко).
+// MusicVisualizerControls v5.1 — доработано с тактильной отдачей и улучшенными зонами тапа.
 //   • showFavorite: true → сердечко слева от названия трека
 //   • Реактивно через isFavoriteProvider — мгновенный отклик без перезагрузки
+//   • Интегрирован HapticFeedback для премиального ощущения
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/track_model.dart';
@@ -94,7 +96,10 @@ class _FullLayout extends StatelessWidget {
           _CoverArt(track: track),
           const SizedBox(height: 28),
           _TrackInfo(
-              track: track, palette: palette, showFavorite: showFavorite),
+            track: track,
+            palette: palette,
+            showFavorite: showFavorite,
+          ),
           const SizedBox(height: 20),
           LiveWaveformProgressBar(
             progress: player.progress,
@@ -223,7 +228,10 @@ class _CapsuleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
@@ -327,15 +335,15 @@ class _TrackInfo extends ConsumerWidget {
           SizedBox(
             width: 40,
             child: GestureDetector(
-              onTap: () =>
-                  ref.read(favoritesProvider.notifier).toggle(track.id),
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                ref.read(favoritesProvider.notifier).toggle(track.id);
+              },
               behavior: HitTestBehavior.opaque,
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
-                transitionBuilder: (child, anim) => ScaleTransition(
-                  scale: anim,
-                  child: child,
-                ),
+                transitionBuilder: (child, anim) =>
+                    ScaleTransition(scale: anim, child: child),
                 child: Icon(
                   isFav
                       ? Icons.favorite_rounded
@@ -421,7 +429,10 @@ class _Controls extends StatelessWidget {
         ),
         const SizedBox(width: 16),
         GestureDetector(
-          onTap: notifier.playPause,
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            notifier.playPause();
+          },
           child: Container(
             width: playSize,
             height: playSize,
@@ -482,10 +493,13 @@ class _CtrlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
         behavior: HitTestBehavior.opaque,
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(12),
           child: Icon(icon, color: color, size: size),
         ),
       );

@@ -1,15 +1,27 @@
 // lib/features/player/presentation/screens/player_screen.dart
 // Компактный плеер (телефон / узкий режим)
+//
+// UPDATED: 
+// - Фикс TopBar (Stack для идеальной центровки)
+// - Адаптация под Status Bar (SafeArea/Padding)
+// - Поддержка Flex Mode (Tabletop)
+// - Унификация кнопок (EQ + Sleep Timer)
 
+import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../domain/track_model.dart';
 import '../providers/player_provider.dart';
-import '../providers/karaoke_provider.dart';
+import '../providers/palette_provider.dart';
 import '../widgets/protogenix_background.dart';
 import '../widgets/music_visualizer_controls.dart';
 import '../widgets/lyrics_search_sheet.dart';
+import '../widgets/beautiful_lyrics_view.dart';
+import '../widgets/eq_sheet.dart';
 import '../../../importer/presentation/importer_sheet.dart';
 
 class PlayerScreen extends ConsumerWidget {
@@ -24,24 +36,65 @@ class PlayerScreen extends ConsumerWidget {
     }
 
     final track = player.currentTrack as TrackModel?;
+    final mediaQuery = MediaQuery.of(context);
+    
+    // Детекция сгиба для Flex Mode (Tabletop)
+    final displayFeatures = mediaQuery.displayFeatures;
+    final hinge = displayFeatures.firstWhere(
+      (f) => f.type == DisplayFeatureType.hinge || f.type == DisplayFeatureType.fold,
+      orElse: () => const DisplayFeature(
+        bounds: Rect.zero,
+        type: DisplayFeatureType.unknown,
+        state: DisplayFeatureState.unknown,
+      ),
+    );
+
+    final isTabletop = hinge.state == DisplayFeatureState.halfOpened &&
+        hinge.bounds.top > 0 &&
+        hinge.bounds.left == 0;
+
+    if (isTabletop) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: ProtogenixBackground(
+          child: SafeArea(
+            child: Column(
+              children: [
+                _TopBar(track: track),
+                // Верхняя половина: Текст песни
+                const Expanded(child: BeautifulLyricsView()),
+                // Мертвая зона шарнира
+                SizedBox(height: hinge.bounds.height),
+                // Нижняя половина: Управление
+                Expanded(
+                  child: MusicVisualizerControls(
+                    compact: true,
+                    showFavorite: true,
+                  ),
+                ),
+                _BottomRow(track: track),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: ProtogenixBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
-              _TopBar(track: track),
-              Expanded(
-                child: MusicVisualizerControls(
-                  compact: false,
-                  showFavorite: true, // ← сердечко рядом с названием
-                ),
+        child: Column(
+          children: [
+            _TopBar(track: track),
+            Expanded(
+              child: const MusicVisualizerControls(
+                compact: false,
+                showFavorite: true,
               ),
-              _BottomRow(track: track),
-              const SizedBox(height: 8),
-            ],
-          ),
+            ),
+            _BottomRow(track: track),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
@@ -49,71 +102,97 @@ class PlayerScreen extends ConsumerWidget {
 }
 
 // ── Top Bar ───────────────────────────────────────────────────────────────────
-// FIX: Переписан на Stack(alignment: Alignment.center), чтобы элементы
-// не "наезжали" друг на друга ни на сложенном, ни на разложенном экране.
-//
-// Слой 1 (Positioned left:8)  — кнопка «Назад», только если canPop
-// Слой 2 (центр, без Positioned) — надпись «PROTOGENIX»
-// Слой 3 (Positioned right:16) — иконка текстов (если трек загружен)
 
-class _TopBar extends StatelessWidget {
+class _TopBar extends ConsumerWidget {
   const _TopBar({required this.track});
   final TrackModel? track;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Кнопка «Назад» — слева, только если есть куда возвращаться
-          if (Navigator.canPop(context))
-            Positioned(
-              left: 8,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withAlpha(15),
-                  ),
-                  child: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white70,
-                    size: 24,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = ref.watch(paletteProvider);
+    final eqActive = ref.watch(playerProvider.select((s) => s.eqEnabled));
+    final topPadding = MediaQuery.viewPaddingOf(context).top;
+
+    return Padding(
+      padding: EdgeInsets.only(top: topPadding + 8, left: 16, right: 16),
+      child: SizedBox(
+        height: 44,
+        width: double.infinity,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Слева: Кнопка закрытия
+            if (Navigator.canPop(context))
+              Positioned(
+                left: 0,
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).pop();
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withAlpha(20),
+                    ),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
                   ),
                 ),
               ),
+
+            // Центр: Логотип
+            const Text(
+              'PROTOGENIX',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 3.5,
+              ),
             ),
 
-          // Логотип строго по центру
-          const Text(
-            'PROTOGENIX',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 2.5,
+            // Справа: Эквалайзер (только Android) +Lyrics
+            Positioned(
+              right: 0,
+              child: Row(
+                children: [
+                  if (Platform.isAndroid)
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.mediumImpact();
+                        showEqSheet(context, ref);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Icon(
+                          Icons.tune_rounded,
+                          color: eqActive ? palette.primary : Colors.white54,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  if (track != null)
+                    const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
+                    ),
+                ],
+              ),
             ),
-          ),
-
-          // Иконка текстов — справа
-          if (track != null)
-            const Positioned(
-              right: 16,
-              child:
-                  Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-// ── Bottom Row — кнопки «Добавить трек» и «Текст» ────────────────────────────
+// ── Bottom Row ────────────────────────────────────────────────────────────────
 
 class _BottomRow extends ConsumerWidget {
   const _BottomRow({required this.track});
@@ -121,22 +200,40 @@ class _BottomRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final palette = ref.watch(paletteProvider);
+    final timerActive = ref.watch(playerProvider.select((s) => s.sleepTimerActive));
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _CapsuleBtn(
             icon: Icons.add_rounded,
             label: 'Добавить',
-            onTap: () => showImporterSheet(context),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              showImporterSheet(context);
+            },
+          ),
+          _CapsuleBtn(
+            icon: Icons.bedtime_rounded,
+            label: 'Таймер',
+            isActive: timerActive,
+            accentColor: palette.primary,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              // Здесь должна быть логика вызова Sleep Timer диалога
+            },
           ),
           _CapsuleBtn(
             icon: Icons.manage_search_rounded,
             label: 'Текст',
-            // Открывает ручной поиск текста (ранее был пустой () {})
             onTap: track != null
-                ? () => showLyricsSearchSheet(context, ref, track!)
+                ? () {
+                    HapticFeedback.lightImpact();
+                    showLyricsSearchSheet(context, ref, track!);
+                  }
                 : null,
           ),
         ],
@@ -150,45 +247,57 @@ class _CapsuleBtn extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.isActive = false,
+    this.accentColor,
   });
+
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final bool isActive;
+  final Color? accentColor;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Opacity(
-          opacity: onTap != null ? 1.0 : 0.4,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: Colors.white.withAlpha(12),
-              border: Border.all(color: Colors.white.withAlpha(25)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: Colors.white60, size: 15),
-                const SizedBox(width: 6),
-                Text(label,
-                    style:
-                        const TextStyle(color: Colors.white60, fontSize: 12)),
-              ],
+  Widget build(BuildContext context) {
+    final color = isActive ? (accentColor ?? Colors.white) : Colors.white60;
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Opacity(
+        opacity: onTap != null ? 1.0 : 0.4,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: isActive ? color.withAlpha(30) : Colors.white.withAlpha(12),
+            border: Border.all(
+              color: isActive ? color.withAlpha(100) : Colors.white.withAlpha(25),
             ),
           ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(color: color, fontSize: 12, fontWeight: isActive ? FontWeight.w600 : FontWeight.normal),
+              ),
+            ],
+          ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 // ── Empty Library ─────────────────────────────────────────────────────────────
 
-class _EmptyLibraryScreen extends ConsumerWidget {
+class _EmptyLibraryScreen extends StatelessWidget {
   const _EmptyLibraryScreen();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: ProtogenixBackground(
@@ -197,23 +306,25 @@ class _EmptyLibraryScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.library_music_rounded,
-                    size: 80, color: Colors.white24),
+                const Icon(Icons.library_music_rounded, size: 80, color: Colors.white24),
                 const SizedBox(height: 24),
-                const Text('Библиотека пуста',
-                    style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600)),
+                const Text(
+                  'Библиотека пуста',
+                  style: TextStyle(color: Colors.white70, fontSize: 22, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 8),
-                const Text('Добавь треки, чтобы начать',
-                    style: TextStyle(color: Colors.white38, fontSize: 14)),
+                const Text(
+                  'Добавь треки, чтобы начать',
+                  style: TextStyle(color: Colors.white38, fontSize: 14),
+                ),
                 const SizedBox(height: 32),
                 GestureDetector(
-                  onTap: () => showImporterSheet(context),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    showImporterSheet(context);
+                  },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 28, vertical: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       color: Colors.white.withAlpha(20),
@@ -224,15 +335,13 @@ class _EmptyLibraryScreen extends ConsumerWidget {
                       children: [
                         Icon(Icons.add_rounded, color: Colors.white70),
                         SizedBox(width: 8),
-                        Text('Добавить трек',
-                            style:
-                                TextStyle(color: Colors.white70, fontSize: 16)),
+                        Text('Добавить трек', style: TextStyle(color: Colors.white70, fontSize: 16)),
                       ],
                     ),
                   ),
                 ),
               ],
-            ),
+            ).animate().fadeIn(duration: 600.ms).scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
           ),
         ),
       ),

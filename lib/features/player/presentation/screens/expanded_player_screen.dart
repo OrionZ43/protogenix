@@ -10,6 +10,7 @@
 //   └─────────────────────────────────────┴───────────────────────────────┘
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/palette_provider.dart';
@@ -26,7 +27,7 @@ class ExpandedPlayerScreen extends ConsumerWidget {
   const ExpandedPlayerScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final player = ref.watch(playerProvider);
     ref.watch(karaokeProvider);
     ref.watch(paletteProvider);
@@ -67,10 +68,7 @@ class ExpandedPlayerScreen extends ConsumerWidget {
                     ),
 
                     // Правая колонка — текст песни (58%)
-                    const Expanded(
-                      flex: 58,
-                      child: BeautifulLyricsView(),
-                    ),
+                    const Expanded(flex: 58, child: BeautifulLyricsView()),
                   ],
                 ),
               ),
@@ -94,55 +92,85 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 48,
-      child: Stack(
-        alignment: Alignment.center,
+      width: double.infinity,
+      child: Row(
         children: [
-          // Кнопка "назад" — слева
-          Positioned(
-            left: 8,
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withAlpha(15),
-                ),
-                child: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: Colors.white70,
-                  size: 24,
+          // Левая часть: кнопка «Назад» (Фиксированная ширина 120 для баланса)
+          SizedBox(
+            width: 120,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).pop();
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withAlpha(15),
+                    ),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Colors.white70,
+                      size: 24,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
 
-          // Название приложения по центру
-          const Text(
-            'PROTOGENIX',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 2.5,
+          // Центр: Логотип (Expanded занимает всё пространство и центрирует текст)
+          const Expanded(
+            child: Text(
+              'PROTOGENIX',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 2.5,
+              ),
             ),
           ),
 
-          // Название трека справа
-          if (track != null)
-            Positioned(
-              right: 16,
-              child: Text(
-                track!.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white38,
-                  fontSize: 12,
-                ),
-              ),
+          // Правая часть: кнопки / название трека (Тоже 120 для симметрии)
+          SizedBox(
+            width: 120,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (track != null)
+                  Expanded(
+                    child: Text(
+                      track!.title,
+                      textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                if (track != null)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 16.0),
+                    child: Icon(
+                      Icons.lyrics_outlined,
+                      color: Colors.white38,
+                      size: 18,
+                    ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
     );

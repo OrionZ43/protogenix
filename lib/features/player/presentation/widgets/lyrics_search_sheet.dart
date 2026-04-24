@@ -7,7 +7,9 @@
 //   3. Обновляет lrcPath в LibraryDatabase через libraryProvider.updateLrcPath()
 //      → при следующем запуске поиск не запускается заново
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../domain/track_model.dart';
@@ -117,11 +119,14 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
     Navigator.of(context).pop();
 
     // 3. Сохраняем .lrc файл и обновляем БД (fire-and-forget, UI не блокируется)
-    LyricsService.instance.saveLrc(content, trackId).then((lrcPath) {
-      libraryNotifier.updateLrcPath(trackId, lrcPath);
-    }).catchError((e) {
-      debugPrint('[LyricsSearch] Не удалось сохранить .lrc: $e');
-    });
+    LyricsService.instance
+        .saveLrc(content, trackId)
+        .then((lrcPath) {
+          libraryNotifier.updateLrcPath(trackId, lrcPath);
+        })
+        .catchError((e) {
+          debugPrint('[LyricsSearch] Не удалось сохранить .lrc: $e');
+        });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -139,128 +144,148 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.of(context).viewInsets;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.88,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D0D0D),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(2),
-            ),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.88,
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(200),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: Colors.white.withAlpha(30)),
           ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Найти текст вручную',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
+          child: Column(
+            children: [
+              // Ручка (Drag handle)
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Введи название и артиста, чтобы найти нужный текст',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children: [
-                _SearchField(
-                  controller: _titleCtrl,
-                  hint: 'Название песни',
-                  icon: Icons.music_note_rounded,
-                  onSubmitted: (_) => _search(),
-                ),
-                const SizedBox(height: 10),
-                _SearchField(
-                  controller: _artistCtrl,
-                  hint: 'Артист',
-                  icon: Icons.person_rounded,
-                  onSubmitted: (_) => _search(),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _isSearching ? null : _search,
-                    icon: _isSearching
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(Icons.search_rounded),
-                    label: Text(_isSearching ? 'Ищу...' : 'Найти'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF7B5EA7),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+              ),
+
+              const SizedBox(height: 20),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Найти текст вручную',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
                       ),
-                      elevation: 0,
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _error != null
-                ? Center(
-                    child: Text(
-                      _error!,
-                      style:
-                          const TextStyle(color: Colors.white38, fontSize: 14),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : _results.isEmpty && !_isSearching
-                    ? const SizedBox.shrink()
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
-                        itemCount: _results.length,
-                        separatorBuilder: (_, __) =>
-                            Divider(color: Colors.white.withAlpha(12)),
-                        itemBuilder: (context, i) {
-                          final scored = _results[i];
-                          return _LyricResultTile(
-                            scored: scored,
-                            onTap: () => _apply(scored),
-                          ).animate().fadeIn(
-                                duration: 200.ms,
-                                delay: (i * 40).ms,
-                              );
-                        },
+                    const SizedBox(height: 4),
+                    Text(
+                      'Введи название и артиста, чтобы найти нужный текст',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 13,
                       ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  children: [
+                    _SearchField(
+                      controller: _titleCtrl,
+                      hint: 'Название песни',
+                      icon: Icons.music_note_rounded,
+                      onSubmitted: (_) => _search(),
+                    ),
+                    const SizedBox(height: 10),
+                    _SearchField(
+                      controller: _artistCtrl,
+                      hint: 'Артист',
+                      icon: Icons.person_rounded,
+                      onSubmitted: (_) => _search(),
+                    ),
+                    const SizedBox(height: 14),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isSearching ? null : _search,
+                        icon: _isSearching
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.search_rounded),
+                        label: Text(_isSearching ? 'Ищу...' : 'Найти'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7B5EA7),
+                          foregroundColor: Colors.white,
+                          padding: const Duration(milliseconds: 300) > Duration.zero 
+                              ? const EdgeInsets.symmetric(vertical: 14) 
+                              : EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Expanded(
+                child: _error != null
+                    ? Center(
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : _results.isEmpty && !_isSearching
+                        ? const SizedBox.shrink()
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+                            itemCount: _results.length,
+                            separatorBuilder: (_, __) =>
+                                Divider(color: Colors.white.withAlpha(12)),
+                            itemBuilder: (context, i) {
+                              final scored = _results[i];
+                              return _LyricResultTile(
+                                scored: scored,
+                                onTap: () => _apply(scored),
+                              ).animate().fadeIn(
+                                    duration: 200.ms,
+                                    delay: (i * 40).ms,
+                                  );
+                            },
+                          ),
+              ),
+
+              SizedBox(height: viewInsets.bottom),
+            ],
           ),
-          SizedBox(height: viewInsets.bottom),
-        ],
+        ),
       ),
     );
   }
@@ -335,7 +360,10 @@ class _LyricResultTile extends StatelessWidget {
     };
 
     return ListTile(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       contentPadding: EdgeInsets.zero,
       title: Text(
         meta.trackName,

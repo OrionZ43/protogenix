@@ -3,8 +3,11 @@
 // Экран плейлистов + детальный экран плейлиста.
 
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/playlist_database.dart';
@@ -35,12 +38,12 @@ class PlaylistsScreen extends ConsumerWidget {
         child: SafeArea(
           bottom: false,
           child: CustomScrollView(
-            slivers: [
+            slivers:[
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                   child: Row(
-                    children: [
+                    children:[
                       const Text(
                         'Плейлисты',
                         style: TextStyle(
@@ -73,8 +76,7 @@ class PlaylistsScreen extends ConsumerWidget {
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
@@ -85,9 +87,8 @@ class PlaylistsScreen extends ConsumerWidget {
                         playlist: playlists[i],
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => PlaylistDetailScreen(
-                              playlist: playlists[i],
-                            ),
+                            builder: (_) =>
+                                PlaylistDetailScreen(playlist: playlists[i]),
                           ),
                         ),
                         onDelete: () => ref
@@ -128,7 +129,7 @@ class _CreateFab extends StatelessWidget {
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
-          children: [
+          children:[
             Icon(Icons.add_rounded, color: Colors.white, size: 20),
             SizedBox(width: 8),
             Text(
@@ -157,7 +158,7 @@ class _EmptyPlaylists extends StatelessWidget {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: [
+        children:[
           const Icon(
             Icons.queue_music_rounded,
             size: 80,
@@ -179,9 +180,15 @@ class _EmptyPlaylists extends StatelessWidget {
           ),
           const SizedBox(height: 28),
           GestureDetector(
-            onTap: onTap,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onTap();
+            },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
                 color: Colors.white.withAlpha(18),
@@ -189,19 +196,26 @@ class _EmptyPlaylists extends StatelessWidget {
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.add_rounded, color: Colors.white70, size: 18),
+                children:[
+                  Icon(
+                    Icons.add_rounded,
+                    color: Colors.white70,
+                    size: 18,
+                  ),
                   SizedBox(width: 8),
                   Text(
                     'Создать плейлист',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
         ],
-      ),
+      ).animate().fadeIn(duration: 600.ms).scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
     );
   }
 }
@@ -230,7 +244,7 @@ class _PlaylistCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          children:[
             Container(
               width: 44,
               height: 44,
@@ -257,7 +271,7 @@ class _PlaylistCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Row(
-              children: [
+              children:[
                 GestureDetector(
                   onTap: onRename,
                   child: const Icon(
@@ -288,44 +302,57 @@ class _PlaylistCard extends StatelessWidget {
 
 Future<void> _createPlaylistDialog(BuildContext context, WidgetRef ref) async {
   final ctrl = TextEditingController();
-  final name = await showDialog<String>(
+  final name = await showGeneralDialog<String>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF13131F),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
-        'Новый плейлист',
-        style: TextStyle(color: Colors.white, fontSize: 17),
-      ),
-      content: TextField(
-        controller: ctrl,
-        autofocus: true,
-        style: const TextStyle(color: Colors.white),
-        cursorColor: Colors.white70,
-        decoration: InputDecoration(
-          hintText: 'Название...',
-          hintStyle: const TextStyle(color: Colors.white38),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white24),
+    barrierDismissible: true,
+    barrierLabel: '',
+    transitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (ctx, anim1, anim2) => const SizedBox.shrink(),
+    transitionBuilder: (ctx, anim1, anim2, child) {
+      return Transform.scale(
+        scale: anim1.value,
+        child: Opacity(
+          opacity: anim1.value,
+          child: _GlassDialog(
+            title: 'Новый плейлист',
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              cursorColor: Colors.white70,
+              decoration: InputDecoration(
+                hintText: 'Название...',
+                hintStyle: const TextStyle(color: Colors.white38),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white60),
+                ),
+              ),
+            ),
+            actions:[
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text(
+                  'Отмена',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+                child: const Text(
+                  'Создать',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white60),
-          ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Отмена', style: TextStyle(color: Colors.white54)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-          child: const Text('Создать', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
+      );
+    },
   );
   if (name != null && name.isNotEmpty) {
     ref.read(playlistsProvider.notifier).create(name);
@@ -333,47 +360,122 @@ Future<void> _createPlaylistDialog(BuildContext context, WidgetRef ref) async {
 }
 
 Future<void> _renameDialog(
-    BuildContext context, WidgetRef ref, Playlist playlist) async {
+  BuildContext context,
+  WidgetRef ref,
+  Playlist playlist,
+) async {
   final ctrl = TextEditingController(text: playlist.name);
-  final name = await showDialog<String>(
+  final name = await showGeneralDialog<String>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF13131F),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
-        'Переименовать',
-        style: TextStyle(color: Colors.white, fontSize: 17),
-      ),
-      content: TextField(
-        controller: ctrl,
-        autofocus: true,
-        style: const TextStyle(color: Colors.white),
-        cursorColor: Colors.white70,
-        decoration: InputDecoration(
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white24),
+    barrierDismissible: true,
+    barrierLabel: '',
+    transitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (ctx, anim1, anim2) => const SizedBox.shrink(),
+    transitionBuilder: (ctx, anim1, anim2, child) {
+      return Transform.scale(
+        scale: anim1.value,
+        child: Opacity(
+          opacity: anim1.value,
+          child: _GlassDialog(
+            title: 'Переименовать',
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              cursorColor: Colors.white70,
+              decoration: InputDecoration(
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white60),
+                ),
+              ),
+            ),
+            actions:[
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text(
+                  'Отмена',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+                child: const Text(
+                  'Сохранить',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white60),
-          ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Отмена', style: TextStyle(color: Colors.white54)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-          child: const Text('Сохранить', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
+      );
+    },
   );
   if (name != null && name.isNotEmpty) {
     ref.read(playlistsProvider.notifier).rename(playlist.id, name);
+  }
+}
+
+class _GlassDialog extends StatelessWidget {
+  const _GlassDialog({
+    required this.title,
+    required this.content,
+    required this.actions,
+  });
+
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(200),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: Colors.white.withAlpha(30)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children:[
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    content,
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: actions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -397,10 +499,10 @@ class PlaylistDetailScreen extends ConsumerWidget {
             loading: () => const Center(
               child: CircularProgressIndicator(color: Colors.white24),
             ),
-            error: (e, _) => Center(
+            error: (e, _) => const Center(
               child: Text(
                 'Ошибка загрузки',
-                style: const TextStyle(color: Colors.white54),
+                style: TextStyle(color: Colors.white54),
               ),
             ),
             data: (tracks) => _PlaylistContent(
@@ -415,10 +517,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
 }
 
 class _PlaylistContent extends ConsumerWidget {
-  const _PlaylistContent({
-    required this.playlist,
-    required this.tracks,
-  });
+  const _PlaylistContent({required this.playlist, required this.tracks});
 
   final Playlist playlist;
   final List<LibraryTrack> tracks;
@@ -426,13 +525,13 @@ class _PlaylistContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return CustomScrollView(
-      slivers: [
+      slivers:[
         // Заголовок
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
             child: Row(
-              children: [
+              children:[
                 IconButton(
                   icon: const Icon(
                     Icons.arrow_back_rounded,
@@ -474,6 +573,7 @@ class _PlaylistContent extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: GestureDetector(
                 onTap: () {
+                  // ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ: Без .toList()
                   final models = tracks.map((t) => t.toTrackModel());
                   ref.read(playerProvider.notifier).loadPlaylist(models);
                 },
@@ -486,9 +586,12 @@ class _PlaylistContent extends ConsumerWidget {
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.play_arrow_rounded,
-                          color: Colors.white, size: 20),
+                    children:[
+                      Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         'Слушать всё',
@@ -554,6 +657,7 @@ class _PlaylistTrackTile extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
+        // ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ: Без .toList()
         final models = allTracks.map((t) => t.toTrackModel());
         ref.read(playerProvider.notifier).loadPlaylist(
               models,
@@ -563,7 +667,7 @@ class _PlaylistTrackTile extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
-          children: [
+          children:[
             Text(
               '${index + 1}',
               style: TextStyle(
@@ -592,7 +696,7 @@ class _PlaylistTrackTile extends ConsumerWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children:[
                   Text(
                     track.title,
                     maxLines: 1,
@@ -680,7 +784,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
+          children:[
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
               width: 40,
@@ -695,7 +799,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Row(
-                children: [
+                children:[
                   Expanded(
                     child: Text(
                       track.title,
@@ -769,7 +873,7 @@ class _OptionTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
-          children: [
+          children:[
             Icon(icon, color: iconColor ?? Colors.white70, size: 22),
             const SizedBox(width: 16),
             Text(
