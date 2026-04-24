@@ -91,31 +91,33 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 48,
+      width: double.infinity,
       child: Row(
         children: [
           // Левая часть: кнопка «Назад»
           SizedBox(
             width: 120,
-            child: Navigator.canPop(context)
-                ? Center(
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withAlpha(15),
-                        ),
-                        child: const Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: Colors.white70,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  )
-                : const SizedBox.shrink(),
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.of(context).pop();
+                },
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withAlpha(15),
+                  ),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white70,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
           ),
 
           // Центр: Логотип
@@ -132,24 +134,40 @@ class _TopBar extends StatelessWidget {
             ),
           ),
 
-          // Правая часть: название трека
+          // Правая часть: кнопки / название трека
           SizedBox(
             width: 120,
-            child: track != null
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (track != null)
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      // Placeholder для Sleep Timer
+                    },
+                    child: const Icon(
+                      Icons.timer_outlined,
+                      color: Colors.white38,
+                      size: 20,
+                    ),
+                  ),
+                const SizedBox(width: 12),
+                if (track != null)
+                  Expanded(
                     child: Text(
                       track!.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
                       style: const TextStyle(
                         color: Colors.white38,
                         fontSize: 12,
                       ),
                     ),
-                  )
-                : const SizedBox.shrink(),
+                  ),
+                const SizedBox(width: 16),
+              ],
+            ),
           ),
         ],
       ),

@@ -504,7 +504,7 @@ class _CtrlButton extends StatelessWidget {
     },
     behavior: HitTestBehavior.opaque,
     child: Padding(
-      padding: const EdgeInsets.all(12), // Увеличена зона тапа (UX)
+      padding: const EdgeInsets.all(12),
       child: Icon(icon, color: color, size: size),
     ),
   );

@@ -1,6 +1,7 @@
 // lib/features/player/presentation/screens/player_screen.dart
 // Компактный плеер (телефон / узкий режим)
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,6 +25,52 @@ class PlayerScreen extends ConsumerWidget {
     }
 
     final track = player.currentTrack as TrackModel?;
+    final mediaQuery = MediaQuery.of(context);
+    final displayFeatures = mediaQuery.displayFeatures;
+
+    // Проверка на Flex Mode (Tabletop)
+    final hinge = displayFeatures.firstWhere(
+      (f) =>
+          f.type == DisplayFeatureType.hinge ||
+          f.type == DisplayFeatureType.fold,
+      orElse: () => const DisplayFeature(
+        bounds: Rect.zero,
+        type: DisplayFeatureType.unknown,
+        state: DisplayFeatureState.unknown,
+      ),
+    );
+
+    final isTabletop =
+        hinge.state == DisplayFeatureState.halfOpened &&
+        hinge.bounds.top > 0 &&
+        hinge.bounds.left == 0; // Горизонтальный сгиб
+
+    if (isTabletop) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: ProtogenixBackground(
+          child: SafeArea(
+            child: Column(
+              children: [
+                _TopBar(track: track),
+                // Верхняя половина: Текст песни
+                const Expanded(child: BeautifulLyricsView()),
+                // Зона шарнира (hinge)
+                SizedBox(height: hinge.bounds.height),
+                // Нижняя половина: Управление
+                Expanded(
+                  child: MusicVisualizerControls(
+                    compact: true,
+                    showFavorite: true,
+                  ),
+                ),
+                _BottomRow(track: track),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -64,15 +111,19 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 48,
+      width: double.infinity,
       child: Row(
         children: [
           // Левая часть: кнопка «Назад»
           SizedBox(
-            width: 60,
+            width: 64,
             child: Navigator.canPop(context)
                 ? Center(
                     child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.of(context).pop();
+                      },
                       child: Container(
                         width: 36,
                         height: 36,
@@ -105,14 +156,25 @@ class _TopBar extends StatelessWidget {
             ),
           ),
 
-          // Правая часть: иконка текстов
+          // Правая часть: кнопки EQ / Текст
           SizedBox(
-            width: 60,
+            width: 64,
             child: track != null
-                ? const Icon(
-                    Icons.lyrics_outlined,
-                    color: Colors.white54,
-                    size: 22,
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          // Placeholder для EQ
+                        },
+                        child: const Icon(
+                          Icons.tune_rounded,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
+                      ),
+                    ],
                   )
                 : const SizedBox.shrink(),
           ),
@@ -204,56 +266,62 @@ class _EmptyLibraryScreen extends ConsumerWidget {
       body: ProtogenixBackground(
         child: SafeArea(
           child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.library_music_rounded,
-                  size: 80,
-                  color: Colors.white24,
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Библиотека пуста',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Добавь треки, чтобы начать',
-                  style: TextStyle(color: Colors.white38, fontSize: 14),
-                ),
-                const SizedBox(height: 32),
-                GestureDetector(
-                      onTap: () => showImporterSheet(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 14,
+            child:
+                Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.library_music_rounded,
+                          size: 80,
+                          color: Colors.white24,
                         ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          color: Colors.white.withAlpha(20),
-                          border: Border.all(color: Colors.white24),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Библиотека пуста',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.add_rounded, color: Colors.white70),
-                            SizedBox(width: 8),
-                            Text(
-                              'Добавить трек',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 16,
-                              ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Добавь треки, чтобы начать',
+                          style: TextStyle(color: Colors.white38, fontSize: 14),
+                        ),
+                        const SizedBox(height: 32),
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            showImporterSheet(context);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 28,
+                              vertical: 14,
                             ),
-                          ],
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              color: Colors.white.withAlpha(20),
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add_rounded, color: Colors.white70),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Добавить трек',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     )
                     .animate()
                     .fadeIn(duration: 600.ms)
@@ -261,8 +329,6 @@ class _EmptyLibraryScreen extends ConsumerWidget {
                       begin: const Offset(0.9, 0.9),
                       curve: Curves.easeOutCubic,
                     ),
-              ],
-            ),
           ),
         ),
       ),

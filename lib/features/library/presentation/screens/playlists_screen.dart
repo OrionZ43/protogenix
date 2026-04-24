@@ -6,7 +6,6 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/playlist_database.dart';
@@ -158,59 +157,70 @@ class _EmptyPlaylists extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.queue_music_rounded,
-            size: 80,
-            color: Colors.white12,
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Нет плейлистов',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Создай первый плейлист',
-            style: TextStyle(color: Colors.white38, fontSize: 13),
-          ),
-          const SizedBox(height: 28),
-          GestureDetector(
-                onTap: onTap,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+      child:
+          Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.queue_music_rounded,
+                    size: 80,
+                    color: Colors.white12,
                   ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    color: Colors.white.withAlpha(18),
-                    border: Border.all(color: Colors.white24),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Нет плейлистов',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add_rounded, color: Colors.white70, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Создать плейлист',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Создай первый плейлист',
+                    style: TextStyle(color: Colors.white38, fontSize: 13),
+                  ),
+                  const SizedBox(height: 28),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      onTap();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
                       ),
-                    ],
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: Colors.white.withAlpha(18),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add_rounded,
+                            color: Colors.white70,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Создать плейлист',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               )
               .animate()
               .fadeIn(duration: 600.ms)
               .scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
-        ],
-      ),
     );
   }
 }

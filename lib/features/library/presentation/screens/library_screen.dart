@@ -47,32 +47,39 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.library_music_rounded,
-              size: 80,
-              color: Colors.white12,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Библиотека пуста',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Добавь треки, чтобы начать',
-              style: TextStyle(color: Colors.white38, fontSize: 14),
-            ),
-            const SizedBox(height: 32),
-            _ImportButton(onTap: onImport),
-          ],
-        ),
+        child:
+            Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.library_music_rounded,
+                      size: 80,
+                      color: Colors.white12,
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Библиотека пуста',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Добавь треки, чтобы начать',
+                      style: TextStyle(color: Colors.white38, fontSize: 14),
+                    ),
+                    const SizedBox(height: 32),
+                    _ImportButton(onTap: onImport),
+                  ],
+                )
+                .animate()
+                .fadeIn(duration: 600.ms)
+                .scale(
+                  begin: const Offset(0.9, 0.9),
+                  curve: Curves.easeOutCubic,
+                ),
       ),
     );
   }
@@ -99,15 +106,9 @@ class _ImportButton extends StatelessWidget {
             Icon(Icons.add_rounded, color: Colors.white70),
             SizedBox(width: 8),
             Text(
-                  'Импортировать',
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                )
-                .animate()
-                .fadeIn(duration: 600.ms)
-                .scale(
-                  begin: const Offset(0.9, 0.9),
-                  curve: Curves.easeOutCubic,
-                ),
+              'Импортировать',
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
           ],
         ),
       ),
