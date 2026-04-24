@@ -39,8 +39,10 @@ class LyricSyllable {
   final int startMs;
   final int durationMs;
   final bool isPartOfWord;
+  final bool isBackground;
 
   const LyricSyllable({
+    this.isBackground = false,
     required this.text,
     required this.startMs,
     required this.durationMs,
@@ -54,7 +56,8 @@ class LyricSyllable {
   bool get isEmphasized => durationMs >= 800 && text.length > 1;
 
   @override
-  String toString() => 'Syl("$text" @$startMs +$durationMs)';
+  String toString() =>
+      'Syl("$text" @$startMs +$durationMs${isBackground ? " BG" : ""})';
 }
 
 class LyricWord {
@@ -205,7 +208,9 @@ class AdvancedLrcParser {
 
     for (final raw in rawLines) {
       final trimmed = raw.trim();
-      if (trimmed.isEmpty) continue;
+      if (trimmed.isEmpty) {
+        continue;
+      }
 
       final meta = _metaTagRx.firstMatch(trimmed);
       if (meta != null) {
@@ -305,7 +310,9 @@ class AdvancedLrcParser {
 
     for (final raw in rawLines) {
       final trimmed = raw.trim();
-      if (trimmed.isEmpty) continue;
+      if (trimmed.isEmpty) {
+        continue;
+      }
 
       final meta = _metaTagRx.firstMatch(trimmed);
       if (meta != null) {
@@ -315,7 +322,9 @@ class AdvancedLrcParser {
       }
 
       final lrcMatch = _lrcLineRx.firstMatch(trimmed);
-      if (lrcMatch == null) continue;
+      if (lrcMatch == null) {
+        continue;
+      }
 
       var payload = lrcMatch.group(4)!;
 
@@ -330,14 +339,35 @@ class AdvancedLrcParser {
       singerIdx++;
 
       final wordMatches = _enhancedWordRx.allMatches(payload).toList();
-      if (wordMatches.isEmpty) continue;
+      if (wordMatches.isEmpty) {
+        continue;
+      }
 
       final words = <LyricWord>[];
+
+      final plainPayload =
+          payload.replaceAll(RegExp(r'<\d{1,2}:\d{2}\.\d{2,3}>'), '').trim();
+      final lineBgInfo = _processBackgroundText(plainPayload);
+      final bool isLineBg = lineBgInfo.isBg;
+
       for (var i = 0; i < wordMatches.length; i++) {
         final wm = wordMatches[i];
         final wStart = _lrcMs(wm.group(1)!, wm.group(2)!, wm.group(3)!);
-        final wText = wm.group(4)!.trim();
-        if (wText.isEmpty) continue;
+        var wTextRaw = wm.group(4)!.trim();
+        if (wTextRaw.isEmpty) {
+          continue;
+        }
+
+        if (isLineBg) {
+          if (i == 0) {
+            wTextRaw = wTextRaw.replaceFirst(RegExp(r'^[\(\[]'), '');
+          }
+          if (i == wordMatches.length - 1) {
+            wTextRaw = wTextRaw.replaceFirst(RegExp(r'[\)\]]$'), ''); }
+        }
+
+        final bgInfo = _processBackgroundText(wTextRaw);
+        final wText = bgInfo.text;
 
         final wEnd = i + 1 < wordMatches.length
             ? _lrcMs(wordMatches[i + 1].group(1)!, wordMatches[i + 1].group(2)!,
@@ -350,11 +380,14 @@ class AdvancedLrcParser {
             startMs: wStart,
             durationMs: (wEnd - wStart).clamp(50, 10000),
             isPartOfWord: false,
+            isBackground: isLineBg || bgInfo.isBg,
           ),
         ]));
       }
 
-      if (words.isEmpty) continue;
+      if (words.isEmpty) {
+        continue;
+      }
 
       result.add(LyricLine(
         startMs: words.first.startMs,
@@ -386,7 +419,9 @@ class AdvancedLrcParser {
 
     for (final raw in rawLines) {
       final trimmed = raw.trim();
-      if (trimmed.isEmpty) continue;
+      if (trimmed.isEmpty) {
+        continue;
+      }
 
       final meta = _metaTagRx.firstMatch(trimmed);
       if (meta != null) {
@@ -395,7 +430,9 @@ class AdvancedLrcParser {
       }
 
       final lrcMatch = _lrcLineRx.firstMatch(trimmed);
-      if (lrcMatch == null) continue;
+      if (lrcMatch == null) {
+        continue;
+      }
 
       final startMs =
           _lrcMs(lrcMatch.group(1)!, lrcMatch.group(2)!, lrcMatch.group(3)!);
@@ -412,12 +449,16 @@ class AdvancedLrcParser {
       singerIdx++;
 
       final text = payload.trim();
-      if (text.isEmpty) continue;
+      if (text.isEmpty) {
+        continue;
+      }
+
+      final bgInfo = _processBackgroundText(text);
 
       result.add(LyricLine(
         startMs: startMs,
         endMs: startMs + 4000, // placeholder — уточним ниже
-        words: [_plainWord(text, startMs, 4000)],
+        words: [_plainWord(bgInfo.text, startMs, 4000, isBg: bgInfo.isBg)],
         isOpposite: isOpposite,
       ));
     }
@@ -437,6 +478,8 @@ class AdvancedLrcParser {
   /// Каждая буква получает отдельный LyricSyllable — spring сработает на каждой.
   static LyricLine _expandSyncedLine(LyricLine line) {
     final text = line.plainText;
+    final isLineBg =
+        line.words.isNotEmpty && line.words.first.syllables.first.isBackground;
     final wordStrs = text.split(' ').where((w) => w.isNotEmpty).toList();
     if (wordStrs.isEmpty) return line;
 
@@ -458,13 +501,17 @@ class AdvancedLrcParser {
       final msBpL = wordDurMs / word.length;
       final syllables = <LyricSyllable>[];
 
+      final bgInfo = _processBackgroundText(wordStrs[wi]);
+      final cleanWord = bgInfo.text;
+
       for (var li = 0; li < word.length; li++) {
         final letterDurMs = msBpL.round().clamp(40, 2000);
         syllables.add(LyricSyllable(
-          text: word[li],
+          text: cleanWord[li],
           startMs: curMs,
           durationMs: letterDurMs,
           isPartOfWord: li < word.length - 1,
+          isBackground: isLineBg || bgInfo.isBg,
         ));
         curMs += letterDurMs;
       }
@@ -511,6 +558,29 @@ class AdvancedLrcParser {
   // HELPERS
   // ──────────────────────────────────────────────────────────────────────────
 
+  // ─── BACKGROUND TEXT PROCESSING ──────────────────────────────────────────
+  static ({String text, bool isBg}) _processBackgroundText(String input) {
+    if (input.isEmpty) return (text: input, isBg: false);
+
+    final trimmed = input.trim();
+    if ((trimmed.startsWith('(') && trimmed.endsWith(')')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      bool startsWithSpace = input.startsWith(' ');
+      bool endsWithSpace = input.endsWith(' ');
+
+      String stripped = trimmed.substring(1, trimmed.length - 1);
+
+      return (
+        text: (startsWithSpace ? ' ' : '') +
+            stripped +
+            (endsWithSpace ? ' ' : ''),
+        isBg: true
+      );
+    }
+
+    return (text: input, isBg: false);
+  }
+
   /// Группирует плоский список слогов в LyricWord по пробелам.
   ///
   /// АЛГОРИТМ:
@@ -526,24 +596,73 @@ class AdvancedLrcParser {
     for (var i = 0; i < syllables.length; i++) {
       final syl = syllables[i];
 
-      // Граница слова: этот слог заканчивается пробелом
-      //             ИЛИ следующий слог начинается с пробела
-      //             ИЛИ это последний слог
       final endsSpace = syl.text.endsWith(' ');
       final nextSpace =
           i + 1 < syllables.length && syllables[i + 1].text.startsWith(' ');
       final isWordEnd = endsSpace || nextSpace || i == syllables.length - 1;
 
-      // ✅ trim() только для ХРАНЕНИЯ — пробелы уже использованы для детекции
       current.add(LyricSyllable(
-        text: syl.text.trim(),
+        text: syl.text,
         startMs: syl.startMs,
         durationMs: syl.durationMs,
         isPartOfWord: !isWordEnd,
+        isBackground: syl.isBackground,
       ));
 
       if (isWordEnd && current.isNotEmpty) {
-        words.add(LyricWord(syllables: List.unmodifiable(current)));
+        final wordText = current.map((s) => s.text).join().trim();
+        final bgInfo = _processBackgroundText(wordText);
+
+        final processedSyllables = <LyricSyllable>[];
+
+        if (bgInfo.isBg) {
+          bool removedStart = false;
+          for (var j = 0; j < current.length; j++) {
+            var t = current[j].text;
+            if (!removedStart &&
+                (t.trimLeft().startsWith('(') ||
+                    t.trimLeft().startsWith('['))) {
+              t = t.replaceFirst(RegExp(r'^\s*[\(\[]'), '');
+              removedStart = true;
+            }
+            current[j] = LyricSyllable(
+              text: t,
+              startMs: current[j].startMs,
+              durationMs: current[j].durationMs,
+              isPartOfWord: current[j].isPartOfWord,
+              isBackground: true,
+            );
+          }
+
+          bool removedEnd = false;
+          for (var j = current.length - 1; j >= 0; j--) {
+            var t = current[j].text;
+            if (!removedEnd &&
+                (t.trimRight().endsWith(')') || t.trimRight().endsWith(']'))) {
+              t = t.replaceFirst(RegExp(r'[\)\]]\s*$'), '');
+              removedEnd = true;
+            }
+            current[j] = LyricSyllable(
+              text: t,
+              startMs: current[j].startMs,
+              durationMs: current[j].durationMs,
+              isPartOfWord: current[j].isPartOfWord,
+              isBackground: true,
+            );
+          }
+        }
+
+        for (var s in current) {
+          processedSyllables.add(LyricSyllable(
+            text: s.text.trim(),
+            startMs: s.startMs,
+            durationMs: s.durationMs,
+            isPartOfWord: s.isPartOfWord,
+            isBackground: s.isBackground || bgInfo.isBg,
+          ));
+        }
+
+        words.add(LyricWord(syllables: List.unmodifiable(processedSyllables)));
         current = [];
       }
     }
@@ -555,13 +674,16 @@ class AdvancedLrcParser {
     return words;
   }
 
-  static LyricWord _plainWord(String text, int startMs, int durationMs) {
+  static LyricWord _plainWord(String text, int startMs, int durationMs,
+      {bool isBg = false}) {
+    final bgInfo = _processBackgroundText(text);
     return LyricWord(syllables: [
       LyricSyllable(
-        text: text,
+        text: bgInfo.text,
         startMs: startMs,
         durationMs: durationMs > 0 ? durationMs : 3000,
         isPartOfWord: false,
+        isBackground: isBg || bgInfo.isBg,
       ),
     ]);
   }
