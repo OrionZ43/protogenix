@@ -10,9 +10,9 @@ class QueuePanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player  = ref.watch(playerProvider);
+    final player = ref.watch(playerProvider);
     final palette = ref.watch(paletteProvider);
-    final queue   = player.queue.cast<TrackModel>();
+    final queue = player.queue.cast<TrackModel>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -22,30 +22,29 @@ class QueuePanel extends ConsumerWidget {
           child: Text(
             'UP NEXT',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.white54,
-              letterSpacing: 4,
-            ),
+                  color: Colors.white54,
+                  letterSpacing: 4,
+                ),
           ).animate().fadeIn(duration: 600.ms),
         ),
-
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: queue.length,
             itemBuilder: (context, index) {
-              final track     = queue[index];
+              final track = queue[index];
               final isCurrent = index == player.currentIndex;
 
               return _QueueItem(
-                track:     track,
+                track: track,
                 isCurrent: isCurrent,
-                index:     index,
-                palette:   palette,
+                index: index,
+                palette: palette,
                 onTap: () {
                   ref.read(playerProvider.notifier).loadPlaylist(
-                    queue,
-                    initialIndex: index,
-                  );
+                        queue,
+                        initialIndex: index,
+                      );
                 },
               )
                   .animate(delay: Duration(milliseconds: 80 * index))
@@ -68,9 +67,9 @@ class _QueueItem extends StatelessWidget {
     required this.onTap,
   });
 
-  final TrackModel   track;
-  final bool         isCurrent;
-  final int          index;
+  final TrackModel track;
+  final bool isCurrent;
+  final int index;
   final PaletteState palette;
   final VoidCallback onTap;
 
@@ -120,9 +119,8 @@ class _QueueItem extends StatelessWidget {
                         track.title,
                         style: TextStyle(
                           color: isCurrent ? Colors.white : Colors.white70,
-                          fontWeight: isCurrent
-                              ? FontWeight.w600
-                              : FontWeight.normal,
+                          fontWeight:
+                              isCurrent ? FontWeight.w600 : FontWeight.normal,
                           fontSize: 15,
                         ),
                         overflow: TextOverflow.ellipsis,

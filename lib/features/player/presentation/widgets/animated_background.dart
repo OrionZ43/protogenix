@@ -1,21 +1,13 @@
 // lib/features/player/presentation/widgets/animated_background.dart
 //
-// AnimatedBackground v3 — автономный фон без привязки к аудио.
-//   • Блобы медленно «дышат» по таймеру (синусоидальный скейл)
-//   • Скорость орбиты и размер блобов постоянны
-//   • Vignette статична, нет никаких пульсаций от звука
-//   • Убраны: visualizer, bass, highs, beatDrop, spring-реакции
+// AnimatedBackground v3.1 — автономный фон с элитной оптимизацией.
 //
-// ── Bug 1 fix ──────────────────────────────────────────────────────────────
-//   БЫЛО:   _onTick → setState(() {}) → пересобирает ВЕСЬ стек включая
-//           widget.child (интерфейс плеера) — 60 fps jank.
-//   СТАЛО:  _onTick → _blobTick.value++ (ValueNotifier) → пересобирает
-//           ТОЛЬКО Positioned.fill(ListenableBuilder → CustomPaint).
-//           widget.child НЕ входит в поддерево AnimatedBuilder и потому
-//           не пересобирается от тиков фона вообще.
+// ── Elite Optimization ──────────────────────────────────────────────────────
+// Отрисовка блобов происходит ТОЛЬКО в фазе Paint через repaint: _blobTick.
+// Это полностью исключает build/layout тики (0ms build time во время анимации).
+// widget.child (интерфейс плеера) не перерисовывается от тиков фона.
 
 import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -45,8 +37,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
 
   late final List<_BlobState> _blobs;
 
-  /// Bug 1 fix: уведомляем ТОЛЬКО слой блобов, а не весь виджет.
-  /// Инкремент целого числа дешевле, чем создание нового объекта-состояния.
+  /// Уведомляем ТОЛЬКО слой отрисовки (Paint), а не дерево виджетов.
   final _blobTick = ValueNotifier<int>(0);
 
   @override
@@ -89,26 +80,21 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
       blob.tick(dt, _time);
     }
 
-    // Bug 1 fix: НЕ вызываем setState(). Только дёргаем нотификатор блобов.
-    // build() на _AnimatedBackgroundState теперь вызывается ТОЛЬКО при смене
-    // цветов палитры (т.е. при загрузке нового трека), а не 60 fps.
+    // Уведомляем Painter о необходимости перерисоваться. build() НЕ вызывается.
     if (mounted) _blobTick.value++;
   }
 
   Color get _baseBg => Color.lerp(widget.tertiaryColor, Colors.black, 0.55)!;
 
   List<Color> get _blobColors => [
-    widget.primaryColor.withValues(alpha: 0.55),
-    widget.secondaryColor.withValues(alpha: 0.45),
-    widget.primaryColor.withValues(alpha: 0.30),
-    widget.tertiaryColor.withValues(alpha: 0.40),
-  ];
+        widget.primaryColor.withValues(alpha: 0.55),
+        widget.secondaryColor.withValues(alpha: 0.45),
+        widget.primaryColor.withValues(alpha: 0.30),
+        widget.tertiaryColor.withValues(alpha: 0.40),
+      ];
 
   @override
   Widget build(BuildContext context) {
-    // ── Элитная оптимизация фона ─────────────────────────────────────────────
-    // Отрисовка блобов теперь происходит ТОЛЬКО в фазе Paint через repaint: _blobTick.
-    // ListenableBuilder удален, чтобы полностью исключить build/layout тики.
     return ColoredBox(
       color: _baseBg,
       child: Stack(
@@ -126,7 +112,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
             ),
           ),
 
-          // ── Статичная vignette — никогда не пересобирается от тиков ───────
+          // ── Статичная vignette ───────────────────────────────────────────
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -142,7 +128,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
             ),
           ),
 
-          // ── Дочерний UI — НЕ ТРОГАЕТСЯ при анимации блобов ────────────────
+          // ── Дочерний UI ──────────────────────────────────────────────────
           widget.child,
         ],
       ),
@@ -180,16 +166,14 @@ class _BlobState {
     nx = 0.5 + math.cos(angle) * orbitRadius;
     ny = 0.5 + math.sin(angle * 0.7 + phaseOffset) * orbitRadius;
 
-    scale =
-        1.0 +
-        math.sin(t * (math.pi * 2 / breathPeriod) + phaseOffset) * breathAmp;
+    scale = 1.0 + math.sin(t * (math.pi * 2 / breathPeriod) + phaseOffset) * breathAmp;
   }
 }
 
 // ── CustomPainter ─────────────────────────────────────────────────────────────
 
 class _BlobPainter extends CustomPainter {
-  const _BlobPainter({
+  _BlobPainter({
     required this.blobs,
     required this.colors,
     required Listenable repaint,
@@ -216,13 +200,12 @@ class _BlobPainter extends CustomPainter {
         Offset(cx, cy),
         radius,
         Paint()
-          ..shader =
-              RadialGradient(
-                colors: [color, color.withValues(alpha: 0.0)],
-                stops: const [0.0, 1.0],
-              ).createShader(
-                Rect.fromCircle(center: Offset(cx, cy), radius: radius),
-              )
+          ..shader = RadialGradient(
+            colors: [color, color.withValues(alpha: 0.0)],
+            stops: const [0.0, 1.0],
+          ).createShader(
+            Rect.fromCircle(center: Offset(cx, cy), radius: radius),
+          )
           ..blendMode = BlendMode.screen,
       );
     }

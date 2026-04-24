@@ -64,7 +64,7 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Ручка
+              // Ручка (Drag handle)
               Center(
                 child: Container(
                   margin: const EdgeInsets.only(top: 12, bottom: 20),
@@ -90,23 +90,23 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                     Text(
                       'ИМПОРТ ТРЕКА',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white38,
-                        letterSpacing: 3,
-                      ),
+                            color: Colors.white38,
+                            letterSpacing: 3,
+                          ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Вставь ссылку',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleLarge?.copyWith(color: Colors.white),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'YouTube, прямые ссылки на MP3/FLAC',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: Colors.white38),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white38,
+                          ),
                     ),
 
                     const SizedBox(height: 24),
@@ -219,14 +219,14 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
         color: isError
             ? Colors.red.withAlpha(20)
             : isDone
-            ? Colors.green.withAlpha(20)
-            : Colors.white.withAlpha(8),
+                ? Colors.green.withAlpha(20)
+                : Colors.white.withAlpha(8),
         border: Border.all(
           color: isError
               ? Colors.red.withAlpha(60)
               : isDone
-              ? Colors.green.withAlpha(60)
-              : Colors.white.withAlpha(15),
+                  ? Colors.green.withAlpha(60)
+                  : Colors.white.withAlpha(15),
         ),
       ),
       child: Column(
@@ -238,13 +238,13 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                 isError
                     ? Icons.error_outline_rounded
                     : isDone
-                    ? Icons.check_circle_outline_rounded
-                    : Icons.downloading_rounded,
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.downloading_rounded,
                 color: isError
                     ? Colors.redAccent
                     : isDone
-                    ? Colors.greenAccent
-                    : Colors.white60,
+                        ? Colors.greenAccent
+                        : Colors.white60,
                 size: 18,
               ),
               const SizedBox(width: 8),
@@ -257,8 +257,8 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                     color: isError
                         ? Colors.redAccent
                         : isDone
-                        ? Colors.greenAccent
-                        : Colors.white70,
+                            ? Colors.greenAccent
+                            : Colors.white70,
                     fontSize: 13,
                   ),
                 ),

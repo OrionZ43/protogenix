@@ -19,12 +19,11 @@ class FavoritesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allTracks  = ref.watch(libraryProvider);
+    final allTracks = ref.watch(libraryProvider);
     final favoriteIds = ref.watch(favoritesProvider);
 
-    final favorites = allTracks
-        .where((t) => favoriteIds.contains(t.id))
-        .toList();
+    final favorites =
+        allTracks.where((t) => favoriteIds.contains(t.id)).toList();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -42,9 +41,9 @@ class FavoritesScreen extends ConsumerWidget {
                       const Text(
                         'Избранное',
                         style: TextStyle(
-                          color:         Colors.white,
-                          fontSize:      26,
-                          fontWeight:    FontWeight.w700,
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: -0.5,
                         ),
                       ),
@@ -53,7 +52,7 @@ class FavoritesScreen extends ConsumerWidget {
                         Text(
                           '${favorites.length}',
                           style: const TextStyle(
-                            color:    Colors.white38,
+                            color: Colors.white38,
                             fontSize: 16,
                           ),
                         ),
@@ -78,8 +77,8 @@ class FavoritesScreen extends ConsumerWidget {
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, i) => _FavoriteTile(
-                      track:     favorites[i],
-                      index:     i,
+                      track: favorites[i],
+                      index: i,
                       allTracks: favorites,
                     ),
                     childCount: favorites.length,
@@ -106,27 +105,26 @@ class _PlayAllButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: () {
-        final models = tracks.map((t) => t.toTrackModel()).toList();
+        final models = tracks.map((t) => t.toTrackModel());
         ref.read(playerProvider.notifier).loadPlaylist(models);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          color:  Colors.white.withAlpha(15),
+          color: Colors.white.withAlpha(15),
           border: Border.all(color: Colors.white.withAlpha(25)),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.favorite_rounded,
-                color: Colors.redAccent, size: 18),
+            Icon(Icons.favorite_rounded, color: Colors.redAccent, size: 18),
             SizedBox(width: 8),
             Text(
               'Слушать избранное',
               style: TextStyle(
-                color:      Colors.white,
-                fontSize:   14,
+                color: Colors.white,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -150,15 +148,15 @@ class _EmptyFavorites extends StatelessWidget {
         children: [
           const Icon(
             Icons.favorite_outline_rounded,
-            size:  80,
+            size: 80,
             color: Colors.white12,
           ),
           const SizedBox(height: 20),
           const Text(
             'Нет избранных треков',
             style: TextStyle(
-              color:      Colors.white70,
-              fontSize:   20,
+              color: Colors.white70,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -182,18 +180,18 @@ class _FavoriteTile extends ConsumerWidget {
     required this.allTracks,
   });
 
-  final LibraryTrack       track;
-  final int                index;
+  final LibraryTrack track;
+  final int index;
   final List<LibraryTrack> allTracks;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player    = ref.watch(playerProvider);
+    final player = ref.watch(playerProvider);
     final isPlaying = player.currentTrack?.id == track.id;
 
     return InkWell(
       onTap: () {
-        final models = allTracks.map((t) => t.toTrackModel()).toList();
+        final models = allTracks.map((t) => t.toTrackModel());
         ref.read(playerProvider.notifier).loadPlaylist(
               models,
               initialIndex: index,
@@ -213,7 +211,7 @@ class _FavoriteTile extends ConsumerWidget {
                 child: Icon(
                   Icons.favorite_rounded,
                   color: Colors.redAccent,
-                  size:  18,
+                  size: 18,
                 ),
               ),
             ),
@@ -225,9 +223,9 @@ class _FavoriteTile extends ConsumerWidget {
                 image: track.coverPath != null
                     ? FileImage(File(track.coverPath!)) as ImageProvider
                     : const AssetImage('assets/images/mock_cover.jpg'),
-                width:  50,
+                width: 50,
                 height: 50,
-                fit:    BoxFit.cover,
+                fit: BoxFit.cover,
               ),
             ),
 
@@ -242,10 +240,9 @@ class _FavoriteTile extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color:      Colors.white,
-                      fontSize:   15,
-                      fontWeight:
-                          isPlaying ? FontWeight.w600 : FontWeight.w500,
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: isPlaying ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -254,7 +251,7 @@ class _FavoriteTile extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color:    Colors.white54,
+                      color: Colors.white54,
                       fontSize: 12,
                     ),
                   ),
@@ -264,9 +261,9 @@ class _FavoriteTile extends ConsumerWidget {
 
             IconButton(
               icon: const Icon(Icons.more_vert_rounded),
-              color:       Colors.white38,
-              iconSize:    20,
-              padding:     EdgeInsets.zero,
+              color: Colors.white38,
+              iconSize: 20,
+              padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               onPressed: () => showTrackContextMenu(context, ref, track),
             ),

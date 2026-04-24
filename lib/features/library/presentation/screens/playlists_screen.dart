@@ -6,6 +6,8 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/playlist_database.dart';
@@ -36,12 +38,12 @@ class PlaylistsScreen extends ConsumerWidget {
         child: SafeArea(
           bottom: false,
           child: CustomScrollView(
-            slivers: [
+            slivers:[
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                   child: Row(
-                    children: [
+                    children:[
                       const Text(
                         'Плейлисты',
                         style: TextStyle(
@@ -64,7 +66,6 @@ class PlaylistsScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-
               if (playlists.isEmpty)
                 SliverFillRemaining(
                   child: _EmptyPlaylists(
@@ -75,13 +76,12 @@ class PlaylistsScreen extends ConsumerWidget {
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 1.1,
-                        ),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.1,
+                    ),
                     delegate: SliverChildBuilderDelegate(
                       (context, i) => _PlaylistCard(
                         playlist: playlists[i],
@@ -101,7 +101,6 @@ class PlaylistsScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-
               const SliverToBoxAdapter(child: SizedBox(height: 120)),
             ],
           ),
@@ -130,7 +129,7 @@ class _CreateFab extends StatelessWidget {
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
-          children: [
+          children:[
             Icon(Icons.add_rounded, color: Colors.white, size: 20),
             SizedBox(width: 8),
             Text(
@@ -157,70 +156,66 @@ class _EmptyPlaylists extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child:
-          Column(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children:[
+          const Icon(
+            Icons.queue_music_rounded,
+            size: 80,
+            color: Colors.white12,
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Нет плейлистов',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Создай первый плейлист',
+            style: TextStyle(color: Colors.white38, fontSize: 13),
+          ),
+          const SizedBox(height: 28),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onTap();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                color: Colors.white.withAlpha(18),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.queue_music_rounded,
-                    size: 80,
-                    color: Colors.white12,
+                children:[
+                  Icon(
+                    Icons.add_rounded,
+                    color: Colors.white70,
+                    size: 18,
                   ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Нет плейлистов',
+                  SizedBox(width: 8),
+                  Text(
+                    'Создать плейлист',
                     style: TextStyle(
                       color: Colors.white70,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Создай первый плейлист',
-                    style: TextStyle(color: Colors.white38, fontSize: 13),
-                  ),
-                  const SizedBox(height: 28),
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      onTap();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: Colors.white.withAlpha(18),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.add_rounded,
-                            color: Colors.white70,
-                            size: 18,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Создать плейлист',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
+                      fontSize: 14,
                     ),
                   ),
                 ],
-              )
-              .animate()
-              .fadeIn(duration: 600.ms)
-              .scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
+              ),
+            ),
+          ),
+        ],
+      ).animate().fadeIn(duration: 600.ms).scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
     );
   }
 }
@@ -249,7 +244,7 @@ class _PlaylistCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          children:[
             Container(
               width: 44,
               height: 44,
@@ -263,9 +258,7 @@ class _PlaylistCard extends StatelessWidget {
                 size: 22,
               ),
             ),
-
             const Spacer(),
-
             Text(
               playlist.name,
               maxLines: 2,
@@ -276,11 +269,9 @@ class _PlaylistCard extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-
             const SizedBox(height: 6),
-
             Row(
-              children: [
+              children:[
                 GestureDetector(
                   onTap: onRename,
                   child: const Icon(
@@ -342,7 +333,7 @@ Future<void> _createPlaylistDialog(BuildContext context, WidgetRef ref) async {
                 ),
               ),
             ),
-            actions: [
+            actions:[
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
                 child: const Text(
@@ -403,7 +394,7 @@ Future<void> _renameDialog(
                 ),
               ),
             ),
-            actions: [
+            actions:[
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
                 child: const Text(
@@ -461,7 +452,7 @@ class _GlassDialog extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  children:[
                     Text(
                       title,
                       style: const TextStyle(
@@ -508,14 +499,16 @@ class PlaylistDetailScreen extends ConsumerWidget {
             loading: () => const Center(
               child: CircularProgressIndicator(color: Colors.white24),
             ),
-            error: (e, _) => Center(
+            error: (e, _) => const Center(
               child: Text(
                 'Ошибка загрузки',
-                style: const TextStyle(color: Colors.white54),
+                style: TextStyle(color: Colors.white54),
               ),
             ),
-            data: (tracks) =>
-                _PlaylistContent(playlist: playlist, tracks: tracks),
+            data: (tracks) => _PlaylistContent(
+              playlist: playlist,
+              tracks: tracks,
+            ),
           ),
         ),
       ),
@@ -532,13 +525,13 @@ class _PlaylistContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return CustomScrollView(
-      slivers: [
+      slivers:[
         // Заголовок
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
             child: Row(
-              children: [
+              children:[
                 IconButton(
                   icon: const Icon(
                     Icons.arrow_back_rounded,
@@ -563,7 +556,10 @@ class _PlaylistContent extends ConsumerWidget {
                 ),
                 Text(
                   '${tracks.length} треков',
-                  style: const TextStyle(color: Colors.white38, fontSize: 13),
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -577,7 +573,8 @@ class _PlaylistContent extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: GestureDetector(
                 onTap: () {
-                  final models = tracks.map((t) => t.toTrackModel()).toList();
+                  // ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ: Без .toList()
+                  final models = tracks.map((t) => t.toTrackModel());
                   ref.read(playerProvider.notifier).loadPlaylist(models);
                 },
                 child: Container(
@@ -589,7 +586,7 @@ class _PlaylistContent extends ConsumerWidget {
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+                    children:[
                       Icon(
                         Icons.play_arrow_rounded,
                         color: Colors.white,
@@ -660,15 +657,17 @@ class _PlaylistTrackTile extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        final models = allTracks.map((t) => t.toTrackModel()).toList();
-        ref
-            .read(playerProvider.notifier)
-            .loadPlaylist(models, initialIndex: index);
+        // ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ: Без .toList()
+        final models = allTracks.map((t) => t.toTrackModel());
+        ref.read(playerProvider.notifier).loadPlaylist(
+              models,
+              initialIndex: index,
+            );
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
-          children: [
+          children:[
             Text(
               '${index + 1}',
               style: TextStyle(
@@ -697,7 +696,7 @@ class _PlaylistTrackTile extends ConsumerWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children:[
                   Text(
                     track.title,
                     maxLines: 1,
@@ -713,7 +712,10 @@ class _PlaylistTrackTile extends ConsumerWidget {
                     track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -726,8 +728,12 @@ class _PlaylistTrackTile extends ConsumerWidget {
               iconSize: 20,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: () =>
-                  _showPlaylistTrackOptions(context, ref, track, playlistId),
+              onPressed: () => _showPlaylistTrackOptions(
+                context,
+                ref,
+                track,
+                playlistId,
+              ),
             ),
           ],
         ),
@@ -750,7 +756,10 @@ void _showPlaylistTrackOptions(
     backgroundColor: Colors.transparent,
     builder: (_) => UncontrolledProviderScope(
       container: ProviderScope.containerOf(context),
-      child: _PlaylistTrackOptionsSheet(track: track, playlistId: playlistId),
+      child: _PlaylistTrackOptionsSheet(
+        track: track,
+        playlistId: playlistId,
+      ),
     ),
   );
 }
@@ -775,7 +784,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
+          children:[
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
               width: 40,
@@ -790,7 +799,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Row(
-                children: [
+                children:[
                   Expanded(
                     child: Text(
                       track.title,
@@ -864,7 +873,7 @@ class _OptionTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
-          children: [
+          children:[
             Icon(icon, color: iconColor ?? Colors.white70, size: 22),
             const SizedBox(width: 16),
             Text(

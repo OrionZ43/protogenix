@@ -27,21 +27,18 @@ class KaraokeState {
   final LyricsFormat format;
 
   const KaraokeState({
-    this.lines        = const [],
+    this.lines = const [],
     this.currentIndex = -1,
-    this.isLoaded     = false,
-    this.format       = LyricsFormat.plain,
+    this.isLoaded = false,
+    this.format = LyricsFormat.plain,
   });
 
-  LyricLine? get currentLine =>
-      currentIndex >= 0 && currentIndex < lines.length
-          ? lines[currentIndex]
-          : null;
+  LyricLine? get currentLine => currentIndex >= 0 && currentIndex < lines.length
+      ? lines[currentIndex]
+      : null;
 
   LyricLine? get nextLine =>
-      currentIndex + 1 < lines.length
-          ? lines[currentIndex + 1]
-          : null;
+      currentIndex + 1 < lines.length ? lines[currentIndex + 1] : null;
 
   bool get hasSyllableTimings => format == LyricsFormat.yrc;
   bool get hasWordTimings =>
@@ -49,15 +46,16 @@ class KaraokeState {
 
   KaraokeState copyWith({
     List<LyricLine>? lines,
-    int?             currentIndex,
-    bool?            isLoaded,
-    LyricsFormat?    format,
-  }) => KaraokeState(
-    lines:        lines        ?? this.lines,
-    currentIndex: currentIndex ?? this.currentIndex,
-    isLoaded:     isLoaded     ?? this.isLoaded,
-    format:       format       ?? this.format,
-  );
+    int? currentIndex,
+    bool? isLoaded,
+    LyricsFormat? format,
+  }) =>
+      KaraokeState(
+        lines: lines ?? this.lines,
+        currentIndex: currentIndex ?? this.currentIndex,
+        isLoaded: isLoaded ?? this.isLoaded,
+        format: format ?? this.format,
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,9 +137,9 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
       final cached = _cache[track.id]!;
       debugPrint('[Karaoke] ✓ Кэш hit для "${track.title}"');
       state = KaraokeState(
-        lines:    cached.lines,
+        lines: cached.lines,
         isLoaded: true,
-        format:   cached.format,
+        format: cached.format,
       );
       return;
     }
@@ -154,7 +152,7 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
       if (track.lrcPath != null) {
         final file = File(track.lrcPath!);
         if (await file.exists()) {
-          content    = await file.readAsString();
+          content = await file.readAsString();
           sourceType = null;
           debugPrint('[Karaoke] Загружен файл: ${track.lrcPath}');
         }
@@ -166,8 +164,8 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
       // 2. Поиск через LyricsService
       if (content == null) {
         final results = await LyricsService.instance.fetchLyrics(
-          title:    track.title,
-          artist:   track.artist,
+          title: track.title,
+          artist: track.artist,
           filePath: track.filePath ?? '',
         );
 
@@ -176,19 +174,20 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
 
         if (results.isNotEmpty) {
           final best = results.first;
-          content    = best.metadata.content;
+          content = best.metadata.content;
           sourceType = best.metadata.type;
           debugPrint(
             '[Karaoke] Найдено: ${best.metadata.type.label} '
-                'score=${best.scoreLabel} '
-                'source=${best.metadata.source}',
+            'score=${best.scoreLabel} '
+            'source=${best.metadata.source}',
           );
         }
       }
 
       if (content == null || content.trim().isEmpty) {
         // Кэшируем пустой результат, чтобы не делать запрос повторно
-        _cache[track.id] = const ParsedLyrics(lines: [], format: LyricsFormat.plain);
+        _cache[track.id] =
+            const ParsedLyrics(lines: [], format: LyricsFormat.plain);
         state = const KaraokeState(isLoaded: true);
         debugPrint('[Karaoke] Текст не найден для "${track.title}"');
         return;
@@ -212,14 +211,14 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
       }
 
       state = KaraokeState(
-        lines:    parsed.lines,
+        lines: parsed.lines,
         isLoaded: true,
-        format:   parsed.format,
+        format: parsed.format,
       );
 
       debugPrint(
         '[Karaoke] Загружено: ${parsed.lines.length} строк, '
-            'формат=${parsed.format.label}',
+        'формат=${parsed.format.label}',
       );
     } catch (e, st) {
       if (!mounted) return;
@@ -269,9 +268,9 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
     }
 
     state = KaraokeState(
-      lines:    parsed.lines,
+      lines: parsed.lines,
       isLoaded: true,
-      format:   parsed.format,
+      format: parsed.format,
     );
   }
 
@@ -285,9 +284,9 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
     }
 
     state = KaraokeState(
-      lines:    parsed.lines,
+      lines: parsed.lines,
       isLoaded: true,
-      format:   parsed.format,
+      format: parsed.format,
     );
   }
 
@@ -308,11 +307,11 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 final karaokeProvider =
-StateNotifierProvider<KaraokeNotifier, KaraokeState>((ref) {
+    StateNotifierProvider<KaraokeNotifier, KaraokeState>((ref) {
   return KaraokeNotifier(ref);
 });
 
-final karaokeIndexProvider  = karaokeProvider.select((s) => s.currentIndex);
-final karaokeFormatProvider  = karaokeProvider.select((s) => s.format);
+final karaokeIndexProvider = karaokeProvider.select((s) => s.currentIndex);
+final karaokeFormatProvider = karaokeProvider.select((s) => s.format);
 final hasSyllableTimingsProvider =
-karaokeProvider.select((s) => s.hasSyllableTimings);
+    karaokeProvider.select((s) => s.hasSyllableTimings);

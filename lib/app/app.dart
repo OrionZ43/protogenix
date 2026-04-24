@@ -11,10 +11,10 @@ class ProtogenixApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title:                    'Protogenix',
+      title: 'Protogenix',
       debugShowCheckedModeBanner: false,
-      theme:                    AppTheme.dark(),
-      home:                     const AppShell(),
+      theme: AppTheme.dark(),
+      home: const AppShell(),
     );
   }
 }

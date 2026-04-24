@@ -1,8 +1,9 @@
 // lib/features/player/presentation/widgets/music_visualizer_controls.dart
 //
-// MusicVisualizerControls v5 — добавлена кнопка «Избранное» (сердечко).
+// MusicVisualizerControls v5.1 — доработано с тактильной отдачей и улучшенными зонами тапа.
 //   • showFavorite: true → сердечко слева от названия трека
 //   • Реактивно через isFavoriteProvider — мгновенный отклик без перезагрузки
+//   • Интегрирован HapticFeedback для премиального ощущения
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -179,7 +180,6 @@ class _CompactLayout extends StatelessWidget {
             ),
           ),
         ),
-
         if (hasButtons)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -228,30 +228,28 @@ class _CapsuleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: () {
-      HapticFeedback.lightImpact();
-      onTap();
-    },
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withAlpha(18),
-        border: Border.all(color: Colors.white.withAlpha(35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 15),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white60, fontSize: 12),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: Colors.white.withAlpha(18),
+            border: Border.all(color: Colors.white.withAlpha(35)),
           ),
-        ],
-      ),
-    ),
-  );
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 15),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12)),
+            ],
+          ),
+        ),
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -316,9 +314,8 @@ class _TrackInfo extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isFav = showFavorite
-        ? ref.watch(isFavoriteProvider(track.id))
-        : false;
+    final isFav =
+        showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
 
     final titleStyle = TextStyle(
       color: Colors.white,
@@ -431,7 +428,6 @@ class _Controls extends StatelessWidget {
           onTap: notifier.previous,
         ),
         const SizedBox(width: 16),
-
         GestureDetector(
           onTap: () {
             HapticFeedback.mediumImpact();
@@ -458,7 +454,6 @@ class _Controls extends StatelessWidget {
             ),
           ),
         ),
-
         const SizedBox(width: 16),
         _CtrlButton(
           icon: Icons.skip_next_rounded,
@@ -498,14 +493,14 @@ class _CtrlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: () {
-      HapticFeedback.lightImpact();
-      onTap();
-    },
-    behavior: HitTestBehavior.opaque,
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Icon(icon, color: color, size: size),
-    ),
-  );
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Icon(icon, color: color, size: size),
+        ),
+      );
 }

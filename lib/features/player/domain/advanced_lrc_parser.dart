@@ -23,11 +23,11 @@ enum LyricsFormat { yrc, enhancedLrc, syncedLrc, plain }
 
 extension LyricsFormatExt on LyricsFormat {
   String get label => switch (this) {
-    LyricsFormat.yrc         => 'YRC (Syllable)',
-    LyricsFormat.enhancedLrc => 'Enhanced LRC (Word)',
-    LyricsFormat.syncedLrc   => 'Synced LRC (Line)',
-    LyricsFormat.plain       => 'Plain',
-  };
+        LyricsFormat.yrc => 'YRC (Syllable)',
+        LyricsFormat.enhancedLrc => 'Enhanced LRC (Word)',
+        LyricsFormat.syncedLrc => 'Synced LRC (Line)',
+        LyricsFormat.plain => 'Plain',
+      };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,9 +36,9 @@ extension LyricsFormatExt on LyricsFormat {
 
 class LyricSyllable {
   final String text;
-  final int    startMs;
-  final int    durationMs;
-  final bool   isPartOfWord;
+  final int startMs;
+  final int durationMs;
+  final bool isPartOfWord;
 
   const LyricSyllable({
     required this.text,
@@ -47,7 +47,7 @@ class LyricSyllable {
     required this.isPartOfWord,
   });
 
-  int  get endMs        => startMs + durationMs;
+  int get endMs => startMs + durationMs;
 
   /// Акцентированный слог: долгий (≥800ms) И содержит >1 символа.
   /// Такой слог разбивается на побуквенную анимацию в _EmphasizedSyllable.
@@ -61,16 +61,16 @@ class LyricWord {
   final List<LyricSyllable> syllables;
   const LyricWord({required this.syllables});
 
-  String get text    => syllables.map((s) => s.text).join();
-  int    get startMs => syllables.first.startMs;
-  int    get endMs   => syllables.last.endMs;
+  String get text => syllables.map((s) => s.text).join();
+  int get startMs => syllables.first.startMs;
+  int get endMs => syllables.last.endMs;
 }
 
 class LyricLine {
-  final int             startMs;
-  final int             endMs;
+  final int startMs;
+  final int endMs;
   final List<LyricWord> words;
-  final bool            isOpposite;
+  final bool isOpposite;
 
   const LyricLine({
     required this.startMs,
@@ -92,16 +92,16 @@ class LyricLine {
       words.isNotEmpty && words.any((w) => w.syllables.isNotEmpty);
 
   LyricLine copyWith({int? endMs}) => LyricLine(
-    startMs:    startMs,
-    endMs:      endMs ?? this.endMs,
-    words:      words,
-    isOpposite: isOpposite,
-  );
+        startMs: startMs,
+        endMs: endMs ?? this.endMs,
+        words: words,
+        isOpposite: isOpposite,
+      );
 }
 
 class ParsedLyrics {
-  final List<LyricLine>     lines;
-  final LyricsFormat        format;
+  final List<LyricLine> lines;
+  final LyricsFormat format;
   final Map<String, String> tags;
 
   const ParsedLyrics({
@@ -118,7 +118,6 @@ class ParsedLyrics {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AdvancedLrcParser {
-
   // ── Regex ─────────────────────────────────────────────────────────────────
 
   /// YRC заголовок строки: [startMs,durationMs]
@@ -129,12 +128,11 @@ class AdvancedLrcParser {
   static final _yrcSylRx = RegExp(r'\((\d+),(\d+),\d+\)([^(]*)');
 
   /// Synced/Enhanced LRC строка: [mm:ss.xx]
-  static final _lrcLineRx =
-  RegExp(r'^\[(\d{1,2}):(\d{2})\.(\d{2,3})\](.*)$');
+  static final _lrcLineRx = RegExp(r'^\[(\d{1,2}):(\d{2})\.(\d{2,3})\](.*)$');
 
   /// Enhanced LRC тег слова: <mm:ss.xx>text
   static final _enhancedWordRx =
-  RegExp(r'<(\d{1,2}):(\d{2})\.(\d{2,3})>([^<]*)');
+      RegExp(r'<(\d{1,2}):(\d{2})\.(\d{2,3})>([^<]*)');
 
   /// LRC метатег: [ti:Title]
   static final _metaTagRx = RegExp(r'^\[([a-zA-Z]+):(.+)\]$');
@@ -151,13 +149,11 @@ class AdvancedLrcParser {
   // ── Определение формата ──────────────────────────────────────────────────
 
   static LyricsFormat _detectFormat(String content) {
-    final lines = content
-        .split('\n')
-        .map((l) => l.trim())
-        .where((l) => l.isNotEmpty);
+    final lines =
+        content.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty);
 
-    int yrcCount      = 0;
-    int lrcCount      = 0;
+    int yrcCount = 0;
+    int lrcCount = 0;
     int enhancedCount = 0;
 
     for (final line in lines) {
@@ -169,9 +165,9 @@ class AdvancedLrcParser {
       }
     }
 
-    if (yrcCount > 0)      return LyricsFormat.yrc;
+    if (yrcCount > 0) return LyricsFormat.yrc;
     if (enhancedCount > 0) return LyricsFormat.enhancedLrc;
-    if (lrcCount > 0)      return LyricsFormat.syncedLrc;
+    if (lrcCount > 0) return LyricsFormat.syncedLrc;
     return LyricsFormat.plain;
   }
 
@@ -190,10 +186,10 @@ class AdvancedLrcParser {
     debugPrint('[AdvancedLrcParser] Формат: ${format.label}');
 
     return switch (format) {
-      LyricsFormat.yrc         => _parseYrc(content),
+      LyricsFormat.yrc => _parseYrc(content),
       LyricsFormat.enhancedLrc => _parseEnhancedLrc(content),
-      LyricsFormat.syncedLrc   => _parseSyncedLrc(content),
-      LyricsFormat.plain       => _parsePlain(content),
+      LyricsFormat.syncedLrc => _parseSyncedLrc(content),
+      LyricsFormat.plain => _parsePlain(content),
     };
   }
 
@@ -204,8 +200,8 @@ class AdvancedLrcParser {
 
   static ParsedLyrics _parseYrc(String content) {
     final rawLines = content.split('\n');
-    final result   = <LyricLine>[];
-    final tags     = <String, String>{};
+    final result = <LyricLine>[];
+    final tags = <String, String>{};
 
     for (final raw in rawLines) {
       final trimmed = raw.trim();
@@ -231,9 +227,9 @@ class AdvancedLrcParser {
     if (headerMatch == null) return null;
 
     final lineStartMs = int.parse(headerMatch.group(1)!);
-    final lineDurMs   = int.parse(headerMatch.group(2)!);
-    final lineEndMs   = lineStartMs + lineDurMs;
-    final rest        = raw.substring(headerMatch.end);
+    final lineDurMs = int.parse(headerMatch.group(2)!);
+    final lineEndMs = lineStartMs + lineDurMs;
+    final rest = raw.substring(headerMatch.end);
 
     final sylMatches = _yrcSylRx.allMatches(rest).toList();
     if (sylMatches.isEmpty) return null;
@@ -243,8 +239,8 @@ class AdvancedLrcParser {
     final rawSyls = <({int start, int dur, String text})>[];
     for (final m in sylMatches) {
       final start = int.parse(m.group(1)!);
-      final dur   = int.parse(m.group(2)!);
-      final text  = _cleanYrcText(m.group(3) ?? '');
+      final dur = int.parse(m.group(2)!);
+      final text = _cleanYrcText(m.group(3) ?? '');
 
       // Пропускаем пустые (только пробелы или пустую строку)
       if (text.trim().isNotEmpty) {
@@ -261,12 +257,14 @@ class AdvancedLrcParser {
     // ─── КОНВЕРТИРУЕМ В LyricSyllable ────────────────────────────────────
     // text СОХРАНЯЕМ С ПРОБЕЛАМИ — _groupSyllablesIntoWords использует их
     // для определения границ слов, затем strip-ает при сохранении в модель.
-    final syllables = rawSyls.map((s) => LyricSyllable(
-      text:         s.text,            // с trailing-пробелом если есть
-      startMs:      s.start,
-      durationMs:   s.dur > 0 ? s.dur : 100,
-      isPartOfWord: false,             // определим в _groupSyllablesIntoWords
-    )).toList();
+    final syllables = rawSyls
+        .map((s) => LyricSyllable(
+              text: s.text, // с trailing-пробелом если есть
+              startMs: s.start,
+              durationMs: s.dur > 0 ? s.dur : 100,
+              isPartOfWord: false, // определим в _groupSyllablesIntoWords
+            ))
+        .toList();
 
     final words = _groupSyllablesIntoWords(syllables);
 
@@ -276,8 +274,8 @@ class AdvancedLrcParser {
 
     return LyricLine(
       startMs: lineStartMs,
-      endMs:   lineEndMs,
-      words:   words,
+      endMs: lineEndMs,
+      words: words,
     );
   }
 
@@ -289,7 +287,7 @@ class AdvancedLrcParser {
   static String _cleanYrcText(String raw) {
     return raw
         .replaceAll(RegExp(r'\(\d+,\d+,\d+\)'), '') // вложенные слоговые теги
-        .replaceAll(RegExp(r'\[\d+,\d+\]'), '');     // вложенные временны́е теги
+        .replaceAll(RegExp(r'\[\d+,\d+\]'), ''); // вложенные временны́е теги
     // .trim() — НАМЕРЕННО УБРАНО
   }
 
@@ -299,11 +297,11 @@ class AdvancedLrcParser {
   // ──────────────────────────────────────────────────────────────────────────
 
   static ParsedLyrics _parseEnhancedLrc(String content) {
-    final rawLines   = content.split('\n');
-    final result     = <LyricLine>[];
-    final tags       = <String, String>{};
-    var   singerIdx  = 0;
-    var   duetActive = false;
+    final rawLines = content.split('\n');
+    final result = <LyricLine>[];
+    final tags = <String, String>{};
+    var singerIdx = 0;
+    var duetActive = false;
 
     for (final raw in rawLines) {
       final trimmed = raw.trim();
@@ -319,13 +317,13 @@ class AdvancedLrcParser {
       final lrcMatch = _lrcLineRx.firstMatch(trimmed);
       if (lrcMatch == null) continue;
 
-      var   payload = lrcMatch.group(4)!;
+      var payload = lrcMatch.group(4)!;
 
       bool isOpposite = false;
       if (_duetTagRx.hasMatch(payload)) {
         duetActive = true;
         isOpposite = true;
-        payload    = payload.replaceAll(_duetTagRx, '').trim();
+        payload = payload.replaceAll(_duetTagRx, '').trim();
       } else if (duetActive) {
         isOpposite = singerIdx.isOdd;
       }
@@ -336,22 +334,21 @@ class AdvancedLrcParser {
 
       final words = <LyricWord>[];
       for (var i = 0; i < wordMatches.length; i++) {
-        final wm      = wordMatches[i];
-        final wStart  = _lrcMs(wm.group(1)!, wm.group(2)!, wm.group(3)!);
-        final wText   = wm.group(4)!.trim();
+        final wm = wordMatches[i];
+        final wStart = _lrcMs(wm.group(1)!, wm.group(2)!, wm.group(3)!);
+        final wText = wm.group(4)!.trim();
         if (wText.isEmpty) continue;
 
         final wEnd = i + 1 < wordMatches.length
-            ? _lrcMs(wordMatches[i + 1].group(1)!,
-            wordMatches[i + 1].group(2)!,
-            wordMatches[i + 1].group(3)!)
+            ? _lrcMs(wordMatches[i + 1].group(1)!, wordMatches[i + 1].group(2)!,
+                wordMatches[i + 1].group(3)!)
             : wStart + 800;
 
         words.add(LyricWord(syllables: [
           LyricSyllable(
-            text:         wText,
-            startMs:      wStart,
-            durationMs:   (wEnd - wStart).clamp(50, 10000),
+            text: wText,
+            startMs: wStart,
+            durationMs: (wEnd - wStart).clamp(50, 10000),
             isPartOfWord: false,
           ),
         ]));
@@ -360,16 +357,17 @@ class AdvancedLrcParser {
       if (words.isEmpty) continue;
 
       result.add(LyricLine(
-        startMs:    words.first.startMs,
-        endMs:      words.last.endMs,
-        words:      words,
+        startMs: words.first.startMs,
+        endMs: words.last.endMs,
+        words: words,
         isOpposite: isOpposite,
       ));
     }
 
     _fixLineEndTimes(result);
     debugPrint('[AdvancedLrcParser] Enhanced LRC: ${result.length} строк');
-    return ParsedLyrics(lines: result, format: LyricsFormat.enhancedLrc, tags: tags);
+    return ParsedLyrics(
+        lines: result, format: LyricsFormat.enhancedLrc, tags: tags);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -380,11 +378,11 @@ class AdvancedLrcParser {
   // ──────────────────────────────────────────────────────────────────────────
 
   static ParsedLyrics _parseSyncedLrc(String content) {
-    final rawLines   = content.split('\n');
-    final result     = <LyricLine>[];
-    final tags       = <String, String>{};
-    var   singerIdx  = 0;
-    var   duetActive = false;
+    final rawLines = content.split('\n');
+    final result = <LyricLine>[];
+    final tags = <String, String>{};
+    var singerIdx = 0;
+    var duetActive = false;
 
     for (final raw in rawLines) {
       final trimmed = raw.trim();
@@ -399,14 +397,15 @@ class AdvancedLrcParser {
       final lrcMatch = _lrcLineRx.firstMatch(trimmed);
       if (lrcMatch == null) continue;
 
-      final startMs = _lrcMs(lrcMatch.group(1)!, lrcMatch.group(2)!, lrcMatch.group(3)!);
-      var   payload = lrcMatch.group(4)!;
+      final startMs =
+          _lrcMs(lrcMatch.group(1)!, lrcMatch.group(2)!, lrcMatch.group(3)!);
+      var payload = lrcMatch.group(4)!;
 
       bool isOpposite = false;
       if (_duetTagRx.hasMatch(payload)) {
         duetActive = true;
         isOpposite = true;
-        payload    = payload.replaceAll(_duetTagRx, '').trim();
+        payload = payload.replaceAll(_duetTagRx, '').trim();
       } else if (duetActive) {
         isOpposite = singerIdx.isOdd;
       }
@@ -416,9 +415,9 @@ class AdvancedLrcParser {
       if (text.isEmpty) continue;
 
       result.add(LyricLine(
-        startMs:    startMs,
-        endMs:      startMs + 4000, // placeholder — уточним ниже
-        words:      [_plainWord(text, startMs, 4000)],
+        startMs: startMs,
+        endMs: startMs + 4000, // placeholder — уточним ниже
+        words: [_plainWord(text, startMs, 4000)],
         isOpposite: isOpposite,
       ));
     }
@@ -430,40 +429,41 @@ class AdvancedLrcParser {
     final expanded = result.map(_expandSyncedLine).toList();
 
     debugPrint('[AdvancedLrcParser] Synced LRC: ${expanded.length} строк');
-    return ParsedLyrics(lines: expanded, format: LyricsFormat.syncedLrc, tags: tags);
+    return ParsedLyrics(
+        lines: expanded, format: LyricsFormat.syncedLrc, tags: tags);
   }
 
   /// Разбивает синхронизированную строку на слова→буквы с временны́ми таймингами.
   /// Каждая буква получает отдельный LyricSyllable — spring сработает на каждой.
   static LyricLine _expandSyncedLine(LyricLine line) {
-    final text     = line.plainText;
+    final text = line.plainText;
     final wordStrs = text.split(' ').where((w) => w.isNotEmpty).toList();
     if (wordStrs.isEmpty) return line;
 
     final lineStartMs = line.startMs;
-    final lineDurMs   = (line.endMs - line.startMs).clamp(800, 15000);
+    final lineDurMs = (line.endMs - line.startMs).clamp(800, 15000);
 
     // Суммарный вес = буквы + пробелы (25% веса буквы)
-    const spaceW   = 0.25;
+    const spaceW = 0.25;
     final totLetters = wordStrs.fold<int>(0, (s, w) => s + w.length);
-    final totalW     = totLetters + (wordStrs.length - 1) * spaceW;
-    final msPerW     = lineDurMs / totalW;
+    final totalW = totLetters + (wordStrs.length - 1) * spaceW;
+    final msPerW = lineDurMs / totalW;
 
     final words = <LyricWord>[];
-    var   curMs = lineStartMs;
+    var curMs = lineStartMs;
 
     for (var wi = 0; wi < wordStrs.length; wi++) {
-      final word        = wordStrs[wi];
-      final wordDurMs   = (word.length * msPerW).round();
-      final msBpL       = wordDurMs / word.length;
-      final syllables   = <LyricSyllable>[];
+      final word = wordStrs[wi];
+      final wordDurMs = (word.length * msPerW).round();
+      final msBpL = wordDurMs / word.length;
+      final syllables = <LyricSyllable>[];
 
       for (var li = 0; li < word.length; li++) {
         final letterDurMs = msBpL.round().clamp(40, 2000);
         syllables.add(LyricSyllable(
-          text:         word[li],
-          startMs:      curMs,
-          durationMs:   letterDurMs,
+          text: word[li],
+          startMs: curMs,
+          durationMs: letterDurMs,
           isPartOfWord: li < word.length - 1,
         ));
         curMs += letterDurMs;
@@ -478,9 +478,9 @@ class AdvancedLrcParser {
     }
 
     return LyricLine(
-      startMs:    line.startMs,
-      endMs:      line.endMs,
-      words:      words,
+      startMs: line.startMs,
+      endMs: line.endMs,
+      words: words,
       isOpposite: line.isOpposite,
     );
   }
@@ -490,17 +490,19 @@ class AdvancedLrcParser {
   // ──────────────────────────────────────────────────────────────────────────
 
   static ParsedLyrics _parsePlain(String content) {
-    final lines  = content
+    final lines = content
         .split('\n')
         .map((l) => l.trim())
         .where((l) => l.isNotEmpty)
         .toList();
 
-    final result = lines.map((text) => LyricLine(
-      startMs: 0,
-      endMs:   0,
-      words:   [_plainWord(text, 0, 3000)],
-    )).toList();
+    final result = lines
+        .map((text) => LyricLine(
+              startMs: 0,
+              endMs: 0,
+              words: [_plainWord(text, 0, 3000)],
+            ))
+        .toList();
 
     return ParsedLyrics(lines: result, format: LyricsFormat.plain);
   }
@@ -518,8 +520,8 @@ class AdvancedLrcParser {
   ///   3. Всё от текущей позиции до границы = один LyricWord.
   static List<LyricWord> _groupSyllablesIntoWords(
       List<LyricSyllable> syllables) {
-    final words   = <LyricWord>[];
-    var   current = <LyricSyllable>[];
+    final words = <LyricWord>[];
+    var current = <LyricSyllable>[];
 
     for (var i = 0; i < syllables.length; i++) {
       final syl = syllables[i];
@@ -528,15 +530,15 @@ class AdvancedLrcParser {
       //             ИЛИ следующий слог начинается с пробела
       //             ИЛИ это последний слог
       final endsSpace = syl.text.endsWith(' ');
-      final nextSpace = i + 1 < syllables.length &&
-          syllables[i + 1].text.startsWith(' ');
+      final nextSpace =
+          i + 1 < syllables.length && syllables[i + 1].text.startsWith(' ');
       final isWordEnd = endsSpace || nextSpace || i == syllables.length - 1;
 
       // ✅ trim() только для ХРАНЕНИЯ — пробелы уже использованы для детекции
       current.add(LyricSyllable(
-        text:         syl.text.trim(),
-        startMs:      syl.startMs,
-        durationMs:   syl.durationMs,
+        text: syl.text.trim(),
+        startMs: syl.startMs,
+        durationMs: syl.durationMs,
         isPartOfWord: !isWordEnd,
       ));
 
@@ -556,9 +558,9 @@ class AdvancedLrcParser {
   static LyricWord _plainWord(String text, int startMs, int durationMs) {
     return LyricWord(syllables: [
       LyricSyllable(
-        text:         text,
-        startMs:      startMs,
-        durationMs:   durationMs > 0 ? durationMs : 3000,
+        text: text,
+        startMs: startMs,
+        durationMs: durationMs > 0 ? durationMs : 3000,
         isPartOfWord: false,
       ),
     ]);
@@ -568,12 +570,10 @@ class AdvancedLrcParser {
   static int _lrcMs(String mm, String ss, String frac) {
     final minutes = int.parse(mm);
     final seconds = int.parse(ss);
-    final millis  = frac.length == 2
-        ? int.parse(frac) * 10
-        : int.parse(frac);
+    final millis = frac.length == 2 ? int.parse(frac) * 10 : int.parse(frac);
     return Duration(
-      minutes:      minutes,
-      seconds:      seconds,
+      minutes: minutes,
+      seconds: seconds,
       milliseconds: millis,
     ).inMilliseconds;
   }
@@ -581,10 +581,9 @@ class AdvancedLrcParser {
   /// Уточняет endMs каждой строки = startMs следующей - 50мс
   static void _fixLineEndTimes(List<LyricLine> lines) {
     for (var i = 0; i < lines.length - 1; i++) {
-      final next    = lines[i + 1].startMs;
+      final next = lines[i + 1].startMs;
       final current = lines[i];
-      if (current.endMs >= next ||
-          current.endMs == current.startMs + 4000) {
+      if (current.endMs >= next || current.endMs == current.startMs + 4000) {
         lines[i] = current.copyWith(
           endMs: (next - 50).clamp(current.startMs + 100, next),
         );
@@ -602,7 +601,7 @@ class AdvancedLrcParser {
       final mid = (lo + hi) >> 1;
       if (lines[mid].startMs <= positionMs) {
         result = mid;
-        lo     = mid + 1;
+        lo = mid + 1;
       } else {
         hi = mid - 1;
       }
@@ -611,6 +610,6 @@ class AdvancedLrcParser {
   }
 
   static int currentLineIndexFromDuration(
-      List<LyricLine> lines, Duration position) =>
+          List<LyricLine> lines, Duration position) =>
       currentLineIndex(lines, position.inMilliseconds);
 }

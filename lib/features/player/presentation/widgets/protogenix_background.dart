@@ -24,9 +24,9 @@ class ProtogenixBackground extends ConsumerWidget {
     final palette = ref.watch(paletteProvider);
 
     return AnimatedBackground(
-      primaryColor:   palette.primary,
+      primaryColor: palette.primary,
       secondaryColor: palette.secondary,
-      tertiaryColor:  palette.tertiary,
+      tertiaryColor: palette.tertiary,
       child: child,
     );
   }

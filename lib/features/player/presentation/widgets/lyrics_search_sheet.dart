@@ -9,6 +9,7 @@
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../domain/track_model.dart';
@@ -156,6 +157,7 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
           ),
           child: Column(
             children: [
+              // Ручка (Drag handle)
               Container(
                 margin: const EdgeInsets.only(top: 12),
                 width: 40,
@@ -232,7 +234,9 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF7B5EA7),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const Duration(milliseconds: 300) > Duration.zero 
+                              ? const EdgeInsets.symmetric(vertical: 14) 
+                              : EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -259,23 +263,23 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
                         ),
                       )
                     : _results.isEmpty && !_isSearching
-                    ? const SizedBox.shrink()
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
-                        itemCount: _results.length,
-                        separatorBuilder: (_, __) =>
-                            Divider(color: Colors.white.withAlpha(12)),
-                        itemBuilder: (context, i) {
-                          final scored = _results[i];
-                          return _LyricResultTile(
-                            scored: scored,
-                            onTap: () => _apply(scored),
-                          ).animate().fadeIn(
-                            duration: 200.ms,
-                            delay: (i * 40).ms,
-                          );
-                        },
-                      ),
+                        ? const SizedBox.shrink()
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+                            itemCount: _results.length,
+                            separatorBuilder: (_, __) =>
+                                Divider(color: Colors.white.withAlpha(12)),
+                            itemBuilder: (context, i) {
+                              final scored = _results[i];
+                              return _LyricResultTile(
+                                scored: scored,
+                                onTap: () => _apply(scored),
+                              ).animate().fadeIn(
+                                    duration: 200.ms,
+                                    delay: (i * 40).ms,
+                                  );
+                            },
+                          ),
               ),
 
               SizedBox(height: viewInsets.bottom),
@@ -356,7 +360,10 @@ class _LyricResultTile extends StatelessWidget {
     };
 
     return ListTile(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       contentPadding: EdgeInsets.zero,
       title: Text(
         meta.trackName,

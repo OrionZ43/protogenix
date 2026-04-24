@@ -16,7 +16,7 @@ import 'package:sqflite/sqflite.dart';
 class Playlist {
   final String id;
   final String name;
-  final int    createdAt;
+  final int createdAt;
 
   const Playlist({
     required this.id,
@@ -25,28 +25,28 @@ class Playlist {
   });
 
   Map<String, dynamic> toMap() => {
-    'id':        id,
-    'name':      name,
-    'createdAt': createdAt,
-  };
+        'id': id,
+        'name': name,
+        'createdAt': createdAt,
+      };
 
   static Playlist fromMap(Map<String, dynamic> m) => Playlist(
-    id:        m['id'] as String,
-    name:      m['name'] as String,
-    createdAt: m['createdAt'] as int,
-  );
+        id: m['id'] as String,
+        name: m['name'] as String,
+        createdAt: m['createdAt'] as int,
+      );
 
   Playlist copyWith({String? name}) => Playlist(
-    id:        id,
-    name:      name ?? this.name,
-    createdAt: createdAt,
-  );
+        id: id,
+        name: name ?? this.name,
+        createdAt: createdAt,
+      );
 }
 
 class PlaylistTrack {
   final String playlistId;
   final String trackId;
-  final int    position;
+  final int position;
 
   const PlaylistTrack({
     required this.playlistId,
@@ -55,10 +55,10 @@ class PlaylistTrack {
   });
 
   Map<String, dynamic> toMap() => {
-    'playlistId': playlistId,
-    'trackId':    trackId,
-    'position':   position,
-  };
+        'playlistId': playlistId,
+        'trackId': trackId,
+        'position': position,
+      };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,8 +115,8 @@ class PlaylistDatabase {
   Future<Playlist> createPlaylist(String name) async {
     final database = await db;
     final playlist = Playlist(
-      id:        '${DateTime.now().millisecondsSinceEpoch}_${name.hashCode}',
-      name:      name,
+      id: '${DateTime.now().millisecondsSinceEpoch}_${name.hashCode}',
+      name: name,
       createdAt: DateTime.now().millisecondsSinceEpoch,
     );
     await database.insert('playlists', playlist.toMap());
@@ -153,16 +153,17 @@ class PlaylistDatabase {
     final database = await db;
     // Считаем текущую позицию
     final count = Sqflite.firstIntValue(await database.rawQuery(
-      'SELECT COUNT(*) FROM playlist_tracks WHERE playlistId = ?',
-      [playlistId],
-    )) ?? 0;
+          'SELECT COUNT(*) FROM playlist_tracks WHERE playlistId = ?',
+          [playlistId],
+        )) ??
+        0;
 
     await database.insert(
       'playlist_tracks',
       PlaylistTrack(
         playlistId: playlistId,
-        trackId:    trackId,
-        position:   count,
+        trackId: trackId,
+        position: count,
       ).toMap(),
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
@@ -184,7 +185,7 @@ class PlaylistDatabase {
     final database = await db;
     final maps = await database.query(
       'playlist_tracks',
-      where:   'playlistId = ?',
+      where: 'playlistId = ?',
       whereArgs: [playlistId],
       orderBy: 'position ASC',
     );
@@ -221,7 +222,8 @@ class PlaylistDatabase {
 
   Future<void> removeFromFavorites(String trackId) async {
     final database = await db;
-    await database.delete('favorites', where: 'trackId = ?', whereArgs: [trackId]);
+    await database
+        .delete('favorites', where: 'trackId = ?', whereArgs: [trackId]);
   }
 
   Future<bool> isFavorite(String trackId) async {
