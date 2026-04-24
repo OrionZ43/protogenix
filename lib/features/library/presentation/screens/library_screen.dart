@@ -211,7 +211,7 @@ class _TrackTile extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        final models = tracks.map((t) => t.toTrackModel()).toList();
+        final models = tracks.map((t) => t.toTrackModel());
         ref.read(playerProvider.notifier).loadPlaylist(
               models,
               initialIndex: index,
