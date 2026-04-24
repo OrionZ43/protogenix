@@ -34,8 +34,8 @@ class PlayerScreen extends ConsumerWidget {
               _TopBar(track: track),
               Expanded(
                 child: MusicVisualizerControls(
-                  compact:      false,
-                  showFavorite: true,   // ← сердечко рядом с названием
+                  compact: false,
+                  showFavorite: true, // ← сердечко рядом с названием
                 ),
               ),
               _BottomRow(track: track),
@@ -64,48 +64,58 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 48,
-      child: Stack(
-        alignment: Alignment.center,
+      child: Row(
         children: [
-          // Кнопка «Назад» — слева, только если есть куда возвращаться
-          if (Navigator.canPop(context))
-            Positioned(
-              left: 8,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Container(
-                  width:  36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withAlpha(15),
-                  ),
-                  child: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white70,
-                    size:  24,
-                  ),
-                ),
-              ),
-            ),
+          // Левая часть: кнопка «Назад»
+          SizedBox(
+            width: 60,
+            child: Navigator.canPop(context)
+                ? Center(
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withAlpha(15),
+                        ),
+                        child: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white70,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
 
-          // Логотип строго по центру
-          const Text(
-            'PROTOGENIX',
-            style: TextStyle(
-              color:         Colors.white70,
-              fontSize:      11,
-              fontWeight:    FontWeight.w600,
-              letterSpacing: 2.5,
+          // Центр: Логотип
+          const Expanded(
+            child: Text(
+              'PROTOGENIX',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 2.5,
+              ),
             ),
           ),
 
-          // Иконка текстов — справа
-          if (track != null)
-            const Positioned(
-              right: 16,
-              child: Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
-            ),
+          // Правая часть: иконка текстов
+          SizedBox(
+            width: 60,
+            child: track != null
+                ? const Icon(
+                    Icons.lyrics_outlined,
+                    color: Colors.white54,
+                    size: 22,
+                  )
+                : const SizedBox.shrink(),
+          ),
         ],
       ),
     );
@@ -126,12 +136,12 @@ class _BottomRow extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _CapsuleBtn(
-            icon:  Icons.add_rounded,
+            icon: Icons.add_rounded,
             label: 'Добавить',
             onTap: () => showImporterSheet(context),
           ),
           _CapsuleBtn(
-            icon:  Icons.manage_search_rounded,
+            icon: Icons.manage_search_rounded,
             label: 'Текст',
             // Открывает ручной поиск текста (ранее был пустой () {})
             onTap: track != null
@@ -150,8 +160,8 @@ class _CapsuleBtn extends StatelessWidget {
     required this.label,
     required this.onTap,
   });
-  final IconData     icon;
-  final String       label;
+  final IconData icon;
+  final String label;
   final VoidCallback? onTap;
 
   @override
@@ -163,7 +173,7 @@ class _CapsuleBtn extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color:  Colors.white.withAlpha(12),
+          color: Colors.white.withAlpha(12),
           border: Border.all(color: Colors.white.withAlpha(25)),
         ),
         child: Row(
@@ -171,7 +181,10 @@ class _CapsuleBtn extends StatelessWidget {
           children: [
             Icon(icon, color: Colors.white60, size: 15),
             const SizedBox(width: 6),
-            Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white60, fontSize: 12),
+            ),
           ],
         ),
       ),
@@ -194,38 +207,60 @@ class _EmptyLibraryScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.library_music_rounded,
-                    size: 80, color: Colors.white24),
+                const Icon(
+                  Icons.library_music_rounded,
+                  size: 80,
+                  color: Colors.white24,
+                ),
                 const SizedBox(height: 24),
-                const Text('Библиотека пуста',
-                    style: TextStyle(color: Colors.white70, fontSize: 22,
-                        fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                const Text('Добавь треки, чтобы начать',
-                    style: TextStyle(color: Colors.white38, fontSize: 14)),
-                const SizedBox(height: 32),
-                GestureDetector(
-                  onTap: () => showImporterSheet(context),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 28, vertical: 14),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color:  Colors.white.withAlpha(20),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_rounded, color: Colors.white70),
-                        SizedBox(width: 8),
-                        Text('Добавить трек',
-                            style: TextStyle(
-                                color: Colors.white70, fontSize: 16)),
-                      ],
-                    ),
+                const Text(
+                  'Библиотека пуста',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Добавь треки, чтобы начать',
+                  style: TextStyle(color: Colors.white38, fontSize: 14),
+                ),
+                const SizedBox(height: 32),
+                GestureDetector(
+                      onTap: () => showImporterSheet(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: Colors.white.withAlpha(20),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded, color: Colors.white70),
+                            SizedBox(width: 8),
+                            Text(
+                              'Добавить трек',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .animate()
+                    .fadeIn(duration: 600.ms)
+                    .scale(
+                      begin: const Offset(0.9, 0.9),
+                      curve: Curves.easeOutCubic,
+                    ),
               ],
             ),
           ),

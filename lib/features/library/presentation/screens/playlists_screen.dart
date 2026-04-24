@@ -3,8 +3,10 @@
 // Экран плейлистов + детальный экран плейлиста.
 
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/playlist_database.dart';
@@ -44,9 +46,9 @@ class PlaylistsScreen extends ConsumerWidget {
                       const Text(
                         'Плейлисты',
                         style: TextStyle(
-                          color:         Colors.white,
-                          fontSize:      26,
-                          fontWeight:    FontWeight.w700,
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: -0.5,
                         ),
                       ),
@@ -55,7 +57,7 @@ class PlaylistsScreen extends ConsumerWidget {
                         Text(
                           '${playlists.length}',
                           style: const TextStyle(
-                            color:    Colors.white38,
+                            color: Colors.white38,
                             fontSize: 16,
                           ),
                         ),
@@ -76,19 +78,18 @@ class PlaylistsScreen extends ConsumerWidget {
                   sliver: SliverGrid(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount:   2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing:  12,
-                      childAspectRatio: 1.1,
-                    ),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 1.1,
+                        ),
                     delegate: SliverChildBuilderDelegate(
                       (context, i) => _PlaylistCard(
                         playlist: playlists[i],
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => PlaylistDetailScreen(
-                              playlist: playlists[i],
-                            ),
+                            builder: (_) =>
+                                PlaylistDetailScreen(playlist: playlists[i]),
                           ),
                         ),
                         onDelete: () => ref
@@ -125,7 +126,7 @@ class _CreateFab extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color:  Colors.white.withAlpha(20),
+          color: Colors.white.withAlpha(20),
           border: Border.all(color: Colors.white.withAlpha(40)),
         ),
         child: const Row(
@@ -136,8 +137,8 @@ class _CreateFab extends StatelessWidget {
             Text(
               'Создать',
               style: TextStyle(
-                color:      Colors.white,
-                fontSize:   14,
+                color: Colors.white,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -162,15 +163,15 @@ class _EmptyPlaylists extends StatelessWidget {
         children: [
           const Icon(
             Icons.queue_music_rounded,
-            size:  80,
+            size: 80,
             color: Colors.white12,
           ),
           const SizedBox(height: 20),
           const Text(
             'Нет плейлистов',
             style: TextStyle(
-              color:      Colors.white70,
-              fontSize:   20,
+              color: Colors.white70,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -181,27 +182,33 @@ class _EmptyPlaylists extends StatelessWidget {
           ),
           const SizedBox(height: 28),
           GestureDetector(
-            onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                color:  Colors.white.withAlpha(18),
-                border: Border.all(color: Colors.white24),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.add_rounded, color: Colors.white70, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    'Создать плейлист',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                onTap: onTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
                   ),
-                ],
-              ),
-            ),
-          ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    color: Colors.white.withAlpha(18),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_rounded, color: Colors.white70, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Создать плейлист',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+              .animate()
+              .fadeIn(duration: 600.ms)
+              .scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
         ],
       ),
     );
@@ -218,7 +225,7 @@ class _PlaylistCard extends StatelessWidget {
     required this.onRename,
   });
 
-  final Playlist     playlist;
+  final Playlist playlist;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onRename;
@@ -229,12 +236,12 @@ class _PlaylistCard extends StatelessWidget {
       onTap: onTap,
       child: GlassCard(
         borderRadius: 18,
-        padding:      const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width:  44,
+              width: 44,
               height: 44,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
@@ -243,7 +250,7 @@ class _PlaylistCard extends StatelessWidget {
               child: const Icon(
                 Icons.queue_music_rounded,
                 color: Colors.white60,
-                size:  22,
+                size: 22,
               ),
             ),
 
@@ -254,8 +261,8 @@ class _PlaylistCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color:      Colors.white,
-                fontSize:   14,
+                color: Colors.white,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -269,7 +276,7 @@ class _PlaylistCard extends StatelessWidget {
                   child: const Icon(
                     Icons.edit_outlined,
                     color: Colors.white38,
-                    size:  16,
+                    size: 16,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -278,7 +285,7 @@ class _PlaylistCard extends StatelessWidget {
                   child: const Icon(
                     Icons.delete_outline_rounded,
                     color: Colors.white38,
-                    size:  16,
+                    size: 16,
                   ),
                 ),
               ],
@@ -294,44 +301,57 @@ class _PlaylistCard extends StatelessWidget {
 
 Future<void> _createPlaylistDialog(BuildContext context, WidgetRef ref) async {
   final ctrl = TextEditingController();
-  final name = await showDialog<String>(
+  final name = await showGeneralDialog<String>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF13131F),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
-        'Новый плейлист',
-        style: TextStyle(color: Colors.white, fontSize: 17),
-      ),
-      content: TextField(
-        controller:  ctrl,
-        autofocus:   true,
-        style:       const TextStyle(color: Colors.white),
-        cursorColor: Colors.white70,
-        decoration: InputDecoration(
-          hintText:      'Название...',
-          hintStyle:     const TextStyle(color: Colors.white38),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:   const BorderSide(color: Colors.white24),
+    barrierDismissible: true,
+    barrierLabel: '',
+    transitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (ctx, anim1, anim2) => const SizedBox.shrink(),
+    transitionBuilder: (ctx, anim1, anim2, child) {
+      return Transform.scale(
+        scale: anim1.value,
+        child: Opacity(
+          opacity: anim1.value,
+          child: _GlassDialog(
+            title: 'Новый плейлист',
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              cursorColor: Colors.white70,
+              decoration: InputDecoration(
+                hintText: 'Название...',
+                hintStyle: const TextStyle(color: Colors.white38),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white60),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text(
+                  'Отмена',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+                child: const Text(
+                  'Создать',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:   const BorderSide(color: Colors.white60),
-          ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Отмена', style: TextStyle(color: Colors.white54)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-          child: const Text('Создать', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
+      );
+    },
   );
   if (name != null && name.isNotEmpty) {
     ref.read(playlistsProvider.notifier).create(name);
@@ -339,47 +359,122 @@ Future<void> _createPlaylistDialog(BuildContext context, WidgetRef ref) async {
 }
 
 Future<void> _renameDialog(
-    BuildContext context, WidgetRef ref, Playlist playlist) async {
+  BuildContext context,
+  WidgetRef ref,
+  Playlist playlist,
+) async {
   final ctrl = TextEditingController(text: playlist.name);
-  final name = await showDialog<String>(
+  final name = await showGeneralDialog<String>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF13131F),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
-        'Переименовать',
-        style: TextStyle(color: Colors.white, fontSize: 17),
-      ),
-      content: TextField(
-        controller:  ctrl,
-        autofocus:   true,
-        style:       const TextStyle(color: Colors.white),
-        cursorColor: Colors.white70,
-        decoration: InputDecoration(
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:   const BorderSide(color: Colors.white24),
+    barrierDismissible: true,
+    barrierLabel: '',
+    transitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (ctx, anim1, anim2) => const SizedBox.shrink(),
+    transitionBuilder: (ctx, anim1, anim2, child) {
+      return Transform.scale(
+        scale: anim1.value,
+        child: Opacity(
+          opacity: anim1.value,
+          child: _GlassDialog(
+            title: 'Переименовать',
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              cursorColor: Colors.white70,
+              decoration: InputDecoration(
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white60),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text(
+                  'Отмена',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+                child: const Text(
+                  'Сохранить',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:   const BorderSide(color: Colors.white60),
-          ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Отмена', style: TextStyle(color: Colors.white54)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-          child: const Text('Сохранить', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
+      );
+    },
   );
   if (name != null && name.isNotEmpty) {
     ref.read(playlistsProvider.notifier).rename(playlist.id, name);
+  }
+}
+
+class _GlassDialog extends StatelessWidget {
+  const _GlassDialog({
+    required this.title,
+    required this.content,
+    required this.actions,
+  });
+
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(200),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: Colors.white.withAlpha(30)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    content,
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: actions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -409,10 +504,8 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 style: const TextStyle(color: Colors.white54),
               ),
             ),
-            data: (tracks) => _PlaylistContent(
-              playlist: playlist,
-              tracks:   tracks,
-            ),
+            data: (tracks) =>
+                _PlaylistContent(playlist: playlist, tracks: tracks),
           ),
         ),
       ),
@@ -421,12 +514,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
 }
 
 class _PlaylistContent extends ConsumerWidget {
-  const _PlaylistContent({
-    required this.playlist,
-    required this.tracks,
-  });
+  const _PlaylistContent({required this.playlist, required this.tracks});
 
-  final Playlist           playlist;
+  final Playlist playlist;
   final List<LibraryTrack> tracks;
 
   @override
@@ -445,28 +535,25 @@ class _PlaylistContent extends ConsumerWidget {
                     color: Colors.white70,
                   ),
                   onPressed: () => Navigator.of(context).pop(),
-                  padding:     EdgeInsets.zero,
+                  padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     playlist.name,
-                    overflow:  TextOverflow.ellipsis,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color:         Colors.white,
-                      fontSize:      22,
-                      fontWeight:    FontWeight.w700,
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -0.3,
                     ),
                   ),
                 ),
                 Text(
                   '${tracks.length} треков',
-                  style: const TextStyle(
-                    color:    Colors.white38,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: Colors.white38, fontSize: 13),
                 ),
               ],
             ),
@@ -487,20 +574,23 @@ class _PlaylistContent extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(14),
-                    color:  Colors.white.withAlpha(18),
+                    color: Colors.white.withAlpha(18),
                     border: Border.all(color: Colors.white.withAlpha(30)),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.play_arrow_rounded,
-                          color: Colors.white, size: 20),
+                      Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         'Слушать всё',
                         style: TextStyle(
-                          color:      Colors.white,
-                          fontSize:   14,
+                          color: Colors.white,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -525,9 +615,9 @@ class _PlaylistContent extends ConsumerWidget {
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, i) => _PlaylistTrackTile(
-                track:      tracks[i],
-                index:      i,
-                allTracks:  tracks,
+                track: tracks[i],
+                index: i,
+                allTracks: tracks,
                 playlistId: playlist.id,
               ),
               childCount: tracks.length,
@@ -548,23 +638,22 @@ class _PlaylistTrackTile extends ConsumerWidget {
     required this.playlistId,
   });
 
-  final LibraryTrack       track;
-  final int                index;
+  final LibraryTrack track;
+  final int index;
   final List<LibraryTrack> allTracks;
-  final String             playlistId;
+  final String playlistId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player    = ref.watch(playerProvider);
+    final player = ref.watch(playerProvider);
     final isPlaying = player.currentTrack?.id == track.id;
 
     return InkWell(
       onTap: () {
         final models = allTracks.map((t) => t.toTrackModel()).toList();
-        ref.read(playerProvider.notifier).loadPlaylist(
-              models,
-              initialIndex: index,
-            );
+        ref
+            .read(playerProvider.notifier)
+            .loadPlaylist(models, initialIndex: index);
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -573,8 +662,8 @@ class _PlaylistTrackTile extends ConsumerWidget {
             Text(
               '${index + 1}',
               style: TextStyle(
-                color:      isPlaying ? Colors.white : Colors.white24,
-                fontSize:   13,
+                color: isPlaying ? Colors.white : Colors.white24,
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
@@ -587,9 +676,9 @@ class _PlaylistTrackTile extends ConsumerWidget {
                 image: track.coverPath != null
                     ? FileImage(File(track.coverPath!)) as ImageProvider
                     : const AssetImage('assets/images/mock_cover.jpg'),
-                width:  44,
+                width: 44,
                 height: 44,
-                fit:    BoxFit.cover,
+                fit: BoxFit.cover,
               ),
             ),
 
@@ -604,10 +693,9 @@ class _PlaylistTrackTile extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color:      Colors.white,
-                      fontSize:   14,
-                      fontWeight:
-                          isPlaying ? FontWeight.w600 : FontWeight.w500,
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: isPlaying ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -615,10 +703,7 @@ class _PlaylistTrackTile extends ConsumerWidget {
                     track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color:    Colors.white38,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white38, fontSize: 12),
                   ),
                 ],
               ),
@@ -626,14 +711,13 @@ class _PlaylistTrackTile extends ConsumerWidget {
 
             // Меню: убрать из плейлиста + другие действия
             IconButton(
-              icon:        const Icon(Icons.more_vert_rounded),
-              color:       Colors.white38,
-              iconSize:    20,
-              padding:     EdgeInsets.zero,
+              icon: const Icon(Icons.more_vert_rounded),
+              color: Colors.white38,
+              iconSize: 20,
+              padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: () => _showPlaylistTrackOptions(
-                context, ref, track, playlistId,
-              ),
+              onPressed: () =>
+                  _showPlaylistTrackOptions(context, ref, track, playlistId),
             ),
           ],
         ),
@@ -651,15 +735,12 @@ void _showPlaylistTrackOptions(
   String playlistId,
 ) {
   showModalBottomSheet(
-    context:            context,
+    context: context,
     isScrollControlled: true,
-    backgroundColor:    Colors.transparent,
+    backgroundColor: Colors.transparent,
     builder: (_) => UncontrolledProviderScope(
       container: ProviderScope.containerOf(context),
-      child: _PlaylistTrackOptionsSheet(
-        track:      track,
-        playlistId: playlistId,
-      ),
+      child: _PlaylistTrackOptionsSheet(track: track, playlistId: playlistId),
     ),
   );
 }
@@ -671,13 +752,13 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
   });
 
   final LibraryTrack track;
-  final String       playlistId;
+  final String playlistId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: const BoxDecoration(
-        color:        Color(0xFF0E0E1C),
+        color: Color(0xFF0E0E1C),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
@@ -686,11 +767,11 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              margin:     const EdgeInsets.only(top: 12, bottom: 8),
-              width:      40,
-              height:     4,
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
-                color:        Colors.white24,
+                color: Colors.white24,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -706,8 +787,8 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color:      Colors.white,
-                        fontSize:   15,
+                        color: Colors.white,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -721,14 +802,14 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
 
             // Убрать из плейлиста
             _OptionTile(
-              icon:      Icons.remove_circle_outline_rounded,
+              icon: Icons.remove_circle_outline_rounded,
               iconColor: Colors.orangeAccent,
-              label:     'Убрать из плейлиста',
+              label: 'Убрать из плейлиста',
               onTap: () async {
                 Navigator.of(context).pop();
                 await PlaylistDatabase.instance.removeTrackFromPlaylist(
                   playlistId: playlistId,
-                  trackId:    track.id,
+                  trackId: track.id,
                 );
                 // Инвалидируем кэш FutureProvider для этого плейлиста
                 ref.invalidate(playlistTracksProvider(playlistId));
@@ -737,7 +818,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
 
             // Другие действия (открывает общее меню трека)
             _OptionTile(
-              icon:  Icons.more_horiz_rounded,
+              icon: Icons.more_horiz_rounded,
               label: 'Другие действия',
               onTap: () {
                 Navigator.of(context).pop();
@@ -761,10 +842,10 @@ class _OptionTile extends StatelessWidget {
     this.iconColor,
   });
 
-  final IconData     icon;
-  final String       label;
+  final IconData icon;
+  final String label;
   final VoidCallback onTap;
-  final Color?       iconColor;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
