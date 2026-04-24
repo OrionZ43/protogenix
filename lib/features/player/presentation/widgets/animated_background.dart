@@ -28,9 +28,9 @@ class AnimatedBackground extends StatefulWidget {
     required this.child,
   });
 
-  final Color  primaryColor;
-  final Color  secondaryColor;
-  final Color  tertiaryColor;
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color tertiaryColor;
   final Widget child;
 
   @override
@@ -39,16 +39,19 @@ class AnimatedBackground extends StatefulWidget {
 
 class _AnimatedBackgroundState extends State<AnimatedBackground>
     with SingleTickerProviderStateMixin {
-
   late Ticker _ticker;
   double _lastTime = -1.0;
-  double _time     = 0.0;
+  double _time = 0.0;
 
   late final List<_BlobState> _blobs;
 
   /// Bug 1 fix: уведомляем ТОЛЬКО слой блобов, а не весь виджет.
   /// Инкремент целого числа дешевле, чем создание нового объекта-состояния.
   final _blobTick = ValueNotifier<int>(0);
+
+  void _notifyBlobs() {
+    _blobTick.value++;
+  }
 
   @override
   void initState() {
@@ -63,12 +66,12 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
       final angleBase = (i / 4.0) * math.pi * 2;
       return _BlobState(
         initialAngle: angleBase + rng.nextDouble() * 0.5,
-        orbitRadius:  0.25 + rng.nextDouble() * 0.20,
-        speed:        0.06 + rng.nextDouble() * 0.04,
-        sizeRatio:    0.55 + rng.nextDouble() * 0.35,
-        phaseOffset:  rng.nextDouble() * math.pi * 2,
+        orbitRadius: 0.25 + rng.nextDouble() * 0.20,
+        speed: 0.06 + rng.nextDouble() * 0.04,
+        sizeRatio: 0.55 + rng.nextDouble() * 0.35,
+        phaseOffset: rng.nextDouble() * math.pi * 2,
         breathPeriod: 3.0 + rng.nextDouble() * 4.0,
-        breathAmp:    0.04 + rng.nextDouble() * 0.06,
+        breathAmp: 0.04 + rng.nextDouble() * 0.06,
       );
     });
   }
@@ -81,10 +84,10 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
   }
 
   void _onTick(Duration elapsed) {
-    final t  = elapsed.inMicroseconds / 1e6;
+    final t = elapsed.inMicroseconds / 1e6;
     final dt = _lastTime < 0 ? 0.016 : (t - _lastTime).clamp(0.001, 0.05);
     _lastTime = t;
-    _time     = t;
+    _time = t;
 
     for (final blob in _blobs) {
       blob.tick(dt, _time);
@@ -93,11 +96,10 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
     // Bug 1 fix: НЕ вызываем setState(). Только дёргаем нотификатор блобов.
     // build() на _AnimatedBackgroundState теперь вызывается ТОЛЬКО при смене
     // цветов палитры (т.е. при загрузке нового трека), а не 60 fps.
-    if (mounted) _blobTick.value++;
+    if (mounted) _notifyBlobs();
   }
 
-  Color get _baseBg =>
-      Color.lerp(widget.tertiaryColor, Colors.black, 0.55)!;
+  Color get _baseBg => Color.lerp(widget.tertiaryColor, Colors.black, 0.55)!;
 
   List<Color> get _blobColors => [
     widget.primaryColor.withValues(alpha: 0.55),
@@ -119,18 +121,12 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
           // ── Блобы: перерисовываются только здесь, 60 fps ──────────────────
           Positioned.fill(
             child: RepaintBoundary(
-              child: ListenableBuilder(
-                listenable: _blobTick,
-                builder: (ctx, _) {
-                  final size = MediaQuery.sizeOf(ctx);
-                  return CustomPaint(
-                    size: size,
-                    painter: _BlobPainter(
-                      blobs:  _blobs,
-                      colors: _blobColors,
-                    ),
-                  );
-                },
+              child: CustomPaint(
+                painter: _BlobPainter(
+                  blobs: _blobs,
+                  colors: _blobColors,
+                  repaint: _blobTick,
+                ),
               ),
             ),
           ),
@@ -141,7 +137,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
-                  end:   Alignment.bottomCenter,
+                  end: Alignment.bottomCenter,
                   colors: [
                     Colors.black.withValues(alpha: 0.15),
                     Colors.black.withValues(alpha: 0.55),
@@ -180,8 +176,8 @@ class _BlobState {
   final double breathPeriod;
   final double breathAmp;
 
-  double nx    = 0.5;
-  double ny    = 0.5;
+  double nx = 0.5;
+  double ny = 0.5;
   double scale = 1.0;
 
   void tick(double dt, double t) {
@@ -189,8 +185,9 @@ class _BlobState {
     nx = 0.5 + math.cos(angle) * orbitRadius;
     ny = 0.5 + math.sin(angle * 0.7 + phaseOffset) * orbitRadius;
 
-    scale = 1.0 + math.sin(t * (math.pi * 2 / breathPeriod) + phaseOffset)
-        * breathAmp;
+    scale =
+        1.0 +
+        math.sin(t * (math.pi * 2 / breathPeriod) + phaseOffset) * breathAmp;
   }
 }
 
@@ -200,22 +197,23 @@ class _BlobPainter extends CustomPainter {
   const _BlobPainter({
     required this.blobs,
     required this.colors,
-  });
+    required Listenable repaint,
+  }) : super(repaint: repaint);
 
   final List<_BlobState> blobs;
-  final List<Color>      colors;
+  final List<Color> colors;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Offset.zero & size, Paint());
 
     for (int i = 0; i < blobs.length; i++) {
-      final b      = blobs[i];
-      final cx     = b.nx * size.width;
-      final cy     = b.ny * size.height;
-      final radius = (math.min(size.width, size.height) * 0.42 *
-          b.sizeRatio * b.scale)
-          .clamp(80.0, 500.0);
+      final b = blobs[i];
+      final cx = b.nx * size.width;
+      final cy = b.ny * size.height;
+      final radius =
+          (math.min(size.width, size.height) * 0.42 * b.sizeRatio * b.scale)
+              .clamp(80.0, 500.0);
 
       final color = colors[i % colors.length];
 
@@ -223,12 +221,13 @@ class _BlobPainter extends CustomPainter {
         Offset(cx, cy),
         radius,
         Paint()
-          ..shader = RadialGradient(
-            colors: [color, color.withValues(alpha: 0.0)],
-            stops:  const [0.0, 1.0],
-          ).createShader(
-            Rect.fromCircle(center: Offset(cx, cy), radius: radius),
-          )
+          ..shader =
+              RadialGradient(
+                colors: [color, color.withValues(alpha: 0.0)],
+                stops: const [0.0, 1.0],
+              ).createShader(
+                Rect.fromCircle(center: Offset(cx, cy), radius: radius),
+              )
           ..blendMode = BlendMode.screen,
       );
     }
@@ -237,5 +236,6 @@ class _BlobPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_BlobPainter old) => true;
+  bool shouldRepaint(_BlobPainter oldDelegate) =>
+      oldDelegate.blobs != blobs || oldDelegate.colors != colors;
 }

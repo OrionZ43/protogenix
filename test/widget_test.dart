@@ -4,9 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const ProviderScope(child: ProtogenixApp()),
-    );
+    await tester.pumpWidget(const ProviderScope(child: ProtogenixApp()));
     expect(find.byType(ProtogenixApp), findsOneWidget);
   });
 }

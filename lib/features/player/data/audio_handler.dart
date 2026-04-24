@@ -30,11 +30,11 @@ Future<void> initAudioService() async {
   audioHandler = await AudioService.init(
     builder: () => ProtogenixAudioHandler(),
     config: const AudioServiceConfig(
-      androidNotificationChannelId:   'com.protogenix.audio',
+      androidNotificationChannelId: 'com.protogenix.audio',
       androidNotificationChannelName: 'Protogenix Player',
-      androidNotificationOngoing:     true,
-      androidStopForegroundOnPause:   true,
-      notificationColor:              null,
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+      notificationColor: null,
     ),
   );
 }
@@ -45,7 +45,6 @@ Future<void> initAudioService() async {
 
 class ProtogenixAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
-
   final AudioPlayer _player = AudioPlayer();
 
   ProtogenixAudioHandler() {
@@ -95,13 +94,13 @@ class ProtogenixAudioHandler extends BaseAudioHandler
   // ── Базовые команды (экран блокировки, шторка уведомлений) ────────────────
 
   @override
-  Future<void> play()  => _player.play();
+  Future<void> play() => _player.play();
 
   @override
   Future<void> pause() => _player.pause();
 
   @override
-  Future<void> stop()  async {
+  Future<void> stop() async {
     await _player.stop();
     await super.stop();
   }
@@ -138,9 +137,9 @@ class ProtogenixAudioHandler extends BaseAudioHandler
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
     final loopMode = switch (repeatMode) {
-      AudioServiceRepeatMode.none  => LoopMode.off,
-      AudioServiceRepeatMode.one   => LoopMode.one,
-      AudioServiceRepeatMode.all   => LoopMode.all,
+      AudioServiceRepeatMode.none => LoopMode.off,
+      AudioServiceRepeatMode.one => LoopMode.one,
+      AudioServiceRepeatMode.all => LoopMode.all,
       AudioServiceRepeatMode.group => LoopMode.all,
     };
     await _player.setLoopMode(loopMode);
@@ -155,31 +154,33 @@ class ProtogenixAudioHandler extends BaseAudioHandler
 
   void _broadcastState(PlaybackEvent event) {
     final playing = _player.playing;
-    playbackState.add(playbackState.value.copyWith(
-      controls: [
-        MediaControl.skipToPrevious,
-        if (playing) MediaControl.pause else MediaControl.play,
-        MediaControl.skipToNext,
-      ],
-      systemActions: const {
-        MediaAction.seek,
-        MediaAction.seekForward,
-        MediaAction.seekBackward,
-      },
-      androidCompactActionIndices: const [0, 1, 2],
-      processingState: const {
-        ProcessingState.idle:       AudioProcessingState.idle,
-        ProcessingState.loading:    AudioProcessingState.loading,
-        ProcessingState.buffering:  AudioProcessingState.buffering,
-        ProcessingState.ready:      AudioProcessingState.ready,
-        ProcessingState.completed:  AudioProcessingState.completed,
-      }[_player.processingState]!,
-      playing:         playing,
-      updatePosition:  _player.position,
-      bufferedPosition: _player.bufferedPosition,
-      speed:           _player.speed,
-      queueIndex:      event.currentIndex,
-    ));
+    playbackState.add(
+      playbackState.value.copyWith(
+        controls: [
+          MediaControl.skipToPrevious,
+          if (playing) MediaControl.pause else MediaControl.play,
+          MediaControl.skipToNext,
+        ],
+        systemActions: const {
+          MediaAction.seek,
+          MediaAction.seekForward,
+          MediaAction.seekBackward,
+        },
+        androidCompactActionIndices: const [0, 1, 2],
+        processingState: const {
+          ProcessingState.idle: AudioProcessingState.idle,
+          ProcessingState.loading: AudioProcessingState.loading,
+          ProcessingState.buffering: AudioProcessingState.buffering,
+          ProcessingState.ready: AudioProcessingState.ready,
+          ProcessingState.completed: AudioProcessingState.completed,
+        }[_player.processingState]!,
+        playing: playing,
+        updatePosition: _player.position,
+        bufferedPosition: _player.bufferedPosition,
+        speed: _player.speed,
+        queueIndex: event.currentIndex,
+      ),
+    );
   }
 
   @override

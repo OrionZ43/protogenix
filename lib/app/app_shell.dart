@@ -39,9 +39,21 @@ final _tabIndexProvider = StateProvider<int>((ref) => 0);
 // ── Экраны вкладок ────────────────────────────────────────────────────────────
 
 const _tabs = [
-  _TabItem(icon: Icons.library_music_outlined,  activeIcon: Icons.library_music_rounded,  label: 'Треки'),
-  _TabItem(icon: Icons.queue_music_outlined,     activeIcon: Icons.queue_music_rounded,    label: 'Плейлисты'),
-  _TabItem(icon: Icons.favorite_outline_rounded, activeIcon: Icons.favorite_rounded,       label: 'Избранное'),
+  _TabItem(
+    icon: Icons.library_music_outlined,
+    activeIcon: Icons.library_music_rounded,
+    label: 'Треки',
+  ),
+  _TabItem(
+    icon: Icons.queue_music_outlined,
+    activeIcon: Icons.queue_music_rounded,
+    label: 'Плейлисты',
+  ),
+  _TabItem(
+    icon: Icons.favorite_outline_rounded,
+    activeIcon: Icons.favorite_rounded,
+    label: 'Избранное',
+  ),
 ];
 
 final _screens = <Widget>[
@@ -60,7 +72,7 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return FoldLayout(
-      compactBuilder:  (ctx, _) => const _CompactShell(),
+      compactBuilder: (ctx, _) => const _CompactShell(),
       expandedBuilder: (ctx, _) => const _ExpandedShell(),
     );
   }
@@ -89,11 +101,11 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
   ///            т.к. PlayerScreen._TopBar теперь сам обрабатывает навигацию.
   void _openPlayer(BuildContext context) {
     showModalBottomSheet(
-      context:            context,
+      context: context,
       isScrollControlled: true,
-      backgroundColor:    Colors.transparent,
-      useSafeArea:        true,   // ← Bug 3: было false
-      builder:            (_) => const _FullPlayerSheet(),
+      backgroundColor: Colors.transparent,
+      useSafeArea: true, // ← Bug 3: было false
+      builder: (_) => const _FullPlayerSheet(),
     );
   }
 
@@ -125,10 +137,7 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF080810),
-      body: IndexedStack(
-        index: tabIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: tabIndex, children: _screens),
 
       // MiniPlayer + BottomNavigationBar в одной колонке
       bottomNavigationBar: Column(
@@ -174,16 +183,19 @@ class _ExpandedShell extends ConsumerWidget {
           return FadeTransition(
             opacity: CurvedAnimation(
               parent: animation,
-              curve:  Curves.easeInOutCubic,
+              curve: Curves.easeInOutCubic,
             ),
             child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.04),
-                end:   Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve:  Curves.easeOutCubic,
-              )),
+              position:
+                  Tween<Offset>(
+                    begin: const Offset(0, 0.04),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
               child: child,
             ),
           );
@@ -206,8 +218,8 @@ class _ExpandedShell extends ConsumerWidget {
         children: [
           // ── NavigationRail слева ──────────────────────────────────────────
           Container(
-            width:       72,
-            color:       Colors.white.withAlpha(6),
+            width: 72,
+            color: Colors.white.withAlpha(6),
             child: Column(
               children: [
                 const SizedBox(height: 24),
@@ -216,9 +228,9 @@ class _ExpandedShell extends ConsumerWidget {
                 const Text(
                   'PX',
                   style: TextStyle(
-                    color:         Colors.white54,
-                    fontSize:      13,
-                    fontWeight:    FontWeight.w700,
+                    color: Colors.white54,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -229,10 +241,9 @@ class _ExpandedShell extends ConsumerWidget {
                 ...List.generate(_tabs.length, (i) {
                   final selected = tabIndex == i;
                   return _RailIcon(
-                    tab:      _tabs[i],
+                    tab: _tabs[i],
                     selected: selected,
-                    onTap: () =>
-                        ref.read(_tabIndexProvider.notifier).state = i,
+                    onTap: () => ref.read(_tabIndexProvider.notifier).state = i,
                   );
                 }),
 
@@ -244,20 +255,21 @@ class _ExpandedShell extends ConsumerWidget {
                     onTap: () => _openPlayer(context),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 12),
+                        horizontal: 8,
+                        vertical: 12,
+                      ),
                       child: Container(
-                        width:  52,
+                        width: 52,
                         height: 52,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white.withAlpha(15),
-                          border: Border.all(
-                              color: Colors.white.withAlpha(30)),
+                          border: Border.all(color: Colors.white.withAlpha(30)),
                         ),
                         child: const Icon(
                           Icons.music_note_rounded,
                           color: Colors.white70,
-                          size:  22,
+                          size: 22,
                         ),
                       ),
                     ),
@@ -273,10 +285,7 @@ class _ExpandedShell extends ConsumerWidget {
 
           // ── Контент справа ────────────────────────────────────────────────
           Expanded(
-            child: IndexedStack(
-              index: tabIndex,
-              children: _screens,
-            ),
+            child: IndexedStack(index: tabIndex, children: _screens),
           ),
         ],
       ),
@@ -297,7 +306,7 @@ class _BottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color:  const Color(0xFF0D0D1A),
+        color: const Color(0xFF0D0D1A),
         border: Border(top: BorderSide(color: Colors.white.withAlpha(18))),
       ),
       child: SafeArea(
@@ -307,7 +316,7 @@ class _BottomBar extends StatelessWidget {
           child: Row(
             children: List.generate(_tabs.length, (i) {
               final selected = currentIndex == i;
-              final tab      = _tabs[i];
+              final tab = _tabs[i];
               return Expanded(
                 child: GestureDetector(
                   onTap: () => onTap(i),
@@ -319,22 +328,18 @@ class _BottomBar extends StatelessWidget {
                       children: [
                         Icon(
                           selected ? tab.activeIcon : tab.icon,
-                          color: selected
-                              ? Colors.white
-                              : Colors.white38,
+                          color: selected ? Colors.white : Colors.white38,
                           size: 22,
                         ),
                         const SizedBox(height: 3),
                         Text(
                           tab.label,
                           style: TextStyle(
-                            fontSize:   10,
+                            fontSize: 10,
                             fontWeight: selected
                                 ? FontWeight.w600
                                 : FontWeight.w400,
-                            color: selected
-                                ? Colors.white
-                                : Colors.white38,
+                            color: selected ? Colors.white : Colors.white38,
                           ),
                         ),
                       ],
@@ -360,8 +365,8 @@ class _RailIcon extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final _TabItem     tab;
-  final bool         selected;
+  final _TabItem tab;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
@@ -370,23 +375,18 @@ class _RailIcon extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration:   const Duration(milliseconds: 200),
-        width:      double.infinity,
-        padding:    const EdgeInsets.symmetric(vertical: 14),
+        duration: const Duration(milliseconds: 200),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           border: selected
-              ? const Border(
-                  left: BorderSide(
-                    color: Colors.white,
-                    width: 2,
-                  ),
-                )
+              ? const Border(left: BorderSide(color: Colors.white, width: 2))
               : null,
         ),
         child: Icon(
           selected ? tab.activeIcon : tab.icon,
           color: selected ? Colors.white : Colors.white38,
-          size:  22,
+          size: 22,
         ),
       ),
     );
@@ -423,5 +423,5 @@ class _TabItem {
   });
   final IconData icon;
   final IconData activeIcon;
-  final String   label;
+  final String label;
 }

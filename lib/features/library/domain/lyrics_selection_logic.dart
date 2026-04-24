@@ -4,7 +4,6 @@ import '../../player/presentation/widgets/lyrics_selector_sheet.dart';
 
 /// Интеллектуальный роутер: авто-выбор или ручной выбор через UI.
 class LyricsSelectionLogic {
-
   /// Разрешает выбор текста:
   /// - Если список пуст → null
   /// - Если лучший результат выше порога → авто-возврат
@@ -12,10 +11,10 @@ class LyricsSelectionLogic {
   ///
   /// [confidenceThreshold] — порог уверенности [0.0 … 100.0]
   static Future<LyricsMetadata?> resolveLyrics(
-      BuildContext context,
-      List<ScoredLyric> results, {
-        double confidenceThreshold = 65.0,
-      }) async {
+    BuildContext context,
+    List<ScoredLyric> results, {
+    double confidenceThreshold = 65.0,
+  }) async {
     if (results.isEmpty) return null;
 
     // Сортируем по убыванию score
@@ -28,7 +27,7 @@ class LyricsSelectionLogic {
     if (best.score >= confidenceThreshold) {
       debugPrint(
         '[LyricsRouter] Авто-выбор: "${best.metadata.trackName}" '
-            '(score=${best.scoreLabel})',
+        '(score=${best.scoreLabel})',
       );
       return best.metadata;
     }
@@ -36,7 +35,7 @@ class LyricsSelectionLogic {
     // Низкая уверенность — показываем шторку
     debugPrint(
       '[LyricsRouter] Низкая уверенность (${best.scoreLabel} < $confidenceThreshold) '
-          '→ ручной выбор',
+      '→ ручной выбор',
     );
 
     if (!context.mounted) return null;

@@ -21,8 +21,10 @@ class FoldLayout extends StatelessWidget {
     required this.expandedBuilder,
   });
 
-  final Widget Function(BuildContext context, FoldLayoutData data) compactBuilder;
-  final Widget Function(BuildContext context, FoldLayoutData data) expandedBuilder;
+  final Widget Function(BuildContext context, FoldLayoutData data)
+  compactBuilder;
+  final Widget Function(BuildContext context, FoldLayoutData data)
+  expandedBuilder;
 
   @override
   Widget build(BuildContext context) {

@@ -43,24 +43,27 @@ import 'package:just_audio/just_audio.dart';
 // ── Public API ────────────────────────────────────────────────────────────────
 
 class VisualizerSnapshot {
-  final double bass;      // 0.0–1.0  низкие частоты
-  final double highs;     // 0.0–1.0  высокие частоты
-  final double volume;    // 0.0–1.0  общая энергия
-  final bool   beatDrop;  // true — один тик при резком пике
+  final double bass; // 0.0–1.0  низкие частоты
+  final double highs; // 0.0–1.0  высокие частоты
+  final double volume; // 0.0–1.0  общая энергия
+  final bool beatDrop; // true — один тик при резком пике
 
   const VisualizerSnapshot({
-    this.bass     = 0.0,
-    this.highs    = 0.0,
-    this.volume   = 0.0,
+    this.bass = 0.0,
+    this.highs = 0.0,
+    this.volume = 0.0,
     this.beatDrop = false,
   });
 
   VisualizerSnapshot copyWith({
-    double? bass, double? highs, double? volume, bool? beatDrop,
+    double? bass,
+    double? highs,
+    double? volume,
+    bool? beatDrop,
   }) => VisualizerSnapshot(
-    bass:     bass     ?? this.bass,
-    highs:    highs    ?? this.highs,
-    volume:   volume   ?? this.volume,
+    bass: bass ?? this.bass,
+    highs: highs ?? this.highs,
+    volume: volume ?? this.volume,
     beatDrop: beatDrop ?? this.beatDrop,
   );
 }
@@ -68,14 +71,13 @@ class VisualizerSnapshot {
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 class VisualizerEngine {
-
   // ── Platform channels ──────────────────────────────────────────────────────
 
   static const _kMethodChannel = 'z43.studios.protogenix/control';
-  static const _kEventChannel  = 'z43.studios.protogenix/events';
+  static const _kEventChannel = 'z43.studios.protogenix/events';
 
   final _methodChannel = const MethodChannel(_kMethodChannel);
-  final _eventChannel  = const EventChannel(_kEventChannel);
+  final _eventChannel = const EventChannel(_kEventChannel);
 
   // ── Public stream ──────────────────────────────────────────────────────────
 
@@ -88,22 +90,22 @@ class VisualizerEngine {
   // ── Internal state ─────────────────────────────────────────────────────────
 
   AudioPlayer? _player;
-  StreamSubscription<PlayerState>?  _stateSub;
-  StreamSubscription<dynamic>?      _nativeSub;   // EventChannel subscription
-  StreamSubscription<Duration>?     _fallbackSub; // iOS position-stream fallback
+  StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<dynamic>? _nativeSub; // EventChannel subscription
+  StreamSubscription<Duration>? _fallbackSub; // iOS position-stream fallback
 
-  bool _isPlaying      = false;
-  bool _nativeActive   = false; // true когда EventChannel шлёт данные
+  bool _isPlaying = false;
+  bool _nativeActive = false; // true когда EventChannel шлёт данные
   Timer? _decayTimer;
 
   // Fallback EMA (iOS / при недоступном Visualizer)
-  Duration _prevPos        = Duration.zero;
-  DateTime _prevWallTime   = DateTime.now();
-  double   _bassEma        = 0.0;
-  double   _highsEma       = 0.0;
-  double   _volEma         = 0.0;
-  double   _bassLongEma    = 0.0;
-  bool     _dropSent       = false;
+  Duration _prevPos = Duration.zero;
+  DateTime _prevWallTime = DateTime.now();
+  double _bassEma = 0.0;
+  double _highsEma = 0.0;
+  double _volEma = 0.0;
+  double _bassLongEma = 0.0;
+  bool _dropSent = false;
 
   // ── attachPlayer ───────────────────────────────────────────────────────────
 
@@ -113,8 +115,8 @@ class VisualizerEngine {
     _player = player;
 
     _stateSub = player.playerStateStream.listen((state) async {
-      final nowPlaying = state.playing &&
-          state.processingState == ProcessingState.ready;
+      final nowPlaying =
+          state.playing && state.processingState == ProcessingState.ready;
 
       if (nowPlaying == _isPlaying) return;
       _isPlaying = nowPlaying;
@@ -141,9 +143,7 @@ class VisualizerEngine {
     // Подписываемся на EventChannel ДО вызова startVisualizer,
     // чтобы не пропустить первые события.
     _nativeSub?.cancel();
-    _nativeSub = _eventChannel
-        .receiveBroadcastStream()
-        .listen(
+    _nativeSub = _eventChannel.receiveBroadcastStream().listen(
       _onNativeEvent,
       onError: (Object e) {
         // Если нативная сторона вернула ошибку — уходим в fallback
@@ -194,7 +194,7 @@ class VisualizerEngine {
 
   Future<void> _stopNative() async {
     _nativeSub?.cancel();
-    _nativeSub    = null;
+    _nativeSub = null;
     _nativeActive = false;
 
     _fallbackSub?.cancel();
@@ -203,7 +203,9 @@ class VisualizerEngine {
     if (Platform.isAndroid) {
       try {
         await _methodChannel.invokeMethod('stopVisualizer');
-      } on PlatformException catch (_) {/* ignore */}
+      } on PlatformException catch (_) {
+        /* ignore */
+      }
     }
   }
 
@@ -231,17 +233,19 @@ class VisualizerEngine {
     if (data is! List || data.length < 4) return;
     _nativeActive = true;
 
-    final bass     = (data[0] as num).toDouble().clamp(0.0, 1.0);
-    final highs    = (data[1] as num).toDouble().clamp(0.0, 1.0);
-    final volume   = (data[2] as num).toDouble().clamp(0.0, 1.0);
+    final bass = (data[0] as num).toDouble().clamp(0.0, 1.0);
+    final highs = (data[1] as num).toDouble().clamp(0.0, 1.0);
+    final volume = (data[2] as num).toDouble().clamp(0.0, 1.0);
     final beatDrop = (data[3] as num).toDouble() >= 0.5;
 
-    _emit(VisualizerSnapshot(
-      bass:     bass,
-      highs:    highs,
-      volume:   volume,
-      beatDrop: beatDrop,
-    ));
+    _emit(
+      VisualizerSnapshot(
+        bass: bass,
+        highs: highs,
+        volume: volume,
+        beatDrop: beatDrop,
+      ),
+    );
   }
 
   // ── iOS / Desktop Fallback: Volume Envelope из positionStream ─────────────
@@ -251,7 +255,7 @@ class VisualizerEngine {
 
   void _startFallback(AudioPlayer player) {
     _fallbackSub?.cancel();
-    _prevPos      = player.position;
+    _prevPos = player.position;
     _prevWallTime = DateTime.now();
 
     _fallbackSub = player.positionStream.listen(_onFallbackPosition);
@@ -260,10 +264,10 @@ class VisualizerEngine {
   void _onFallbackPosition(Duration pos) {
     if (!_isPlaying) return;
 
-    final now    = DateTime.now();
+    final now = DateTime.now();
     final wallDt = now.difference(_prevWallTime).inMicroseconds / 1e6;
     final audioDt = (pos.inMicroseconds - _prevPos.inMicroseconds) / 1e6;
-    _prevPos      = pos;
+    _prevPos = pos;
     _prevWallTime = now;
 
     if (wallDt < 0.004 || wallDt > 0.3 || audioDt < 0.0) return;
@@ -275,19 +279,24 @@ class VisualizerEngine {
     final aV = (wallDt / 0.040).clamp(0.0, 1.0);
     final aL = (wallDt / 1.500).clamp(0.0, 1.0);
 
-    _bassEma     += aB * (energy - _bassEma);
-    _highsEma    += aH * (energy - _highsEma);
-    _volEma      += aV * (energy - _volEma);
+    _bassEma += aB * (energy - _bassEma);
+    _highsEma += aH * (energy - _highsEma);
+    _volEma += aV * (energy - _volEma);
     _bassLongEma += aL * (_bassEma - _bassLongEma);
 
-    final bass   = _softClip(_bassEma  * 2.5);
-    final highs  = _softClip(_highsEma * 1.8);
-    final volume = _softClip(_volEma   * 2.0);
-    final drop   = _detectDrop(bass);
+    final bass = _softClip(_bassEma * 2.5);
+    final highs = _softClip(_highsEma * 1.8);
+    final volume = _softClip(_volEma * 2.0);
+    final drop = _detectDrop(bass);
 
-    _emit(VisualizerSnapshot(
-      bass: bass, highs: highs, volume: volume, beatDrop: drop,
-    ));
+    _emit(
+      VisualizerSnapshot(
+        bass: bass,
+        highs: highs,
+        volume: volume,
+        beatDrop: drop,
+      ),
+    );
   }
 
   // ── Decay при паузе ───────────────────────────────────────────────────────
@@ -295,14 +304,14 @@ class VisualizerEngine {
   void _scheduleDecay() {
     _cancelDecay();
     _decayTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
-      _bassEma  *= 0.88;
+      _bassEma *= 0.88;
       _highsEma *= 0.75;
-      _volEma   *= 0.85;
+      _volEma *= 0.85;
 
       final snap = VisualizerSnapshot(
-        bass:   _softClip(_bassEma  * 2.5),
-        highs:  _softClip(_highsEma * 1.8),
-        volume: _softClip(_volEma   * 2.0),
+        bass: _softClip(_bassEma * 2.5),
+        highs: _softClip(_highsEma * 1.8),
+        volume: _softClip(_volEma * 2.0),
       );
       _emit(snap);
 
@@ -346,10 +355,10 @@ class VisualizerEngine {
     _stateSub?.cancel();
     _nativeSub?.cancel();
     _fallbackSub?.cancel();
-    _stateSub    = null;
-    _nativeSub   = null;
+    _stateSub = null;
+    _nativeSub = null;
     _fallbackSub = null;
-    _player      = null;
+    _player = null;
     _nativeActive = false;
     _cancelDecay();
 

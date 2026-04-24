@@ -12,10 +12,7 @@ import 'providers/netease_provider.dart';
 class LyricsService {
   LyricsService._() {
     // Регистрируем провайдеры по умолчанию
-    _providers = [
-      LrcLibProvider(),
-      NetEaseProvider(),
-    ];
+    _providers = [LrcLibProvider(), NetEaseProvider()];
   }
 
   static final LyricsService instance = LyricsService._();
@@ -33,13 +30,15 @@ class LyricsService {
     required String title,
     required String artist,
     String? filePath,
-    int?    trackDurationMs,
+    int? trackDurationMs,
   }) async {
     debugPrint('\n╔══════════════════════════════════════════════════');
     debugPrint('║ LyricsService.fetchLyrics');
     debugPrint('║ title:    "$title"');
     debugPrint('║ artist:   "$artist"');
-    debugPrint('║ duration: ${trackDurationMs != null ? "${trackDurationMs}ms" : "—"}');
+    debugPrint(
+      '║ duration: ${trackDurationMs != null ? "${trackDurationMs}ms" : "—"}',
+    );
     debugPrint('╚══════════════════════════════════════════════════');
 
     // 1. Проверяем локальный файл
@@ -48,12 +47,12 @@ class LyricsService {
       if (local != null) {
         debugPrint('[LyricsService] ✓ Локальный .lrc файл');
         final meta = LyricsMetadata(
-          id:         'local_${filePath.hashCode}',
-          trackName:  title,
+          id: 'local_${filePath.hashCode}',
+          trackName: title,
           artistName: artist,
-          content:    local,
-          type:       _classifyContent(local),
-          source:     'local',
+          content: local,
+          type: _classifyContent(local),
+          source: 'local',
         );
         return [ScoredLyric(metadata: meta, score: 100.0)];
       }
@@ -77,15 +76,15 @@ class LyricsService {
 
     debugPrint(
       '[LyricsService] Параллельных запросов: '
-          '${_providers.length} провайдера × ${queries.length} запросов '
-          '= ${allFutures.length}',
+      '${_providers.length} провайдера × ${queries.length} запросов '
+      '= ${allFutures.length}',
     );
 
     final allLists = await Future.wait(allFutures);
 
     // 4. Собираем и дедуплицируем результаты
-    final seen    = <String>{};
-    final unique  = <LyricsMetadata>[];
+    final seen = <String>{};
+    final unique = <LyricsMetadata>[];
 
     for (final list in allLists) {
       for (final meta in list) {
@@ -106,9 +105,9 @@ class LyricsService {
     // 5. Scoring
     final scored = unique.map((meta) {
       final score = _calculateScore(
-        meta:            meta,
-        originalTitle:   title,
-        originalArtist:  artist,
+        meta: meta,
+        originalTitle: title,
+        originalArtist: artist,
         trackDurationMs: trackDurationMs,
       );
       return ScoredLyric(metadata: meta, score: score);
@@ -125,9 +124,9 @@ class LyricsService {
       final s = top10[i];
       debugPrint(
         '[LyricsService] #${i + 1} '
-            '"${s.metadata.artistName} — ${s.metadata.trackName}" '
-            '| ${s.metadata.type} | ${s.metadata.source} '
-            '| score=${s.scoreLabel}',
+        '"${s.metadata.artistName} — ${s.metadata.trackName}" '
+        '| ${s.metadata.type} | ${s.metadata.source} '
+        '| score=${s.scoreLabel}',
       );
     }
 
@@ -140,16 +139,16 @@ class LyricsService {
 
   double _calculateScore({
     required LyricsMetadata meta,
-    required String         originalTitle,
-    required String         originalArtist,
-    int?                    trackDurationMs,
+    required String originalTitle,
+    required String originalArtist,
+    int? trackDurationMs,
   }) {
     double score = 0.0;
 
     // Нормализуем для сравнения
-    final normTitle   = _normalize(originalTitle);
-    final normArtist  = _normalize(originalArtist);
-    final normMTitle  = _normalize(meta.trackName);
+    final normTitle = _normalize(originalTitle);
+    final normArtist = _normalize(originalArtist);
+    final normMTitle = _normalize(meta.trackName);
     final normMArtist = _normalize(meta.artistName);
 
     // ── Схожесть названия: до +40 баллов ─────────────────────────────────
@@ -166,14 +165,14 @@ class LyricsService {
 
     // ── Бонус за длительность: до +15 баллов ─────────────────────────────
     if (trackDurationMs != null && meta.durationMs != null) {
-      final diffMs  = (trackDurationMs - meta.durationMs!).abs();
+      final diffMs = (trackDurationMs - meta.durationMs!).abs();
       final diffSec = diffMs / 1000.0;
 
       if (diffSec < 3.0) {
         score += 15.0;
         debugPrint(
           '[SCORE] "${meta.trackName}" +15.0 (длит. совпадает, '
-              'diff=${diffSec.toStringAsFixed(1)}s)',
+          'diff=${diffSec.toStringAsFixed(1)}s)',
         );
       } else if (diffSec < 10.0) {
         score += 5.0;
@@ -182,7 +181,7 @@ class LyricsService {
         score -= 10.0;
         debugPrint(
           '[SCORE] "${meta.trackName}" -10.0 '
-              '(длит. сильно отличается, diff=${diffSec.toStringAsFixed(0)}s)',
+          '(длит. сильно отличается, diff=${diffSec.toStringAsFixed(0)}s)',
         );
       }
     }
@@ -191,17 +190,17 @@ class LyricsService {
     final formatBonus = switch (meta.type) {
       LyricsType.syllable => 60.0,
       LyricsType.enhanced => 45.0,
-      LyricsType.synced   => 25.0,
-      LyricsType.plain    =>  5.0,
+      LyricsType.synced => 25.0,
+      LyricsType.plain => 5.0,
     };
     score += formatBonus;
 
     debugPrint(
       '[SCORE] "${meta.artistName} — ${meta.trackName}" '
-          '| title=${(titleSim * 40).toStringAsFixed(1)} '
-          'artist=${(artistSim * 20).toStringAsFixed(1)} '
-          'format=$formatBonus '
-          '| TOTAL=${score.toStringAsFixed(1)} [${meta.type}] [${meta.source}]',
+      '| title=${(titleSim * 40).toStringAsFixed(1)} '
+      'artist=${(artistSim * 20).toStringAsFixed(1)} '
+      'format=$formatBonus '
+      '| TOTAL=${score.toStringAsFixed(1)} [${meta.type}] [${meta.source}]',
     );
 
     return score;
@@ -227,8 +226,10 @@ class LyricsService {
     if (RegExp(r'<\d{2}:\d{2}\.\d{2,3}>').hasMatch(content)) {
       return LyricsType.enhanced;
     }
-    if (RegExp(r'^\[\d{2}:\d{2}\.\d{2,3}\]', multiLine: true)
-        .hasMatch(content)) {
+    if (RegExp(
+      r'^\[\d{2}:\d{2}\.\d{2,3}\]',
+      multiLine: true,
+    ).hasMatch(content)) {
       return LyricsType.synced;
     }
     return LyricsType.plain;
@@ -248,7 +249,7 @@ class LyricsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   Future<String> saveLrc(String lrcContent, String trackId) async {
-    final dir  = await getApplicationDocumentsDirectory();
+    final dir = await getApplicationDocumentsDirectory();
     final file = File(p.join(dir.path, 'lyrics', '$trackId.lrc'));
     await file.parent.create(recursive: true);
     await file.writeAsString(lrcContent);
@@ -268,9 +269,9 @@ class LyricsService {
     int? trackDurationMs,
   }) async {
     final results = await fetchLyrics(
-      title:           title,
-      artist:          artist,
-      filePath:        filePath,
+      title: title,
+      artist: artist,
+      filePath: filePath,
       trackDurationMs: trackDurationMs,
     );
     return results.isEmpty ? null : results.first.metadata.content;

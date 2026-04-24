@@ -11,7 +11,7 @@ Future<void> main() async {
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      statusBarColor:           Colors.transparent,
+      statusBarColor: Colors.transparent,
       systemNavigationBarColor: Colors.transparent,
     ),
   );
@@ -19,9 +19,5 @@ Future<void> main() async {
   // Инициализируем фоновое воспроизведение ПЕРЕД runApp
   await initAudioService();
 
-  runApp(
-    const ProviderScope(
-      child: ProtogenixApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: ProtogenixApp()));
 }

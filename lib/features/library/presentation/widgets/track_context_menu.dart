@@ -23,9 +23,9 @@ void showTrackContextMenu(
   LibraryTrack track,
 ) {
   showModalBottomSheet(
-    context:            context,
+    context: context,
     isScrollControlled: true,
-    backgroundColor:    Colors.transparent,
+    backgroundColor: Colors.transparent,
     builder: (_) => UncontrolledProviderScope(
       container: ProviderScope.containerOf(context),
       child: _TrackContextMenu(track: track),
@@ -45,7 +45,7 @@ class _TrackContextMenu extends ConsumerWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        color:        Color(0xFF0E0E1C),
+        color: Color(0xFF0E0E1C),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
@@ -55,11 +55,11 @@ class _TrackContextMenu extends ConsumerWidget {
           children: [
             // Ручка
             Container(
-              margin:     const EdgeInsets.only(top: 12, bottom: 8),
-              width:      40,
-              height:     4,
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
-                color:        Colors.white24,
+                color: Colors.white24,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -75,9 +75,9 @@ class _TrackContextMenu extends ConsumerWidget {
                       image: track.coverPath != null
                           ? FileImage(File(track.coverPath!)) as ImageProvider
                           : const AssetImage('assets/images/mock_cover.jpg'),
-                      width:  48,
+                      width: 48,
                       height: 48,
-                      fit:    BoxFit.cover,
+                      fit: BoxFit.cover,
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -90,8 +90,8 @@ class _TrackContextMenu extends ConsumerWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color:      Colors.white,
-                            fontSize:   15,
+                            color: Colors.white,
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -101,7 +101,7 @@ class _TrackContextMenu extends ConsumerWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color:    Colors.white54,
+                            color: Colors.white54,
                             fontSize: 13,
                           ),
                         ),
@@ -119,9 +119,11 @@ class _TrackContextMenu extends ConsumerWidget {
 
             // Избранное
             _MenuItem(
-              icon:      isFav ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+              icon: isFav
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_outline_rounded,
               iconColor: isFav ? Colors.redAccent : Colors.white70,
-              label:     isFav ? 'Убрать из избранного' : 'В избранное',
+              label: isFav ? 'Убрать из избранного' : 'В избранное',
               onTap: () {
                 ref.read(favoritesProvider.notifier).toggle(track.id);
                 Navigator.of(context).pop();
@@ -130,7 +132,7 @@ class _TrackContextMenu extends ConsumerWidget {
 
             // Добавить в плейлист
             _MenuItem(
-              icon:  Icons.playlist_add_rounded,
+              icon: Icons.playlist_add_rounded,
               label: 'Добавить в плейлист',
               onTap: () {
                 Navigator.of(context).pop();
@@ -140,7 +142,7 @@ class _TrackContextMenu extends ConsumerWidget {
 
             // Найти текст
             _MenuItem(
-              icon:  Icons.manage_search_rounded,
+              icon: Icons.manage_search_rounded,
               label: 'Найти текст вручную',
               onTap: () {
                 Navigator.of(context).pop();
@@ -150,9 +152,9 @@ class _TrackContextMenu extends ConsumerWidget {
 
             // Удалить трек
             _MenuItem(
-              icon:       Icons.delete_outline_rounded,
-              iconColor:  Colors.redAccent,
-              label:      'Удалить трек',
+              icon: Icons.delete_outline_rounded,
+              iconColor: Colors.redAccent,
+              label: 'Удалить трек',
               labelColor: Colors.redAccent,
               onTap: () {
                 Navigator.of(context).pop();
@@ -176,9 +178,9 @@ void _showAddToPlaylistSheet(
   LibraryTrack track,
 ) {
   showModalBottomSheet(
-    context:            context,
+    context: context,
     isScrollControlled: true,
-    backgroundColor:    Colors.transparent,
+    backgroundColor: Colors.transparent,
     builder: (_) => UncontrolledProviderScope(
       container: ProviderScope.containerOf(context),
       child: _AddToPlaylistSheet(track: track),
@@ -196,7 +198,7 @@ class _AddToPlaylistSheet extends ConsumerWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        color:        Color(0xFF0E0E1C),
+        color: Color(0xFF0E0E1C),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
@@ -205,11 +207,11 @@ class _AddToPlaylistSheet extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              margin:     const EdgeInsets.only(top: 12, bottom: 16),
-              width:      40,
-              height:     4,
+              margin: const EdgeInsets.only(top: 12, bottom: 16),
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
-                color:        Colors.white24,
+                color: Colors.white24,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -221,8 +223,8 @@ class _AddToPlaylistSheet extends ConsumerWidget {
                 child: Text(
                   'Добавить в плейлист',
                   style: TextStyle(
-                    color:      Colors.white,
-                    fontSize:   17,
+                    color: Colors.white,
+                    fontSize: 17,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -231,7 +233,7 @@ class _AddToPlaylistSheet extends ConsumerWidget {
 
             // Создать новый
             _MenuItem(
-              icon:  Icons.add_circle_outline_rounded,
+              icon: Icons.add_circle_outline_rounded,
               label: 'Создать новый плейлист',
               onTap: () async {
                 Navigator.of(context).pop();
@@ -242,7 +244,7 @@ class _AddToPlaylistSheet extends ConsumerWidget {
                       .create(name);
                   await PlaylistDatabase.instance.addTrackToPlaylist(
                     playlistId: pl.id,
-                    trackId:    track.id,
+                    trackId: track.id,
                   );
                 }
               },
@@ -259,12 +261,12 @@ class _AddToPlaylistSheet extends ConsumerWidget {
             else
               ...playlists.map(
                 (pl) => _MenuItem(
-                  icon:  Icons.queue_music_rounded,
+                  icon: Icons.queue_music_rounded,
                   label: pl.name,
                   onTap: () async {
                     await PlaylistDatabase.instance.addTrackToPlaylist(
                       playlistId: pl.id,
-                      trackId:    track.id,
+                      trackId: track.id,
                     );
                     if (context.mounted) {
                       Navigator.of(context).pop();
@@ -305,20 +307,20 @@ Future<String?> _promptPlaylistName(BuildContext context) {
         style: TextStyle(color: Colors.white, fontSize: 17),
       ),
       content: TextField(
-        controller:  ctrl,
-        autofocus:   true,
-        style:       const TextStyle(color: Colors.white),
+        controller: ctrl,
+        autofocus: true,
+        style: const TextStyle(color: Colors.white),
         cursorColor: Colors.white70,
         decoration: InputDecoration(
-          hintText:      'Название...',
-          hintStyle:     const TextStyle(color: Colors.white38),
+          hintText: 'Название...',
+          hintStyle: const TextStyle(color: Colors.white38),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:   const BorderSide(color: Colors.white24),
+            borderSide: const BorderSide(color: Colors.white24),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:   const BorderSide(color: Colors.white60),
+            borderSide: const BorderSide(color: Colors.white60),
           ),
         ),
       ),
@@ -338,11 +340,7 @@ Future<String?> _promptPlaylistName(BuildContext context) {
 
 // ── Подтверждение удаления — удаляет из БД + с диска ─────────────────────────
 
-void _confirmDelete(
-  BuildContext context,
-  WidgetRef ref,
-  LibraryTrack track,
-) {
+void _confirmDelete(BuildContext context, WidgetRef ref, LibraryTrack track) {
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -369,14 +367,19 @@ void _confirmDelete(
                 ref.read(playerProvider).currentTrack?.id == track.id;
 
             // Удаляем из БД + физические файлы с диска
-            await ref.read(libraryProvider.notifier).removeTrackWithFiles(track);
+            await ref
+                .read(libraryProvider.notifier)
+                .removeTrackWithFiles(track);
 
             // Если удалённый трек сейчас играл — перезагружаем плеер
             if (isCurrentTrack) {
               await ref.read(playerProvider.notifier).reloadFromLibrary();
             }
           },
-          child: const Text('Удалить', style: TextStyle(color: Colors.redAccent)),
+          child: const Text(
+            'Удалить',
+            style: TextStyle(color: Colors.redAccent),
+          ),
         ),
       ],
     ),
@@ -394,11 +397,11 @@ class _MenuItem extends StatelessWidget {
     this.labelColor,
   });
 
-  final IconData     icon;
-  final String       label;
+  final IconData icon;
+  final String label;
   final VoidCallback onTap;
-  final Color?       iconColor;
-  final Color?       labelColor;
+  final Color? iconColor;
+  final Color? labelColor;
 
   @override
   Widget build(BuildContext context) {
@@ -412,10 +415,7 @@ class _MenuItem extends StatelessWidget {
             const SizedBox(width: 16),
             Text(
               label,
-              style: TextStyle(
-                color:    labelColor ?? Colors.white,
-                fontSize: 15,
-              ),
+              style: TextStyle(color: labelColor ?? Colors.white, fontSize: 15),
             ),
           ],
         ),

@@ -8,7 +8,14 @@ import '../../library/data/library_database.dart';
 import '../../library/data/lyrics_service.dart';
 import '../../library/domain/library_track.dart';
 
-enum ImportStatus { idle, fetchingMeta, downloading, fetchingLyrics, done, error }
+enum ImportStatus {
+  idle,
+  fetchingMeta,
+  downloading,
+  fetchingLyrics,
+  done,
+  error,
+}
 
 class ImportProgress {
   final ImportStatus status;
@@ -53,18 +60,22 @@ class ImporterService {
       } else if (_isDirectAudio(url)) {
         await _importDirectUrl(url: url, onProgress: onProgress);
       } else {
-        onProgress(const ImportProgress(
-          status: ImportStatus.error,
-          message: 'Неизвестный формат ссылки',
-          error: 'Поддерживаются: YouTube, прямые ссылки на MP3/FLAC',
-        ));
+        onProgress(
+          const ImportProgress(
+            status: ImportStatus.error,
+            message: 'Неизвестный формат ссылки',
+            error: 'Поддерживаются: YouTube, прямые ссылки на MP3/FLAC',
+          ),
+        );
       }
     } catch (e) {
-      onProgress(ImportProgress(
-        status: ImportStatus.error,
-        message: 'Ошибка импорта',
-        error: e.toString(),
-      ));
+      onProgress(
+        ImportProgress(
+          status: ImportStatus.error,
+          message: 'Ошибка импорта',
+          error: e.toString(),
+        ),
+      );
     }
   }
 
@@ -74,11 +85,13 @@ class ImporterService {
     required String url,
     required void Function(ImportProgress) onProgress,
   }) async {
-    onProgress(const ImportProgress(
-      status: ImportStatus.fetchingMeta,
-      message: 'Получение метаданных...',
-      progress: 0.03,
-    ));
+    onProgress(
+      const ImportProgress(
+        status: ImportStatus.fetchingMeta,
+        message: 'Получение метаданных...',
+        progress: 0.03,
+      ),
+    );
 
     // Создаём ОДИН экземпляр на всю операцию. URL и скачивание — один клиент.
     final yt = YoutubeExplode();
@@ -88,11 +101,13 @@ class ImporterService {
       final id = video.id.value;
       final title = _cleanYouTubeTitle(video.title);
 
-      onProgress(ImportProgress(
-        status: ImportStatus.fetchingMeta,
-        message: 'Найдено: $title',
-        progress: 0.1,
-      ));
+      onProgress(
+        ImportProgress(
+          status: ImportStatus.fetchingMeta,
+          message: 'Найдено: $title',
+          progress: 0.1,
+        ),
+      );
 
       // Пробуем клиентов по очереди до первого успешного скачивания
       bool downloaded = false;
@@ -106,11 +121,13 @@ class ImporterService {
             yt: yt,
             videoId: id,
             client: client,
-            onProgress: (p, msg) => onProgress(ImportProgress(
-              status: ImportStatus.downloading,
-              message: msg,
-              progress: p,
-            )),
+            onProgress: (p, msg) => onProgress(
+              ImportProgress(
+                status: ImportStatus.downloading,
+                message: msg,
+                progress: p,
+              ),
+            ),
           );
           downloaded = true;
           debugPrint('[YT] Успех с клиентом: $client');
@@ -134,31 +151,37 @@ class ImporterService {
         throw lastError ?? Exception('Все клиенты YouTube исчерпаны');
       }
 
-      onProgress(const ImportProgress(
-        status: ImportStatus.downloading,
-        message: 'Сохранение в библиотеку...',
-        progress: 0.92,
-      ));
+      onProgress(
+        const ImportProgress(
+          status: ImportStatus.downloading,
+          message: 'Сохранение в библиотеку...',
+          progress: 0.92,
+        ),
+      );
 
       final coverPath = await _downloadCover(video.thumbnails.highResUrl, id);
 
-      await LibraryDatabase.instance.insertTrack(LibraryTrack(
-        id: id,
-        title: title,
-        artist: video.author,
-        album: 'YouTube',
-        filePath: savePath,
-        coverPath: coverPath,
-        durationMs: video.duration?.inMilliseconds ?? 0,
-        source: 'youtube',
-        addedAt: DateTime.now(),
-      ));
+      await LibraryDatabase.instance.insertTrack(
+        LibraryTrack(
+          id: id,
+          title: title,
+          artist: video.author,
+          album: 'YouTube',
+          filePath: savePath,
+          coverPath: coverPath,
+          durationMs: video.duration?.inMilliseconds ?? 0,
+          source: 'youtube',
+          addedAt: DateTime.now(),
+        ),
+      );
 
-      onProgress(ImportProgress(
-        status: ImportStatus.done,
-        message: '✓ "$title" добавлен!',
-        progress: 1.0,
-      ));
+      onProgress(
+        ImportProgress(
+          status: ImportStatus.done,
+          message: '✓ "$title" добавлен!',
+          progress: 1.0,
+        ),
+      );
     } finally {
       // Всегда закрываем — освобождает HTTP-сессию и предотвращает утечки
       yt.close();
@@ -180,8 +203,10 @@ class ImporterService {
     );
 
     final audioStreams = manifest.audioOnly.toList()
-      ..sort((a, b) => b.bitrate.kiloBitsPerSecond.compareTo(
-          a.bitrate.kiloBitsPerSecond));
+      ..sort(
+        (a, b) =>
+            b.bitrate.kiloBitsPerSecond.compareTo(a.bitrate.kiloBitsPerSecond),
+      );
 
     if (audioStreams.isEmpty) {
       throw _NoStreamsException('Клиент $client не вернул аудио-потоков');
@@ -192,7 +217,9 @@ class ImporterService {
     final savePath = await _getTrackPath('$videoId.$ext');
     final totalBytes = streamInfo.size.totalBytes;
 
-    debugPrint('[YT] Поток: ${streamInfo.bitrate}, размер: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB');
+    debugPrint(
+      '[YT] Поток: ${streamInfo.bitrate}, размер: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB',
+    );
 
     final file = File(savePath);
     if (await file.exists()) await file.delete();
@@ -272,20 +299,24 @@ class ImporterService {
     required String url,
     required void Function(ImportProgress) onProgress,
   }) async {
-    onProgress(const ImportProgress(
-      status: ImportStatus.fetchingMeta,
-      message: 'Определяем файл...',
-    ));
+    onProgress(
+      const ImportProgress(
+        status: ImportStatus.fetchingMeta,
+        message: 'Определяем файл...',
+      ),
+    );
 
     final fileName = url.split('/').last.split('?').first;
     final id = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
     final savePath = await _getTrackPath(fileName);
 
-    onProgress(const ImportProgress(
-      status: ImportStatus.downloading,
-      message: 'Скачиваем файл...',
-      progress: 0.1,
-    ));
+    onProgress(
+      const ImportProgress(
+        status: ImportStatus.downloading,
+        message: 'Скачиваем файл...',
+        progress: 0.1,
+      ),
+    );
 
     await _dio.download(
       url,
@@ -295,22 +326,26 @@ class ImporterService {
           final receivedMB = (received / 1024 / 1024).toStringAsFixed(1);
           final totalMB = (total / 1024 / 1024).toStringAsFixed(1);
           final percent = (received / total * 100).round();
-          onProgress(ImportProgress(
-            status: ImportStatus.downloading,
-            message: '⬇ $receivedMB / $totalMB MB ($percent%)',
-            progress: 0.1 + (received / total) * 0.75,
-          ));
+          onProgress(
+            ImportProgress(
+              status: ImportStatus.downloading,
+              message: '⬇ $receivedMB / $totalMB MB ($percent%)',
+              progress: 0.1 + (received / total) * 0.75,
+            ),
+          );
         }
       },
     );
 
     final title = p.basenameWithoutExtension(fileName);
 
-    onProgress(const ImportProgress(
-      status: ImportStatus.fetchingLyrics,
-      message: 'Ищем текст песни...',
-      progress: 0.88,
-    ));
+    onProgress(
+      const ImportProgress(
+        status: ImportStatus.fetchingLyrics,
+        message: 'Ищем текст песни...',
+        progress: 0.88,
+      ),
+    );
 
     final lrcContent = await LyricsService.instance.getLrc(
       filePath: savePath,
@@ -323,23 +358,27 @@ class ImporterService {
       lrcPath = await LyricsService.instance.saveLrc(lrcContent, id);
     }
 
-    await LibraryDatabase.instance.insertTrack(LibraryTrack(
-      id: id,
-      title: title,
-      artist: 'Unknown Artist',
-      album: 'Imported',
-      filePath: savePath,
-      lrcPath: lrcPath,
-      durationMs: 0,
-      source: 'direct',
-      addedAt: DateTime.now(),
-    ));
+    await LibraryDatabase.instance.insertTrack(
+      LibraryTrack(
+        id: id,
+        title: title,
+        artist: 'Unknown Artist',
+        album: 'Imported',
+        filePath: savePath,
+        lrcPath: lrcPath,
+        durationMs: 0,
+        source: 'direct',
+        addedAt: DateTime.now(),
+      ),
+    );
 
-    onProgress(ImportProgress(
-      status: ImportStatus.done,
-      message: '✓ "$title" добавлен в библиотеку',
-      progress: 1.0,
-    ));
+    onProgress(
+      ImportProgress(
+        status: ImportStatus.done,
+        message: '✓ "$title" добавлен в библиотеку',
+        progress: 1.0,
+      ),
+    );
   }
 
   // ── SoundCloud — заглушка ─────────────────────────────────────────────────
@@ -348,11 +387,13 @@ class ImporterService {
     required String url,
     required void Function(ImportProgress) onProgress,
   }) async {
-    onProgress(const ImportProgress(
-      status: ImportStatus.error,
-      message: 'SoundCloud в следующем обновлении',
-      error: 'Используй прямую ссылку на MP3 или YouTube',
-    ));
+    onProgress(
+      const ImportProgress(
+        status: ImportStatus.error,
+        message: 'SoundCloud в следующем обновлении',
+        error: 'Используй прямую ссылку на MP3 или YouTube',
+      ),
+    );
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -364,10 +405,10 @@ class ImporterService {
 
   bool _isDirectAudio(String url) =>
       url.endsWith('.mp3') ||
-          url.endsWith('.flac') ||
-          url.endsWith('.m4a') ||
-          url.endsWith('.ogg') ||
-          url.endsWith('.wav');
+      url.endsWith('.flac') ||
+      url.endsWith('.m4a') ||
+      url.endsWith('.ogg') ||
+      url.endsWith('.wav');
 
   Future<String> _getTrackPath(String fileName) async {
     final dir = await getApplicationDocumentsDirectory();

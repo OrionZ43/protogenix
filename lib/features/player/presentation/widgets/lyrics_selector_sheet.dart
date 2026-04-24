@@ -4,13 +4,13 @@ import '../../../library/domain/lyrics_models.dart';
 /// Открывает шторку выбора текста и возвращает выбранный [LyricsMetadata].
 /// Возвращает null если пользователь закрыл шторку без выбора.
 Future<LyricsMetadata?> showLyricsSelectorSheet(
-    BuildContext context,
-    List<ScoredLyric> candidates,
-    ) {
+  BuildContext context,
+  List<ScoredLyric> candidates,
+) {
   return showModalBottomSheet<LyricsMetadata>(
-    context:           context,
+    context: context,
     isScrollControlled: true,
-    backgroundColor:    Colors.transparent,
+    backgroundColor: Colors.transparent,
     builder: (_) => _LyricsSelectorSheet(candidates: candidates),
   );
 }
@@ -31,12 +31,9 @@ class _LyricsSelectorSheet extends StatelessWidget {
     return Container(
       constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
-        color:        const Color(0xFF0E0E18),
+        color: const Color(0xFF0E0E18),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(
-          color: Colors.white.withAlpha(18),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withAlpha(18), width: 1),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -46,9 +43,10 @@ class _LyricsSelectorSheet extends StatelessWidget {
             padding: const EdgeInsets.only(top: 12, bottom: 4),
             child: Center(
               child: Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 decoration: BoxDecoration(
-                  color:        Colors.white.withAlpha(50),
+                  color: Colors.white.withAlpha(50),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -60,14 +58,17 @@ class _LyricsSelectorSheet extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
             child: Row(
               children: [
-                const Icon(Icons.lyrics_rounded,
-                    color: Colors.white54, size: 18),
+                const Icon(
+                  Icons.lyrics_rounded,
+                  color: Colors.white54,
+                  size: 18,
+                ),
                 const SizedBox(width: 10),
                 const Text(
                   'Выбери текст песни',
                   style: TextStyle(
-                    color:      Colors.white,
-                    fontSize:   17,
+                    color: Colors.white,
+                    fontSize: 17,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -75,7 +76,7 @@ class _LyricsSelectorSheet extends StatelessWidget {
                 Text(
                   '${candidates.length} вариантов',
                   style: TextStyle(
-                    color:    Colors.white.withAlpha(60),
+                    color: Colors.white.withAlpha(60),
                     fontSize: 12,
                   ),
                 ),
@@ -88,11 +89,11 @@ class _LyricsSelectorSheet extends StatelessWidget {
           // ── Список кандидатов ──────────────────────────────────────────
           Flexible(
             child: ListView.separated(
-              shrinkWrap:  true,
+              shrinkWrap: true,
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-              itemCount:   candidates.length,
+              itemCount: candidates.length,
               separatorBuilder: (_, __) => Divider(
-                color:  Colors.white.withAlpha(10),
+                color: Colors.white.withAlpha(10),
                 height: 1,
                 indent: 16,
               ),
@@ -100,8 +101,8 @@ class _LyricsSelectorSheet extends StatelessWidget {
                 final item = candidates[index];
                 return _CandidateTile(
                   scored: item,
-                  isTop:  index == 0,
-                  onTap:  () => Navigator.of(context).pop(item.metadata),
+                  isTop: index == 0,
+                  onTap: () => Navigator.of(context).pop(item.metadata),
                 );
               },
             ),
@@ -123,8 +124,8 @@ class _CandidateTile extends StatelessWidget {
     required this.onTap,
   });
 
-  final ScoredLyric  scored;
-  final bool         isTop;
+  final ScoredLyric scored;
+  final bool isTop;
   final VoidCallback onTap;
 
   @override
@@ -134,25 +135,24 @@ class _CandidateTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap:        onTap,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        splashColor:  Colors.white.withAlpha(10),
+        splashColor: Colors.white.withAlpha(10),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           decoration: isTop
               ? BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color:        Colors.white.withAlpha(8),
-            border: Border.all(
-              color: Colors.white.withAlpha(20),
-              width: 1,
-            ),
-          )
+                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white.withAlpha(8),
+                  border: Border.all(
+                    color: Colors.white.withAlpha(20),
+                    width: 1,
+                  ),
+                )
               : null,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               // ── Иконка типа ──────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.only(top: 2, right: 12),
@@ -170,25 +170,22 @@ class _CandidateTile extends StatelessWidget {
                           child: Text(
                             meta.trackName,
                             style: const TextStyle(
-                              color:      Colors.white,
-                              fontSize:   15,
+                              color: Colors.white,
+                              fontSize: 15,
                               fontWeight: FontWeight.w700,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (isTop) ...[
-                          const SizedBox(width: 6),
-                          _TopBadge(),
-                        ],
+                        if (isTop) ...[const SizedBox(width: 6), _TopBadge()],
                       ],
                     ),
                     const SizedBox(height: 3),
                     Text(
                       meta.artistName,
                       style: TextStyle(
-                        color:    Colors.white.withAlpha(120),
+                        color: Colors.white.withAlpha(120),
                         fontSize: 13,
                       ),
                       maxLines: 1,
@@ -237,7 +234,8 @@ class _TypeIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 36, height: 36,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
@@ -260,18 +258,18 @@ class _TypeIcon extends StatelessWidget {
             ],
           },
           begin: Alignment.topLeft,
-          end:   Alignment.bottomRight,
+          end: Alignment.bottomRight,
         ),
       ),
       child: Icon(
         switch (type) {
           LyricsType.syllable => Icons.record_voice_over_rounded,
           LyricsType.enhanced => Icons.auto_awesome_rounded,
-          LyricsType.synced   => Icons.access_time_rounded,
-          LyricsType.plain    => Icons.article_outlined,
+          LyricsType.synced => Icons.access_time_rounded,
+          LyricsType.plain => Icons.article_outlined,
         },
         color: Colors.white,
-        size:  18,
+        size: 18,
       ),
     );
   }
@@ -286,20 +284,20 @@ class _TypeBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, colors) = switch (type) {
       LyricsType.syllable => (
-      'Syllable',
-      [const Color(0xFFE040FB), const Color(0xFF7C4DFF)],
+        'Syllable',
+        [const Color(0xFFE040FB), const Color(0xFF7C4DFF)],
       ),
       LyricsType.enhanced => (
-      'Word-by-Word',
-      [const Color(0xFFFFD700), const Color(0xFFFF8C00)],
+        'Word-by-Word',
+        [const Color(0xFFFFD700), const Color(0xFFFF8C00)],
       ),
       LyricsType.synced => (
-      'Synced',
-      [const Color(0xFF29B6F6), const Color(0xFF0277BD)],
+        'Synced',
+        [const Color(0xFF29B6F6), const Color(0xFF0277BD)],
       ),
       LyricsType.plain => (
-      'Plain',
-      [const Color(0xFF607D8B), const Color(0xFF455A64)],
+        'Plain',
+        [const Color(0xFF607D8B), const Color(0xFF455A64)],
       ),
     };
 
@@ -309,15 +307,15 @@ class _TypeBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         gradient: LinearGradient(
           colors: colors,
-          begin:  Alignment.topLeft,
-          end:    Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          color:      Colors.white,
-          fontSize:   10,
+          color: Colors.white,
+          fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
         ),
@@ -337,13 +335,13 @@ class _SourceBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
-        color:        Colors.white.withAlpha(15),
+        color: Colors.white.withAlpha(15),
         border: Border.all(color: Colors.white.withAlpha(25)),
       ),
       child: Text(
         source,
         style: TextStyle(
-          color:    Colors.white.withAlpha(140),
+          color: Colors.white.withAlpha(140),
           fontSize: 10,
           fontWeight: FontWeight.w500,
         ),
@@ -360,28 +358,28 @@ class _DurationBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalSec = durationMs ~/ 1000;
-    final minutes  = totalSec ~/ 60;
-    final seconds  = totalSec % 60;
-    final label    = '$minutes:${seconds.toString().padLeft(2, '0')}';
+    final minutes = totalSec ~/ 60;
+    final seconds = totalSec % 60;
+    final label = '$minutes:${seconds.toString().padLeft(2, '0')}';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
-        color:        Colors.white.withAlpha(10),
+        color: Colors.white.withAlpha(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.schedule_rounded,
-              size: 10, color: Colors.white.withAlpha(80)),
+          Icon(
+            Icons.schedule_rounded,
+            size: 10,
+            color: Colors.white.withAlpha(80),
+          ),
           const SizedBox(width: 3),
           Text(
             label,
-            style: TextStyle(
-              color:    Colors.white.withAlpha(100),
-              fontSize: 10,
-            ),
+            style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 10),
           ),
         ],
       ),
@@ -397,7 +395,7 @@ class _ScoreWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color color = score >= 80
-        ? const Color(0xFF66BB6A)   // зелёный — высокая уверенность
+        ? const Color(0xFF66BB6A) // зелёный — высокая уверенность
         : score >= 50
         ? const Color(0xFFFFA726) // оранжевый — средняя
         : const Color(0xFFEF5350); // красный — низкая
@@ -409,15 +407,15 @@ class _ScoreWidget extends StatelessWidget {
         Text(
           score.toStringAsFixed(0),
           style: TextStyle(
-            color:      color,
-            fontSize:   18,
+            color: color,
+            fontSize: 18,
             fontWeight: FontWeight.w800,
           ),
         ),
         Text(
           'score',
           style: TextStyle(
-            color:    Colors.white.withAlpha(50),
+            color: Colors.white.withAlpha(50),
             fontSize: 9,
             letterSpacing: 0.5,
           ),
@@ -442,8 +440,8 @@ class _TopBadge extends StatelessWidget {
       child: const Text(
         'TOP',
         style: TextStyle(
-          color:      Colors.white,
-          fontSize:   9,
+          color: Colors.white,
+          fontSize: 9,
           fontWeight: FontWeight.w800,
           letterSpacing: 1,
         ),

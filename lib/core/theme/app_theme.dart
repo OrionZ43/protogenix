@@ -5,7 +5,8 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData dark({ColorScheme? colorScheme}) {
-    final scheme = colorScheme ??
+    final scheme =
+        colorScheme ??
         ColorScheme.fromSeed(
           seedColor: AppColors.defaultSeed,
           brightness: Brightness.dark,

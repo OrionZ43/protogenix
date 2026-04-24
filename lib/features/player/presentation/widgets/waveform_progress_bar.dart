@@ -16,19 +16,19 @@ class LiveWaveformProgressBar extends StatefulWidget {
     required this.progress,
     required this.accentColor,
     required this.onSeek,
-    this.position  = Duration.zero,
-    this.total     = Duration.zero,
-    this.height    = 56.0,
-    this.barCount  = 80,
+    this.position = Duration.zero,
+    this.total = Duration.zero,
+    this.height = 56.0,
+    this.barCount = 80,
   });
 
-  final double   progress;
-  final Color    accentColor;
+  final double progress;
+  final Color accentColor;
   final ValueChanged<double> onSeek;
   final Duration position;
   final Duration total;
-  final double   height;
-  final int      barCount;
+  final double height;
+  final int barCount;
 
   @override
   State<LiveWaveformProgressBar> createState() =>
@@ -37,11 +37,10 @@ class LiveWaveformProgressBar extends StatefulWidget {
 
 class _LiveWaveformProgressBarState extends State<LiveWaveformProgressBar>
     with SingleTickerProviderStateMixin {
-
-  late Ticker       _ticker;
+  late Ticker _ticker;
   late List<double> _baseAmps;
   late List<double> _phaseOffsets;
-  double _time     = 0.0;
+  double _time = 0.0;
   double _lastTime = -1.0;
 
   @override
@@ -52,15 +51,15 @@ class _LiveWaveformProgressBarState extends State<LiveWaveformProgressBar>
   }
 
   void _generateWaveform() {
-    final n   = widget.barCount;
+    final n = widget.barCount;
     final rng = math.Random(widget.total.inSeconds ^ 0xDEADBEEF);
 
     _baseAmps = List.generate(n, (i) {
-      final t        = i / n;
+      final t = i / n;
       final envelope = math.sin(t * math.pi).clamp(0.3, 1.0);
-      final w1       = math.sin(t * 22.3 + rng.nextDouble()) * 0.40;
-      final w2       = math.sin(t * 7.1  + rng.nextDouble() * 2) * 0.30;
-      final w3       = rng.nextDouble() * 0.18;
+      final w1 = math.sin(t * 22.3 + rng.nextDouble()) * 0.40;
+      final w2 = math.sin(t * 7.1 + rng.nextDouble() * 2) * 0.30;
+      final w3 = rng.nextDouble() * 0.18;
       return ((w1 + w2 + w3).abs() * envelope).clamp(0.06, 1.0);
     });
 
@@ -76,10 +75,10 @@ class _LiveWaveformProgressBarState extends State<LiveWaveformProgressBar>
   }
 
   void _onTick(Duration elapsed) {
-    final t  = elapsed.inMicroseconds / 1e6;
+    final t = elapsed.inMicroseconds / 1e6;
     final dt = _lastTime < 0 ? 0.016 : (t - _lastTime).clamp(0.0, 0.1);
     _lastTime = t;
-    _time     = t;
+    _time = t;
     if (dt > 0 && mounted) setState(() {});
   }
 
@@ -121,12 +120,12 @@ class _LiveWaveformProgressBarState extends State<LiveWaveformProgressBar>
             height: widget.height,
             child: CustomPaint(
               painter: _LiveWavePainter(
-                progress:     widget.progress,
-                baseAmps:     _baseAmps,
+                progress: widget.progress,
+                baseAmps: _baseAmps,
                 phaseOffsets: _phaseOffsets,
-                time:         _time,
-                accentColor:  widget.accentColor,
-                barCount:     widget.barCount,
+                time: _time,
+                accentColor: widget.accentColor,
+                barCount: widget.barCount,
               ),
               child: const SizedBox.expand(),
             ),
@@ -166,55 +165,53 @@ class _LiveWavePainter extends CustomPainter {
     required this.barCount,
   });
 
-  final double       progress;
+  final double progress;
   final List<double> baseAmps;
   final List<double> phaseOffsets;
-  final double       time;
-  final Color        accentColor;
-  final int          barCount;
+  final double time;
+  final Color accentColor;
+  final int barCount;
 
   // Тихое «дыхание» волны — медленная синусоида по таймеру
   static const double _breathSpeed = 1.2;
-  static const double _breathAmp   = 0.08;
+  static const double _breathAmp = 0.08;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (baseAmps.isEmpty) return;
 
-    final w         = size.width;
-    final h         = size.height;
-    final centerY   = h / 2;
-    final n         = barCount;
-    final barW      = (w / n) * 0.55;
-    final gap       = (w / n) * 0.45;
-    final maxH      = h * 0.82;
+    final w = size.width;
+    final h = size.height;
+    final centerY = h / 2;
+    final n = barCount;
+    final barW = (w / n) * 0.55;
+    final gap = (w / n) * 0.45;
+    final maxH = h * 0.82;
     final progressX = w * progress;
 
     for (int i = 0; i < n; i++) {
       final x = (i / n) * w + gap / 2;
 
       // Плавное дыхание волны по таймеру — никакого аудио
-      final breath = math.sin(
-        time * _breathSpeed + phaseOffsets[i],
-      ) * _breathAmp;
+      final breath =
+          math.sin(time * _breathSpeed + phaseOffsets[i]) * _breathAmp;
 
       final liveAmp = (baseAmps[i] + breath).clamp(0.06, 1.0);
-      final barH    = liveAmp * maxH;
+      final barH = liveAmp * maxH;
       final isPlayed = x < progressX;
 
       final Color barColor;
       if (isPlayed) {
         barColor = accentColor;
       } else {
-        barColor = Colors.white
-            .withAlpha(38 + (liveAmp * 20).round());
+        barColor = Colors.white.withAlpha(38 + (liveAmp * 20).round());
       }
 
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(
             center: Offset(x + barW / 2, centerY),
-            width:  barW,
+            width: barW,
             height: barH,
           ),
           const Radius.circular(2),
@@ -230,9 +227,9 @@ class _LiveWavePainter extends CustomPainter {
       Offset(progressX, centerY - maxH / 2 - 4),
       Offset(progressX, centerY + maxH / 2 + 4),
       Paint()
-        ..color      = Colors.white
+        ..color = Colors.white
         ..strokeWidth = 2
-        ..style      = PaintingStyle.stroke,
+        ..style = PaintingStyle.stroke,
     );
   }
 

@@ -20,10 +20,7 @@ import '../../domain/track_model.dart';
 import '../../domain/player_state.dart';
 
 class MiniPlayer extends ConsumerStatefulWidget {
-  const MiniPlayer({
-    super.key,
-    this.onTap,
-  });
+  const MiniPlayer({super.key, this.onTap});
 
   /// Коллбэк при нажатии — открывает полный плеер
   final VoidCallback? onTap;
@@ -34,24 +31,20 @@ class MiniPlayer extends ConsumerStatefulWidget {
 
 class _MiniPlayerState extends ConsumerState<MiniPlayer>
     with SingleTickerProviderStateMixin {
-
   late AnimationController _slideCtrl;
-  late Animation<Offset>   _slideAnim;
+  late Animation<Offset> _slideAnim;
 
   @override
   void initState() {
     super.initState();
     _slideCtrl = AnimationController(
-      vsync:    this,
+      vsync: this,
       duration: const Duration(milliseconds: 280),
     );
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 1),
-      end:   Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideCtrl,
-      curve:  Curves.easeOutCubic,
-    ));
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
   }
 
   @override
@@ -78,10 +71,10 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     return SlideTransition(
       position: _slideAnim,
       child: _MiniPlayerContent(
-        track:   track,
-        player:  player,
+        track: track,
+        player: player,
         palette: palette,
-        onTap:   widget.onTap,
+        onTap: widget.onTap,
         notifier: ref.read(playerProvider.notifier),
       ),
     );
@@ -97,11 +90,11 @@ class _MiniPlayerContent extends StatelessWidget {
     this.onTap,
   });
 
-  final TrackModel                track;
-  final ProtogenixPlayerState     player;
-  final PaletteState              palette;
-  final PlayerNotifier            notifier;
-  final VoidCallback?             onTap;
+  final TrackModel track;
+  final ProtogenixPlayerState player;
+  final PaletteState palette;
+  final PlayerNotifier notifier;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -112,11 +105,11 @@ class _MiniPlayerContent extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color:  Colors.black.withAlpha(220),
+          color: Colors.black.withAlpha(220),
           border: Border.all(color: Colors.white.withAlpha(25)),
           boxShadow: [
             BoxShadow(
-              color:      palette.primary.withAlpha(60),
+              color: palette.primary.withAlpha(60),
               blurRadius: 20,
               spreadRadius: 1,
             ),
@@ -128,12 +121,13 @@ class _MiniPlayerContent extends StatelessWidget {
             children: [
               // Прогресс-полоска снизу
               Positioned(
-                bottom: 0, left: 0,
+                bottom: 0,
+                left: 0,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   height: 2,
-                  width:  MediaQuery.of(context).size.width * player.progress,
-                  color:  palette.primary.withAlpha(180),
+                  width: MediaQuery.of(context).size.width * player.progress,
+                  color: palette.primary.withAlpha(180),
                 ),
               ),
 
@@ -159,15 +153,15 @@ class _MiniPlayerContent extends StatelessWidget {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment:  MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             track.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color:      Colors.white,
-                              fontSize:   15,
+                              color: Colors.white,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -177,7 +171,7 @@ class _MiniPlayerContent extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color:    Colors.white.withValues(alpha: 0.55),
+                              color: Colors.white.withValues(alpha: 0.55),
                               fontSize: 12,
                             ),
                           ),
@@ -213,9 +207,9 @@ class _MiniPlayerContent extends StatelessWidget {
                             player.isPlaying
                                 ? Icons.pause_rounded
                                 : Icons.play_arrow_rounded,
-                            key:   ValueKey(player.isPlaying),
+                            key: ValueKey(player.isPlaying),
                             color: Colors.white,
-                            size:  22,
+                            size: 22,
                           ),
                         ),
                       ),

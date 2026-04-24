@@ -12,10 +12,7 @@ import '../providers/palette_provider.dart';
 import 'animated_background.dart';
 
 class ProtogenixBackground extends ConsumerWidget {
-  const ProtogenixBackground({
-    super.key,
-    required this.child,
-  });
+  const ProtogenixBackground({super.key, required this.child});
 
   final Widget child;
 
@@ -24,9 +21,9 @@ class ProtogenixBackground extends ConsumerWidget {
     final palette = ref.watch(paletteProvider);
 
     return AnimatedBackground(
-      primaryColor:   palette.primary,
+      primaryColor: palette.primary,
       secondaryColor: palette.secondary,
-      tertiaryColor:  palette.tertiary,
+      tertiaryColor: palette.tertiary,
       child: child,
     );
   }

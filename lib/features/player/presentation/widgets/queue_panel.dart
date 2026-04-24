@@ -10,9 +10,9 @@ class QueuePanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player  = ref.watch(playerProvider);
+    final player = ref.watch(playerProvider);
     final palette = ref.watch(paletteProvider);
-    final queue   = player.queue.cast<TrackModel>();
+    final queue = player.queue.cast<TrackModel>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -33,21 +33,20 @@ class QueuePanel extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: queue.length,
             itemBuilder: (context, index) {
-              final track     = queue[index];
+              final track = queue[index];
               final isCurrent = index == player.currentIndex;
 
               return _QueueItem(
-                track:     track,
-                isCurrent: isCurrent,
-                index:     index,
-                palette:   palette,
-                onTap: () {
-                  ref.read(playerProvider.notifier).loadPlaylist(
-                    queue,
-                    initialIndex: index,
-                  );
-                },
-              )
+                    track: track,
+                    isCurrent: isCurrent,
+                    index: index,
+                    palette: palette,
+                    onTap: () {
+                      ref
+                          .read(playerProvider.notifier)
+                          .loadPlaylist(queue, initialIndex: index);
+                    },
+                  )
                   .animate(delay: Duration(milliseconds: 80 * index))
                   .fadeIn(duration: 400.ms)
                   .slideX(begin: 0.2, end: 0);
@@ -68,9 +67,9 @@ class _QueueItem extends StatelessWidget {
     required this.onTap,
   });
 
-  final TrackModel   track;
-  final bool         isCurrent;
-  final int          index;
+  final TrackModel track;
+  final bool isCurrent;
+  final int index;
   final PaletteState palette;
   final VoidCallback onTap;
 
@@ -145,10 +144,7 @@ class _QueueItem extends StatelessWidget {
                 else
                   Text(
                     _formatDuration(track.duration),
-                    style: const TextStyle(
-                      color: Colors.white38,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white38, fontSize: 12),
                   ),
               ],
             ),

@@ -26,7 +26,8 @@ class NetEaseProvider implements LyricsProvider {
         receiveTimeout: const Duration(seconds: 15),
         headers: {
           // Заголовки Linux-версии (обход -460)
-          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
+          'User-Agent':
+              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
           'Referer': 'https://music.163.com/',
           'Origin': 'https://music.163.com',
           'Accept': 'application/json, text/plain, */*',
@@ -59,8 +60,8 @@ class NetEaseProvider implements LyricsProvider {
   static const int _kMaxSongs = 5;
 
   // Retry при ошибках 429 / 503
-  static const int _kMaxRetries    = 2;
-  static const int _kRetryDelayMs  = 600;
+  static const int _kMaxRetries = 2;
+  static const int _kRetryDelayMs = 600;
 
   @override
   String get name => 'netease';
@@ -76,35 +77,35 @@ class NetEaseProvider implements LyricsProvider {
       final searchResp = await _dio.post(
         '/v1/search/get',
         data: {
-          's':      query,
-          'type':   1,       // 1 = треки
-          'limit':  _kMaxSongs,
+          's': query,
+          'type': 1, // 1 = треки
+          'limit': _kMaxSongs,
           'offset': 0,
         },
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-        ),
+        options: Options(contentType: Headers.formUrlEncodedContentType),
       );
 
       final searchData = searchResp.data;
       if (searchData is! Map) {
         debugPrint('[$name] Неожиданный тип ответа: ${searchData.runtimeType}');
-        return[];
+        return [];
       }
 
       final code = searchData['code'];
       if (code != 200) {
         debugPrint('[$name] API вернул код $code для "$query"');
-        return[];
+        return [];
       }
 
-      final songs = (searchData['result']?['songs'] as List?) ??[];
+      final songs = (searchData['result']?['songs'] as List?) ?? [];
       if (songs.isEmpty) {
         debugPrint('[$name] "$query" → 0 треков');
-        return[];
+        return [];
       }
 
-      debugPrint('[$name] "$query" → ${songs.length} треков, запрашиваем тексты...');
+      debugPrint(
+        '[$name] "$query" → ${songs.length} треков, запрашиваем тексты...',
+      );
 
       // Параллельные запросы текстов
       final futures = songs
@@ -113,16 +114,16 @@ class NetEaseProvider implements LyricsProvider {
           .toList();
 
       final results = await Future.wait(futures);
-      final valid   = results.whereType<LyricsMetadata>().toList();
+      final valid = results.whereType<LyricsMetadata>().toList();
 
       debugPrint('[$name] Успешно получено текстов: ${valid.length}');
       return valid;
     } on DioException catch (e) {
       debugPrint('[$name] DioError при поиске "$query": ${e.message}');
-      return[];
+      return [];
     } catch (e) {
       debugPrint('[$name] Ошибка при поиске "$query": $e');
-      return[];
+      return [];
     }
   }
 
@@ -143,26 +144,30 @@ class NetEaseProvider implements LyricsProvider {
 
   Future<LyricsMetadata?> _fetchLyric(dynamic song) async {
     try {
-      final id         = song['id']?.toString()   ?? '';
-      final trackName  = song['name']  as String? ?? '';
+      final id = song['id']?.toString() ?? '';
+      final trackName = song['name'] as String? ?? '';
       final durationMs = song['duration'] as int?;
 
-      final artists    = song['artists'] as List?;
-      final artistName = (artists?.isNotEmpty == true
-          ? artists!.first['name'] as String?
-          : null) ?? '';
+      final artists = song['artists'] as List?;
+      final artistName =
+          (artists?.isNotEmpty == true
+              ? artists!.first['name'] as String?
+              : null) ??
+          '';
 
       if (id.isEmpty) return null;
 
-      debugPrint('[$name] Запрашиваем текст: "$artistName — $trackName" (id=$id)');
+      debugPrint(
+        '[$name] Запрашиваем текст: "$artistName — $trackName" (id=$id)',
+      );
 
       final lyricResp = await _dio.get(
         '/song/lyric',
         queryParameters: {
           'id': id,
-          'lv': 1,   // LRC построчный
-          'tv': -1,  // Перевод (отключаем)
-          'kv': 1,   // KRC (построчный, резервный)
+          'lv': 1, // LRC построчный
+          'tv': -1, // Перевод (отключаем)
+          'kv': 1, // KRC (построчный, резервный)
           // ✅ КРИТИЧНО: yv=1 — запрашивает YRC (послоговой формат NetEase)
           'yv': 1,
         },
@@ -176,39 +181,40 @@ class NetEaseProvider implements LyricsProvider {
       if (yrcContent != null && yrcContent.trim().isNotEmpty) {
         debugPrint(
           '[$name] ★ YRC (СЛОГИ) найден для "$trackName" '
-              '(${yrcContent.length} байт)',
+          '(${yrcContent.length} байт)',
         );
         return LyricsMetadata(
-          id:         '${name}_$id',
-          trackName:  trackName,
+          id: '${name}_$id',
+          trackName: trackName,
           artistName: artistName,
           durationMs: durationMs,
-          content:    yrcContent,
-          type:       LyricsType.syllable,
-          source:     name,
+          content: yrcContent,
+          type: LyricsType.syllable,
+          source: name,
         );
       }
 
       // ── 2. Обычный LRC — фоллбэк ───────────────────────────────────────
       final lrcContent = data['lrc']?['lyric'] as String?;
       if (lrcContent != null && lrcContent.trim().isNotEmpty) {
-        final isEnhanced =
-        RegExp(r'<\d{1,2}:\d{2}\.\d{2,3}>').hasMatch(lrcContent);
+        final isEnhanced = RegExp(
+          r'<\d{1,2}:\d{2}\.\d{2,3}>',
+        ).hasMatch(lrcContent);
 
         final type = isEnhanced ? LyricsType.enhanced : LyricsType.synced;
         debugPrint(
           '[$name] ${isEnhanced ? "Enhanced" : "Synced"} LRC '
-              'для "$trackName"',
+          'для "$trackName"',
         );
 
         return LyricsMetadata(
-          id:         '${name}_$id',
-          trackName:  trackName,
+          id: '${name}_$id',
+          trackName: trackName,
           artistName: artistName,
           durationMs: durationMs,
-          content:    lrcContent,
-          type:       type,
-          source:     name,
+          content: lrcContent,
+          type: type,
+          source: name,
         );
       }
 
@@ -217,13 +223,13 @@ class NetEaseProvider implements LyricsProvider {
       if (krcContent != null && krcContent.trim().isNotEmpty) {
         debugPrint('[$name] KRC найден для "$trackName"');
         return LyricsMetadata(
-          id:         '${name}_$id',
-          trackName:  trackName,
+          id: '${name}_$id',
+          trackName: trackName,
           artistName: artistName,
           durationMs: durationMs,
-          content:    krcContent,
-          type:       LyricsType.synced,
-          source:     name,
+          content: krcContent,
+          type: LyricsType.synced,
+          source: name,
         );
       }
 
@@ -231,7 +237,9 @@ class NetEaseProvider implements LyricsProvider {
       return null;
     } on DioException catch (e) {
       final status = e.response?.statusCode;
-      debugPrint('[$name] DioError получения текста: HTTP $status ${e.message}');
+      debugPrint(
+        '[$name] DioError получения текста: HTTP $status ${e.message}',
+      );
       // 429 Too Many Requests — сигнал для retry
       if (status == 429 || status == 503) return null;
       return null;

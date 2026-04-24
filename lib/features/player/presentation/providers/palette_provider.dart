@@ -16,9 +16,9 @@ class PaletteState {
   });
 
   static const defaultState = PaletteState(
-    primary:   Color(0xFF7B5EA7),
+    primary: Color(0xFF7B5EA7),
     secondary: Color(0xFF4A3580),
-    tertiary:  Color(0xFF1A0D40),
+    tertiary: Color(0xFF1A0D40),
   );
 
   PaletteState copyWith({
@@ -28,9 +28,9 @@ class PaletteState {
     bool? isLoading,
   }) {
     return PaletteState(
-      primary:   primary   ?? this.primary,
+      primary: primary ?? this.primary,
       secondary: secondary ?? this.secondary,
-      tertiary:  tertiary  ?? this.tertiary,
+      tertiary: tertiary ?? this.tertiary,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -56,19 +56,22 @@ class PaletteNotifier extends StateNotifier<PaletteState> {
       debugPrint('muted: ${generator.mutedColor?.color}');
       debugPrint('darkMuted: ${generator.darkMutedColor?.color}');
 
-      final primary = generator.vibrantColor?.color
-          ?? generator.lightVibrantColor?.color
-          ?? generator.dominantColor?.color
-          ?? PaletteState.defaultState.primary;
+      final primary =
+          generator.vibrantColor?.color ??
+          generator.lightVibrantColor?.color ??
+          generator.dominantColor?.color ??
+          PaletteState.defaultState.primary;
 
-      final secondary = generator.darkVibrantColor?.color
-          ?? generator.mutedColor?.color
-          ?? generator.dominantColor?.color
-          ?? PaletteState.defaultState.secondary;
+      final secondary =
+          generator.darkVibrantColor?.color ??
+          generator.mutedColor?.color ??
+          generator.dominantColor?.color ??
+          PaletteState.defaultState.secondary;
 
-      final tertiary = generator.darkMutedColor?.color
-          ?? generator.dominantColor?.color
-          ?? PaletteState.defaultState.tertiary;
+      final tertiary =
+          generator.darkMutedColor?.color ??
+          generator.dominantColor?.color ??
+          PaletteState.defaultState.tertiary;
 
       HSLColor boost(Color c) => HSLColor.fromColor(c);
 
@@ -88,9 +91,9 @@ class PaletteNotifier extends StateNotifier<PaletteState> {
           .toColor();
 
       state = PaletteState(
-        primary:   boostedPrimary,
+        primary: boostedPrimary,
         secondary: boostedSecondary,
-        tertiary:  boostedTertiary,
+        tertiary: boostedTertiary,
         isLoading: false,
       );
     } catch (e, stack) {
@@ -99,11 +102,13 @@ class PaletteNotifier extends StateNotifier<PaletteState> {
       state = PaletteState.defaultState;
     }
   }
-// ← здесь закрывается класс PaletteNotifier
+
+  // ← здесь закрывается класс PaletteNotifier
 }
 
 // ← провайдер снаружи класса
-final paletteProvider =
-StateNotifierProvider<PaletteNotifier, PaletteState>((ref) {
+final paletteProvider = StateNotifierProvider<PaletteNotifier, PaletteState>((
+  ref,
+) {
   return PaletteNotifier();
 });
