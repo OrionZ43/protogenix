@@ -21,44 +21,45 @@ import 'waveform_progress_bar.dart';
 class MusicVisualizerControls extends ConsumerWidget {
   const MusicVisualizerControls({
     super.key,
-    this.compact        = false,
-    this.showFavorite   = false,
+    this.compact = false,
+    this.showFavorite = false,
     this.onAddTrack,
     this.onChangeLyrics,
   });
 
-  final bool          compact;
+  final bool compact;
+
   /// Показывать ли кнопку «Избранное» рядом с названием трека
-  final bool          showFavorite;
+  final bool showFavorite;
   final VoidCallback? onAddTrack;
   final VoidCallback? onChangeLyrics;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player   = ref.watch(playerProvider);
+    final player = ref.watch(playerProvider);
     final notifier = ref.read(playerProvider.notifier);
-    final palette  = ref.watch(paletteProvider);
+    final palette = ref.watch(paletteProvider);
 
     final track = player.currentTrack as TrackModel?;
     if (track == null) return const SizedBox.shrink();
 
     if (compact) {
       return _CompactLayout(
-        track:          track,
-        player:         player,
-        notifier:       notifier,
-        palette:        palette,
-        showFavorite:   showFavorite,
-        onAddTrack:     onAddTrack,
+        track: track,
+        player: player,
+        notifier: notifier,
+        palette: palette,
+        showFavorite: showFavorite,
+        onAddTrack: onAddTrack,
         onChangeLyrics: onChangeLyrics,
       );
     }
 
     return _FullLayout(
-      track:        track,
-      player:       player,
-      notifier:     notifier,
-      palette:      palette,
+      track: track,
+      player: player,
+      notifier: notifier,
+      palette: palette,
       showFavorite: showFavorite,
     );
   }
@@ -77,11 +78,11 @@ class _FullLayout extends StatelessWidget {
     required this.showFavorite,
   });
 
-  final TrackModel               track;
+  final TrackModel track;
   final ps.ProtogenixPlayerState player;
-  final PlayerNotifier           notifier;
-  final PaletteState             palette;
-  final bool                     showFavorite;
+  final PlayerNotifier notifier;
+  final PaletteState palette;
+  final bool showFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -92,14 +93,15 @@ class _FullLayout extends StatelessWidget {
         children: [
           _CoverArt(track: track),
           const SizedBox(height: 28),
-          _TrackInfo(track: track, palette: palette, showFavorite: showFavorite),
+          _TrackInfo(
+              track: track, palette: palette, showFavorite: showFavorite),
           const SizedBox(height: 20),
           LiveWaveformProgressBar(
-            progress:    player.progress,
+            progress: player.progress,
             accentColor: palette.primary,
-            onSeek:      notifier.seekToProgress,
-            position:    player.position,
-            total:       player.total,
+            onSeek: notifier.seekToProgress,
+            position: player.position,
+            total: player.total,
           ),
           const SizedBox(height: 16),
           _Controls(player: player, notifier: notifier, palette: palette),
@@ -124,13 +126,13 @@ class _CompactLayout extends StatelessWidget {
     this.onChangeLyrics,
   });
 
-  final TrackModel               track;
+  final TrackModel track;
   final ps.ProtogenixPlayerState player;
-  final PlayerNotifier           notifier;
-  final PaletteState             palette;
-  final bool                     showFavorite;
-  final VoidCallback?            onAddTrack;
-  final VoidCallback?            onChangeLyrics;
+  final PlayerNotifier notifier;
+  final PaletteState palette;
+  final bool showFavorite;
+  final VoidCallback? onAddTrack;
+  final VoidCallback? onChangeLyrics;
 
   @override
   Widget build(BuildContext context) {
@@ -147,31 +149,32 @@ class _CompactLayout extends StatelessWidget {
                 _CoverArt(track: track, size: 200),
                 const SizedBox(height: 16),
                 _TrackInfo(
-                  track:        track,
-                  palette:      palette,
-                  compact:      true,
+                  track: track,
+                  palette: palette,
+                  compact: true,
                   showFavorite: showFavorite,
                 ),
                 const SizedBox(height: 16),
                 LiveWaveformProgressBar(
-                  progress:    player.progress,
+                  progress: player.progress,
                   accentColor: palette.primary,
-                  onSeek:      notifier.seekToProgress,
-                  position:    player.position,
-                  total:       player.total,
-                  height:      40,
-                  barCount:    60,
+                  onSeek: notifier.seekToProgress,
+                  position: player.position,
+                  total: player.total,
+                  height: 40,
+                  barCount: 60,
                 ),
                 const SizedBox(height: 12),
                 _Controls(
-                  player: player, notifier: notifier,
-                  palette: palette, compact: true,
+                  player: player,
+                  notifier: notifier,
+                  palette: palette,
+                  compact: true,
                 ),
               ],
             ),
           ),
         ),
-
         if (hasButtons)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -180,15 +183,19 @@ class _CompactLayout extends StatelessWidget {
               children: [
                 if (onAddTrack != null) ...[
                   _CapsuleButton(
-                    icon: Icons.add_rounded, label: 'Добавить трек',
-                    color: palette.primary,  onTap: onAddTrack!,
+                    icon: Icons.add_rounded,
+                    label: 'Добавить трек',
+                    color: palette.primary,
+                    onTap: onAddTrack!,
                   ),
                   const SizedBox(width: 10),
                 ],
                 if (onChangeLyrics != null)
                   _CapsuleButton(
-                    icon: Icons.manage_search_rounded, label: 'Другой текст',
-                    color: palette.secondary, onTap: onChangeLyrics!,
+                    icon: Icons.manage_search_rounded,
+                    label: 'Другой текст',
+                    color: palette.secondary,
+                    onTap: onChangeLyrics!,
                   ),
               ],
             ),
@@ -204,32 +211,37 @@ class _CompactLayout extends StatelessWidget {
 
 class _CapsuleButton extends StatelessWidget {
   const _CapsuleButton({
-    required this.icon,  required this.label,
-    required this.color, required this.onTap,
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
   });
-  final IconData icon; final String label;
-  final Color color;   final VoidCallback onTap;
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color:  Colors.white.withAlpha(18),
-        border: Border.all(color: Colors.white.withAlpha(35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 15),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
-        ],
-      ),
-    ),
-  );
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: Colors.white.withAlpha(18),
+            border: Border.all(color: Colors.white.withAlpha(35)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 15),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12)),
+            ],
+          ),
+        ),
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -239,12 +251,12 @@ class _CapsuleButton extends StatelessWidget {
 class _CoverArt extends StatelessWidget {
   const _CoverArt({required this.track, this.size});
   final TrackModel track;
-  final double?    size;
+  final double? size;
 
   @override
   Widget build(BuildContext context) {
-    final sz = size ??
-        (MediaQuery.of(context).size.width - 48).clamp(180.0, 320.0);
+    final sz =
+        size ?? (MediaQuery.of(context).size.width - 48).clamp(180.0, 320.0);
 
     return Container(
       width: sz,
@@ -253,22 +265,22 @@ class _CoverArt extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color:      Colors.black.withAlpha(100),
+            color: Colors.black.withAlpha(100),
             blurRadius: 40,
-            offset:     const Offset(0, 16),
+            offset: const Offset(0, 16),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Image(
         image: track.coverImage,
-        fit:   BoxFit.cover,
+        fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => Container(
           color: Colors.white10,
           child: const Icon(
             Icons.music_note_rounded,
             color: Colors.white24,
-            size:  80,
+            size: 80,
           ),
         ),
       ),
@@ -284,28 +296,27 @@ class _TrackInfo extends ConsumerWidget {
   const _TrackInfo({
     required this.track,
     required this.palette,
-    this.compact      = false,
+    this.compact = false,
     this.showFavorite = false,
   });
-  final TrackModel   track;
+  final TrackModel track;
   final PaletteState palette;
-  final bool         compact;
-  final bool         showFavorite;
+  final bool compact;
+  final bool showFavorite;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isFav = showFavorite
-        ? ref.watch(isFavoriteProvider(track.id))
-        : false;
+    final isFav =
+        showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
 
     final titleStyle = TextStyle(
-      color:         Colors.white,
-      fontSize:      compact ? 18 : 22,
-      fontWeight:    FontWeight.w700,
+      color: Colors.white,
+      fontSize: compact ? 18 : 22,
+      fontWeight: FontWeight.w700,
       letterSpacing: -0.3,
     );
     final artistStyle = TextStyle(
-      color:    Colors.white60,
+      color: Colors.white60,
       fontSize: compact ? 13 : 15,
     );
 
@@ -329,9 +340,9 @@ class _TrackInfo extends ConsumerWidget {
                   isFav
                       ? Icons.favorite_rounded
                       : Icons.favorite_outline_rounded,
-                  key:   ValueKey(isFav),
+                  key: ValueKey(isFav),
                   color: isFav ? Colors.redAccent : Colors.white38,
-                  size:  22,
+                  size: 22,
                 ),
               ),
             ),
@@ -345,18 +356,18 @@ class _TrackInfo extends ConsumerWidget {
             children: [
               Text(
                 track.title,
-                maxLines:  1,
-                overflow:  TextOverflow.ellipsis,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style:     titleStyle,
+                style: titleStyle,
               ),
               const SizedBox(height: 4),
               Text(
                 track.artist,
-                maxLines:  1,
-                overflow:  TextOverflow.ellipsis,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style:     artistStyle,
+                style: artistStyle,
               ),
             ],
           ),
@@ -382,13 +393,13 @@ class _Controls extends StatelessWidget {
   });
 
   final ps.ProtogenixPlayerState player;
-  final PlayerNotifier           notifier;
-  final PaletteState             palette;
-  final bool                     compact;
+  final PlayerNotifier notifier;
+  final PaletteState palette;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final playing  = player.isPlaying;
+    final playing = player.isPlaying;
     final iconSize = compact ? 20.0 : 24.0;
     final playSize = compact ? 52.0 : 64.0;
 
@@ -396,18 +407,19 @@ class _Controls extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _CtrlButton(
-          icon:  Icons.shuffle_rounded,
+          icon: Icons.shuffle_rounded,
           color: player.isShuffle ? palette.primary : Colors.white38,
-          size:  iconSize,
+          size: iconSize,
           onTap: notifier.toggleShuffle,
         ),
         const Spacer(),
         _CtrlButton(
-          icon: Icons.skip_previous_rounded, color: Colors.white,
-          size: iconSize + 4, onTap: notifier.previous,
+          icon: Icons.skip_previous_rounded,
+          color: Colors.white,
+          size: iconSize + 4,
+          onTap: notifier.previous,
         ),
         const SizedBox(width: 16),
-
         GestureDetector(
           onTap: notifier.playPause,
           child: Container(
@@ -418,7 +430,7 @@ class _Controls extends StatelessWidget {
               color: palette.primary,
               boxShadow: [
                 BoxShadow(
-                  color:      palette.primary.withAlpha(80),
+                  color: palette.primary.withAlpha(80),
                   blurRadius: 16,
                   spreadRadius: 2,
                 ),
@@ -427,26 +439,28 @@ class _Controls extends StatelessWidget {
             child: Icon(
               playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
               color: Colors.white,
-              size:  playSize * 0.5,
+              size: playSize * 0.5,
             ),
           ),
         ),
-
         const SizedBox(width: 16),
         _CtrlButton(
-          icon: Icons.skip_next_rounded, color: Colors.white,
-          size: iconSize + 4, onTap: notifier.next,
+          icon: Icons.skip_next_rounded,
+          color: Colors.white,
+          size: iconSize + 4,
+          onTap: notifier.next,
         ),
         const Spacer(),
         _CtrlButton(
           icon: switch (player.repeatMode) {
             ps.RepeatMode.none => Icons.repeat_rounded,
-            ps.RepeatMode.all  => Icons.repeat_rounded,
-            ps.RepeatMode.one  => Icons.repeat_one_rounded,
+            ps.RepeatMode.all => Icons.repeat_rounded,
+            ps.RepeatMode.one => Icons.repeat_one_rounded,
           },
           color: player.repeatMode != ps.RepeatMode.none
-              ? palette.primary : Colors.white38,
-          size:  iconSize,
+              ? palette.primary
+              : Colors.white38,
+          size: iconSize,
           onTap: notifier.toggleRepeat,
         ),
       ],
@@ -456,21 +470,23 @@ class _Controls extends StatelessWidget {
 
 class _CtrlButton extends StatelessWidget {
   const _CtrlButton({
-    required this.icon,  required this.color,
-    required this.size,  required this.onTap,
+    required this.icon,
+    required this.color,
+    required this.size,
+    required this.onTap,
   });
   final IconData icon;
-  final Color    color;
-  final double   size;
+  final Color color;
+  final double size;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    behavior: HitTestBehavior.opaque,
-    child: Padding(
-      padding: const EdgeInsets.all(8),
-      child: Icon(icon, color: color, size: size),
-    ),
-  );
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, color: color, size: size),
+        ),
+      );
 }

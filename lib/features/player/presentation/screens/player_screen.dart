@@ -34,8 +34,8 @@ class PlayerScreen extends ConsumerWidget {
               _TopBar(track: track),
               Expanded(
                 child: MusicVisualizerControls(
-                  compact:      false,
-                  showFavorite: true,   // ← сердечко рядом с названием
+                  compact: false,
+                  showFavorite: true, // ← сердечко рядом с названием
                 ),
               ),
               _BottomRow(track: track),
@@ -74,7 +74,7 @@ class _TopBar extends StatelessWidget {
               child: GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
                 child: Container(
-                  width:  36,
+                  width: 36,
                   height: 36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -83,7 +83,7 @@ class _TopBar extends StatelessWidget {
                   child: const Icon(
                     Icons.keyboard_arrow_down_rounded,
                     color: Colors.white70,
-                    size:  24,
+                    size: 24,
                   ),
                 ),
               ),
@@ -93,9 +93,9 @@ class _TopBar extends StatelessWidget {
           const Text(
             'PROTOGENIX',
             style: TextStyle(
-              color:         Colors.white70,
-              fontSize:      11,
-              fontWeight:    FontWeight.w600,
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
               letterSpacing: 2.5,
             ),
           ),
@@ -104,7 +104,8 @@ class _TopBar extends StatelessWidget {
           if (track != null)
             const Positioned(
               right: 16,
-              child: Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
+              child:
+                  Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
             ),
         ],
       ),
@@ -126,12 +127,12 @@ class _BottomRow extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _CapsuleBtn(
-            icon:  Icons.add_rounded,
+            icon: Icons.add_rounded,
             label: 'Добавить',
             onTap: () => showImporterSheet(context),
           ),
           _CapsuleBtn(
-            icon:  Icons.manage_search_rounded,
+            icon: Icons.manage_search_rounded,
             label: 'Текст',
             // Открывает ручной поиск текста (ранее был пустой () {})
             onTap: track != null
@@ -150,33 +151,35 @@ class _CapsuleBtn extends StatelessWidget {
     required this.label,
     required this.onTap,
   });
-  final IconData     icon;
-  final String       label;
+  final IconData icon;
+  final String label;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Opacity(
-      opacity: onTap != null ? 1.0 : 0.4,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color:  Colors.white.withAlpha(12),
-          border: Border.all(color: Colors.white.withAlpha(25)),
+        onTap: onTap,
+        child: Opacity(
+          opacity: onTap != null ? 1.0 : 0.4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: Colors.white.withAlpha(12),
+              border: Border.all(color: Colors.white.withAlpha(25)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: Colors.white60, size: 15),
+                const SizedBox(width: 6),
+                Text(label,
+                    style:
+                        const TextStyle(color: Colors.white60, fontSize: 12)),
+              ],
+            ),
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white60, size: 15),
-            const SizedBox(width: 6),
-            Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
-          ],
-        ),
-      ),
-    ),
-  );
+      );
 }
 
 // ── Empty Library ─────────────────────────────────────────────────────────────
@@ -198,7 +201,9 @@ class _EmptyLibraryScreen extends ConsumerWidget {
                     size: 80, color: Colors.white24),
                 const SizedBox(height: 24),
                 const Text('Библиотека пуста',
-                    style: TextStyle(color: Colors.white70, fontSize: 22,
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 22,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 const Text('Добавь треки, чтобы начать',
@@ -211,7 +216,7 @@ class _EmptyLibraryScreen extends ConsumerWidget {
                         horizontal: 28, vertical: 14),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      color:  Colors.white.withAlpha(20),
+                      color: Colors.white.withAlpha(20),
                       border: Border.all(color: Colors.white24),
                     ),
                     child: const Row(
@@ -220,8 +225,8 @@ class _EmptyLibraryScreen extends ConsumerWidget {
                         Icon(Icons.add_rounded, color: Colors.white70),
                         SizedBox(width: 8),
                         Text('Добавить трек',
-                            style: TextStyle(
-                                color: Colors.white70, fontSize: 16)),
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 16)),
                       ],
                     ),
                   ),

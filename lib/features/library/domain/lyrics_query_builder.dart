@@ -7,7 +7,6 @@
 /// Результат:
 ///   ["ФУГА TV ЛИМУЗИН", "5opka ЛИМУЗИН", "ЛИМУЗИН", ...]
 class LyricsQueryBuilder {
-
   // ── Регулярки ─────────────────────────────────────────────────────────────
 
   /// Всё внутри скобок — (Live), [Remastered], {Bonus Track} и т.д.
@@ -34,7 +33,7 @@ class LyricsQueryBuilder {
     final pool = <String>{};
 
     // Шаг 1: Санитизация
-    final cleanTitle  = _sanitizeTitle(rawTitle);
+    final cleanTitle = _sanitizeTitle(rawTitle);
     final cleanArtist = _sanitizeArtist(rawArtist);
 
     // Шаг 2: Пытаемся разбить заголовок по тире
@@ -44,7 +43,7 @@ class LyricsQueryBuilder {
     final dashParts = cleanTitle.split(_dashSep);
     if (dashParts.length >= 2) {
       splitArtist = dashParts.first.trim();
-      splitTitle  = dashParts.sublist(1).join(' ').trim();
+      splitTitle = dashParts.sublist(1).join(' ').trim();
     }
 
     // Шаг 3: Генерация пула запросов
@@ -77,7 +76,7 @@ class LyricsQueryBuilder {
 
   String _sanitizeTitle(String raw) {
     return raw
-        .replaceAll(_brackets, '')   // убираем (скобки) и [скобки]
+        .replaceAll(_brackets, '') // убираем (скобки) и [скобки]
         .replaceAll(_multiSpace, ' ')
         .trim();
   }

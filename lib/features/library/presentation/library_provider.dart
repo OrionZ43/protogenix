@@ -62,16 +62,16 @@ class LibraryNotifier extends StateNotifier<List<LibraryTrack>> {
     state = state.map((t) {
       if (t.id != trackId) return t;
       return LibraryTrack(
-        id:         t.id,
-        title:      t.title,
-        artist:     t.artist,
-        album:      t.album,
-        filePath:   t.filePath,
-        coverPath:  t.coverPath,
-        lrcPath:    lrcPath,
+        id: t.id,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        filePath: t.filePath,
+        coverPath: t.coverPath,
+        lrcPath: lrcPath,
         durationMs: t.durationMs,
-        source:     t.source,
-        addedAt:    t.addedAt,
+        source: t.source,
+        addedAt: t.addedAt,
       );
     }).toList();
   }

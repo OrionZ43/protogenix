@@ -15,17 +15,16 @@ class PlayerControlsCompact extends ConsumerStatefulWidget {
       _PlayerControlsCompactState();
 }
 
-class _PlayerControlsCompactState
-    extends ConsumerState<PlayerControlsCompact> {
+class _PlayerControlsCompactState extends ConsumerState<PlayerControlsCompact> {
   bool _isLiked = false;
 
   @override
   Widget build(BuildContext context) {
-    final player   = ref.watch(playerProvider);
-    final palette  = ref.watch(paletteProvider);
+    final player = ref.watch(playerProvider);
+    final palette = ref.watch(paletteProvider);
     final notifier = ref.read(playerProvider.notifier);
-    final track    = player.currentTrack as TrackModel? ?? mockTrack;
-    final size     = MediaQuery.of(context).size;
+    final track = player.currentTrack as TrackModel? ?? mockTrack;
+    final size = MediaQuery.of(context).size;
 
     return SafeArea(
       child: Padding(
@@ -39,9 +38,9 @@ class _PlayerControlsCompactState
                 Text(
                   'NOW PLAYING',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white54,
-                    letterSpacing: 3,
-                  ),
+                        color: Colors.white54,
+                        letterSpacing: 3,
+                      ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.more_vert_rounded),
@@ -133,9 +132,9 @@ class _PlayerControlsCompactState
   }
 
   Widget _buildProgressBar(
-      ps.ProtogenixPlayerState player,
-      PlayerNotifier notifier,
-      ) {
+    ps.ProtogenixPlayerState player,
+    PlayerNotifier notifier,
+  ) {
     String fmt(Duration d) {
       final m = d.inMinutes.toString().padLeft(2, '0');
       final s = (d.inSeconds % 60).toString().padLeft(2, '0');
@@ -149,11 +148,9 @@ class _PlayerControlsCompactState
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(fmt(player.position),
-                style:
-                const TextStyle(color: Colors.white54, fontSize: 11)),
+                style: const TextStyle(color: Colors.white54, fontSize: 11)),
             Text(fmt(player.total),
-                style:
-                const TextStyle(color: Colors.white54, fontSize: 11)),
+                style: const TextStyle(color: Colors.white54, fontSize: 11)),
           ],
         ),
       ],
@@ -161,10 +158,10 @@ class _PlayerControlsCompactState
   }
 
   Widget _buildControls(
-      ps.ProtogenixPlayerState player,
-      PlayerNotifier notifier,
-      PaletteState palette,
-      ) {
+    ps.ProtogenixPlayerState player,
+    PlayerNotifier notifier,
+    PaletteState palette,
+  ) {
     return GlassCard(
       borderRadius: 36,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -202,23 +199,23 @@ class _PlayerControlsCompactState
               ),
               child: player.isLoading || player.isBuffering
                   ? const Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
                   : AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Icon(
-                  player.isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
-                  key: ValueKey(player.isPlaying),
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        player.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        key: ValueKey(player.isPlaying),
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
             ),
           ),
           IconButton(

@@ -1,10 +1,10 @@
 // lib/features/player/presentation/providers/player_provider.dart
 //
-// v4.1 — Smooth Fade Out при паузе.
-// Добавлен приватный _fadeVolume() и переопределён pause():
-//   1. Плавно снижаем громкость 1.0 → 0.0 за 300 мс (10 шагов × 30 мс)
-//   2. Реально ставим трек на паузу (_handler.pause())
-//   3. Бесшумно возвращаем громкость в 1.0, чтобы resume звучал нормально
+// Объединенная версия: 
+// 1. Оптимизация загрузки больших плейлистов (от Bolt: Future.microtask + Iterable)
+// 2. Плавная пауза (Smooth Fade Out)
+// 3. Эквалайзер (EQ)
+// 4. Таймер сна (Sleep Timer / Stop after track)
 
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
@@ -24,13 +24,20 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
 
   final Ref _ref;
 
-  ProtogenixAudioHandler get _handler =>
-      audioHandler as ProtogenixAudioHandler;
+  ProtogenixAudioHandler get _handler => audioHandler as ProtogenixAudioHandler;
 
   AudioPlayer get _player => _handler.player;
 
+  // ── Таймер сна ───────────────────────────────────────────────────────────
+  Timer? _sleepTimer;
+
+  /// Индекс трека, после которого нужно остановиться.
+  /// null = флаг не установлен.
+  int? _stopAfterTrackIndex;
+
+  // ── Инициализация ─────────────────────────────────────────────────────────
+
   Future<void> _init() async {
-    // ── Стандартные подписки ─────────────────────────────────────────────────
     _player.positionStream.listen((pos) {
       if (mounted) state = state.copyWith(position: pos);
     });
@@ -46,46 +53,47 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     _player.playerStateStream.listen((playerState) {
       if (mounted) {
         state = state.copyWith(
-          isPlaying:   playerState.playing,
-          isLoading:   playerState.processingState == ProcessingState.loading,
+          isPlaying: playerState.playing,
+          isLoading: playerState.processingState == ProcessingState.loading,
           isBuffering: playerState.processingState == ProcessingState.buffering,
         );
       }
     });
 
-    _player.currentIndexStream.listen((index) {
-      if (mounted && index != null && index < state.queue.length) {
-        final track = state.queue[index] as TrackModel;
-        state = state.copyWith(
-          currentIndex: index,
-          currentTrack: track,
-        );
-        _updatePalette(track);
+    _player.currentIndexStream.listen((index) async {
+      if (!mounted || index == null || index >= state.queue.length) return;
+
+      final track = state.queue[index] as TrackModel;
+      state = state.copyWith(currentIndex: index, currentTrack: track);
+      _updatePalette(track);
+
+      // Stop After Track: остановить по окончании трека
+      if (_stopAfterTrackIndex != null && index != _stopAfterTrackIndex) {
+        _stopAfterTrackIndex = null;
+        if (mounted) {
+          state = state.copyWith(
+              stopAfterTrack: false, sleepTimerActive: false);
+        }
+        await _handler.pause();
+        // Перематываем начало нового трека, чтобы он был готов к resume play
+        await _handler.seek(Duration.zero);
       }
     });
 
     await _loadLibrary();
   }
 
-  Future<void> reloadFromLibrary() async {
-    await _loadLibrary();
-  }
+  Future<void> reloadFromLibrary() async => _loadLibrary();
 
   Future<void> _loadLibrary() async {
     try {
       final libraryTracks = await LibraryDatabase.instance.getAllTracks();
-
       if (libraryTracks.isEmpty) {
-        state = state.copyWith(
-          queue:        [],
-          currentTrack: null,
-          isLoading:    false,
-        );
+        state = state.copyWith(queue:[], currentTrack: null, isLoading: false);
         return;
       }
-
-      final trackModels = libraryTracks.map((t) => t.toTrackModel()).toList();
-      await loadPlaylist(trackModels);
+      // Передаем ленивый Iterable. loadPlaylist сам вызовет toList() в микротаске.
+      await loadPlaylist(libraryTracks.map((t) => t.toTrackModel()));
     } catch (e) {
       debugPrint('Error loading library into player: $e');
     }
@@ -99,18 +107,20 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     }
   }
 
+  // ── Загрузка плейлиста (Оптимизировано Bolt) ──────────────────────────────
+
   Future<void> loadPlaylist(Iterable<TrackModel> tracks,
       {int initialIndex = 0}) async {
     state = state.copyWith(isLoading: true);
 
-    // Yield to the UI thread to prevent jank
+    // Уступаем поток UI для предотвращения джанка (Jank)
     await Future.microtask(() {});
 
-    // Lazy-mapping: converting to list only when needed for state
+    // Ленивое преобразование в список
     final tracksList = tracks is List<TrackModel> ? tracks : tracks.toList();
 
     state = state.copyWith(
-      queue:        tracksList,
+      queue: tracksList,
       currentIndex: initialIndex,
       currentTrack: tracksList.isNotEmpty ? tracksList[initialIndex] : null,
     );
@@ -120,20 +130,22 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
       return;
     }
 
-    final mediaItems = tracksList.map((t) => MediaItem(
-      id:       t.id,
-      title:    t.title,
-      artist:   t.artist,
-      album:    t.album,
-      duration: t.duration,
-    )).toList();
+    final mediaItems = tracksList
+        .map((t) => MediaItem(
+              id: t.id,
+              title: t.title,
+              artist: t.artist,
+              album: t.album,
+              duration: t.duration,
+            ))
+        .toList();
 
     final audioSources = tracksList.map((t) => t.toAudioSource()).toList();
 
     try {
       await _handler.loadPlaylist(
-        items:        mediaItems,
-        sources:      audioSources,
+        items: mediaItems,
+        sources: audioSources,
         initialIndex: initialIndex,
       );
       if (tracksList.isNotEmpty) {
@@ -146,19 +158,12 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     if (mounted) state = state.copyWith(isLoading: false);
   }
 
-  // ── Плавное изменение громкости ───────────────────────────────────────────
-  //
-  // Используется для Fade Out перед паузой.
-  //   from      — начальная громкость (обычно 1.0)
-  //   to        — конечная громкость  (обычно 0.0)
-  //   steps     — количество шагов   (по умолчанию 10)
-  //   intervalMs — интервал между шагами в мс (по умолчанию 30)
-  //
-  // Итого при дефолтных значениях: 10 × 30 мс = 300 мс затухания.
+  // ── Плавное изменение громкости (Fade) ────────────────────────────────────
+
   Future<void> _fadeVolume({
     required double from,
     required double to,
-    int steps      = 10,
+    int steps = 10,
     int intervalMs = 30,
   }) async {
     for (int i = 1; i <= steps; i++) {
@@ -180,14 +185,11 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
 
   Future<void> play() async => _handler.play();
 
-  /// Плавная пауза с Fade Out:
-  ///   1. Снижаем громкость 1.0 → 0.0 за 300 мс
-  ///   2. Останавливаем воспроизведение
-  ///   3. Возвращаем громкость в 1.0 — при следующем play() звук не «хлопнет»
+  /// Плавная пауза (Fade Out 300 мс).
   Future<void> pause() async {
     await _fadeVolume(from: 1.0, to: 0.0);
     await _handler.pause();
-    // Восстанавливаем громкость без звука — трек уже на паузе
+    // Восстанавливаем громкость (без звука — трек уже на паузе)
     await _player.setVolume(1.0);
   }
 
@@ -203,9 +205,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     }
   }
 
-  Future<void> seekTo(Duration position) async {
-    await _handler.seek(position);
-  }
+  Future<void> seekTo(Duration position) async => _handler.seek(position);
 
   Future<void> seekToProgress(double progress) async {
     final target = Duration(
@@ -227,9 +227,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   void toggleShuffle() {
     final newShuffle = !state.isShuffle;
     _handler.setShuffleMode(
-      newShuffle
-          ? AudioServiceShuffleMode.all
-          : AudioServiceShuffleMode.none,
+      newShuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
     );
     if (mounted) state = state.copyWith(isShuffle: newShuffle);
   }
@@ -237,15 +235,90 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   void toggleRepeat() {
     final next = switch (state.repeatMode) {
       RepeatMode.none => RepeatMode.all,
-      RepeatMode.all  => RepeatMode.one,
-      RepeatMode.one  => RepeatMode.none,
+      RepeatMode.all => RepeatMode.one,
+      RepeatMode.one => RepeatMode.none,
     };
     _handler.setRepeatMode(switch (next) {
       RepeatMode.none => AudioServiceRepeatMode.none,
-      RepeatMode.all  => AudioServiceRepeatMode.all,
-      RepeatMode.one  => AudioServiceRepeatMode.one,
+      RepeatMode.all => AudioServiceRepeatMode.all,
+      RepeatMode.one => AudioServiceRepeatMode.one,
     });
     if (mounted) state = state.copyWith(repeatMode: next);
+  }
+
+  // ── Эквалайзер ─────────────────────────────────────────────────────────────
+
+  /// Включает или выключает Android DSP эквалайзер.
+  Future<void> setEqEnabled(bool enabled) async {
+    try {
+      await _handler.equalizer.setEnabled(enabled);
+      if (mounted) state = state.copyWith(eqEnabled: enabled);
+    } catch (e) {
+      debugPrint('EQ setEnabled error: $e');
+    }
+  }
+
+  /// Устанавливает gain указанной полосы в dB.
+  Future<void> setEqBandGain(int bandIndex, double gain) async {
+    try {
+      final params = await _handler.equalizer.parameters;
+      if (bandIndex < 0 || bandIndex >= params.bands.length) return;
+      await params.bands[bandIndex].setGain(gain);
+
+      final newGains = List<double>.from(state.eqBandGains);
+      newGains[bandIndex] = gain;
+      if (mounted) state = state.copyWith(eqBandGains: newGains);
+    } catch (e) {
+      debugPrint('EQ setGain error (band=$bandIndex): $e');
+    }
+  }
+
+  // ── Таймер сна ─────────────────────────────────────────────────────────────
+
+  /// Запустить таймер: через [duration] вызывает плавную паузу (Fade Out).
+  void startSleepTimer(Duration duration) {
+    _sleepTimer?.cancel();
+    _stopAfterTrackIndex = null;
+
+    _sleepTimer = Timer(duration, () async {
+      await pause(); // Fade Out 300 мс + pause
+      if (mounted) {
+        state = state.copyWith(sleepTimerActive: false, stopAfterTrack: false);
+      }
+    });
+
+    if (mounted) {
+      state = state.copyWith(sleepTimerActive: true, stopAfterTrack: false);
+    }
+  }
+
+  /// Включить режим «остановить по окончании текущего трека».
+  void setStopAfterTrack() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _stopAfterTrackIndex = state.currentIndex;
+
+    if (mounted) {
+      state = state.copyWith(sleepTimerActive: true, stopAfterTrack: true);
+    }
+  }
+
+  /// Отменить любой активный таймер сна.
+  void cancelSleepTimer() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _stopAfterTrackIndex = null;
+    if (mounted) {
+      state = state.copyWith(sleepTimerActive: false, stopAfterTrack: false);
+    }
+  }
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
+
+  @override
+  void dispose() {
+    _sleepTimer?.cancel();
+    super.dispose();
   }
 }
 
