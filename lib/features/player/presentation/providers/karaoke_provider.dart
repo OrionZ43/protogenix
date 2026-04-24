@@ -246,7 +246,14 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
     _lastLineIndex = index;
 
     if (index >= 0) {
-      HapticFeedback.selectionClick();
+      // Для фоновых строк отключаем или делаем слабее хаптик (чтобы не перегружать)
+      final line = state.lines[index];
+      final isLineBg = line.words.isNotEmpty &&
+          line.words.first.syllables.isNotEmpty &&
+          line.words.first.syllables.first.isBackground;
+      if (!isLineBg) {
+        HapticFeedback.selectionClick();
+      }
     }
 
     state = state.copyWith(currentIndex: index);

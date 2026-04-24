@@ -22,6 +22,7 @@ import '../widgets/music_visualizer_controls.dart';
 import '../widgets/lyrics_search_sheet.dart';
 import '../widgets/beautiful_lyrics_view.dart';
 import '../widgets/eq_sheet.dart';
+import 'dart:ui';
 import '../../../importer/presentation/importer_sheet.dart';
 
 class PlayerScreen extends ConsumerWidget {
@@ -178,9 +179,15 @@ class _TopBar extends ConsumerWidget {
                       ),
                     ),
                   if (track != null)
-                    const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _showLyricsSheet(context, ref);
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
+                      ),
                     ),
                 ],
               ),
@@ -227,12 +234,12 @@ class _BottomRow extends ConsumerWidget {
             },
           ),
           _CapsuleBtn(
-            icon: Icons.manage_search_rounded,
+            icon: Icons.lyrics_outlined,
             label: 'Текст',
             onTap: track != null
                 ? () {
                     HapticFeedback.lightImpact();
-                    showLyricsSearchSheet(context, ref, track!);
+                    _showLyricsSheet(context, ref);
                   }
                 : null,
           ),
@@ -240,6 +247,76 @@ class _BottomRow extends ConsumerWidget {
       ),
     );
   }
+}
+
+void _showLyricsSheet(BuildContext context, WidgetRef ref) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(160),
+              ),
+              child: Column(
+                children: [
+                  // Pull indicator
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 12),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(50),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  // Search button inside lyrics view
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SizedBox(width: 40),
+                        const Text(
+                          'LYRICS',
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.manage_search_rounded, color: Colors.white54),
+                          onPressed: () {
+                            final track = ref.read(playerProvider).currentTrack;
+                            if (track != null) {
+                              showLyricsSearchSheet(context, ref, track);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Expanded(child: BeautifulLyricsView()),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _CapsuleBtn extends StatelessWidget {
