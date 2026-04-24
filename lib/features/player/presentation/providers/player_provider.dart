@@ -24,8 +24,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
 
   final Ref _ref;
 
-  ProtogenixAudioHandler get _handler =>
-      audioHandler as ProtogenixAudioHandler;
+  ProtogenixAudioHandler get _handler => audioHandler as ProtogenixAudioHandler;
 
   AudioPlayer get _player => _handler.player;
 
@@ -46,8 +45,8 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     _player.playerStateStream.listen((playerState) {
       if (mounted) {
         state = state.copyWith(
-          isPlaying:   playerState.playing,
-          isLoading:   playerState.processingState == ProcessingState.loading,
+          isPlaying: playerState.playing,
+          isLoading: playerState.processingState == ProcessingState.loading,
           isBuffering: playerState.processingState == ProcessingState.buffering,
         );
       }
@@ -77,9 +76,9 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
 
       if (libraryTracks.isEmpty) {
         state = state.copyWith(
-          queue:        [],
+          queue: [],
           currentTrack: null,
-          isLoading:    false,
+          isLoading: false,
         );
         return;
       }
@@ -102,10 +101,10 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   Future<void> loadPlaylist(List<TrackModel> tracks,
       {int initialIndex = 0}) async {
     state = state.copyWith(
-      queue:        tracks,
+      queue: tracks,
       currentIndex: initialIndex,
       currentTrack: tracks.isNotEmpty ? tracks[initialIndex] : null,
-      isLoading:    true,
+      isLoading: true,
     );
 
     if (tracks.isEmpty) {
@@ -113,20 +112,22 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
       return;
     }
 
-    final mediaItems = tracks.map((t) => MediaItem(
-      id:       t.id,
-      title:    t.title,
-      artist:   t.artist,
-      album:    t.album,
-      duration: t.duration,
-    )).toList();
+    final mediaItems = tracks
+        .map((t) => MediaItem(
+              id: t.id,
+              title: t.title,
+              artist: t.artist,
+              album: t.album,
+              duration: t.duration,
+            ))
+        .toList();
 
     final audioSources = tracks.map((t) => t.toAudioSource()).toList();
 
     try {
       await _handler.loadPlaylist(
-        items:        mediaItems,
-        sources:      audioSources,
+        items: mediaItems,
+        sources: audioSources,
         initialIndex: initialIndex,
       );
       if (tracks.isNotEmpty) {
@@ -151,7 +152,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   Future<void> _fadeVolume({
     required double from,
     required double to,
-    int steps      = 10,
+    int steps = 10,
     int intervalMs = 30,
   }) async {
     for (int i = 1; i <= steps; i++) {
@@ -220,9 +221,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   void toggleShuffle() {
     final newShuffle = !state.isShuffle;
     _handler.setShuffleMode(
-      newShuffle
-          ? AudioServiceShuffleMode.all
-          : AudioServiceShuffleMode.none,
+      newShuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
     );
     if (mounted) state = state.copyWith(isShuffle: newShuffle);
   }
@@ -230,13 +229,13 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   void toggleRepeat() {
     final next = switch (state.repeatMode) {
       RepeatMode.none => RepeatMode.all,
-      RepeatMode.all  => RepeatMode.one,
-      RepeatMode.one  => RepeatMode.none,
+      RepeatMode.all => RepeatMode.one,
+      RepeatMode.one => RepeatMode.none,
     };
     _handler.setRepeatMode(switch (next) {
       RepeatMode.none => AudioServiceRepeatMode.none,
-      RepeatMode.all  => AudioServiceRepeatMode.all,
-      RepeatMode.one  => AudioServiceRepeatMode.one,
+      RepeatMode.all => AudioServiceRepeatMode.all,
+      RepeatMode.one => AudioServiceRepeatMode.one,
     });
     if (mounted) state = state.copyWith(repeatMode: next);
   }

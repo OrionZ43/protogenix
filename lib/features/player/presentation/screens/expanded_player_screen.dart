@@ -51,9 +51,9 @@ class ExpandedPlayerScreen extends ConsumerWidget {
                     Expanded(
                       flex: 42,
                       child: MusicVisualizerControls(
-                        compact:      true,
-                        showFavorite: true,    // ← сердечко рядом с названием
-                        onAddTrack:   () => showImporterSheet(context),
+                        compact: true,
+                        showFavorite: true, // ← сердечко рядом с названием
+                        onAddTrack: () => showImporterSheet(context),
                         onChangeLyrics: track != null
                             ? () => showLyricsSearchSheet(context, ref, track)
                             : null,
@@ -61,8 +61,8 @@ class ExpandedPlayerScreen extends ConsumerWidget {
                     ),
 
                     VerticalDivider(
-                      color:     Colors.white.withAlpha(18),
-                      width:     1,
+                      color: Colors.white.withAlpha(18),
+                      width: 1,
                       thickness: 1,
                     ),
 
@@ -103,7 +103,7 @@ class _TopBar extends StatelessWidget {
             child: GestureDetector(
               onTap: () => Navigator.of(context).pop(),
               child: Container(
-                width:  36,
+                width: 36,
                 height: 36,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -112,7 +112,7 @@ class _TopBar extends StatelessWidget {
                 child: const Icon(
                   Icons.keyboard_arrow_down_rounded,
                   color: Colors.white70,
-                  size:  24,
+                  size: 24,
                 ),
               ),
             ),
@@ -122,9 +122,9 @@ class _TopBar extends StatelessWidget {
           const Text(
             'PROTOGENIX',
             style: TextStyle(
-              color:         Colors.white38,
-              fontSize:      11,
-              fontWeight:    FontWeight.w600,
+              color: Colors.white38,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
               letterSpacing: 2.5,
             ),
           ),
@@ -138,7 +138,7 @@ class _TopBar extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color:    Colors.white38,
+                  color: Colors.white38,
                   fontSize: 12,
                 ),
               ),

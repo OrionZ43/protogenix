@@ -8,7 +8,14 @@ import '../../library/data/library_database.dart';
 import '../../library/data/lyrics_service.dart';
 import '../../library/domain/library_track.dart';
 
-enum ImportStatus { idle, fetchingMeta, downloading, fetchingLyrics, done, error }
+enum ImportStatus {
+  idle,
+  fetchingMeta,
+  downloading,
+  fetchingLyrics,
+  done,
+  error
+}
 
 class ImportProgress {
   final ImportStatus status;
@@ -180,8 +187,8 @@ class ImporterService {
     );
 
     final audioStreams = manifest.audioOnly.toList()
-      ..sort((a, b) => b.bitrate.kiloBitsPerSecond.compareTo(
-          a.bitrate.kiloBitsPerSecond));
+      ..sort((a, b) =>
+          b.bitrate.kiloBitsPerSecond.compareTo(a.bitrate.kiloBitsPerSecond));
 
     if (audioStreams.isEmpty) {
       throw _NoStreamsException('Клиент $client не вернул аудио-потоков');
@@ -192,7 +199,8 @@ class ImporterService {
     final savePath = await _getTrackPath('$videoId.$ext');
     final totalBytes = streamInfo.size.totalBytes;
 
-    debugPrint('[YT] Поток: ${streamInfo.bitrate}, размер: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB');
+    debugPrint(
+        '[YT] Поток: ${streamInfo.bitrate}, размер: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB');
 
     final file = File(savePath);
     if (await file.exists()) await file.delete();
@@ -364,10 +372,10 @@ class ImporterService {
 
   bool _isDirectAudio(String url) =>
       url.endsWith('.mp3') ||
-          url.endsWith('.flac') ||
-          url.endsWith('.m4a') ||
-          url.endsWith('.ogg') ||
-          url.endsWith('.wav');
+      url.endsWith('.flac') ||
+      url.endsWith('.m4a') ||
+      url.endsWith('.ogg') ||
+      url.endsWith('.wav');
 
   Future<String> _getTrackPath(String fileName) async {
     final dir = await getApplicationDocumentsDirectory();

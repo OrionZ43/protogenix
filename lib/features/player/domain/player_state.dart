@@ -61,19 +61,19 @@ class ProtogenixPlayerState {
     bool? isShuffle,
   }) {
     return ProtogenixPlayerState(
-      currentTrack:  currentTrack  ?? this.currentTrack,
-      queue:         queue         ?? this.queue,
-      currentIndex:  currentIndex  ?? this.currentIndex,
-      isPlaying:     isPlaying     ?? this.isPlaying,
-      isLoading:     isLoading     ?? this.isLoading,
-      isBuffering:   isBuffering   ?? this.isBuffering,
-      position:      position      ?? this.position,
-      buffered:      buffered      ?? this.buffered,
-      total:         total         ?? this.total,
-      volume:        volume        ?? this.volume,
-      speed:         speed         ?? this.speed,
-      repeatMode:    repeatMode    ?? this.repeatMode,
-      isShuffle:     isShuffle     ?? this.isShuffle,
+      currentTrack: currentTrack ?? this.currentTrack,
+      queue: queue ?? this.queue,
+      currentIndex: currentIndex ?? this.currentIndex,
+      isPlaying: isPlaying ?? this.isPlaying,
+      isLoading: isLoading ?? this.isLoading,
+      isBuffering: isBuffering ?? this.isBuffering,
+      position: position ?? this.position,
+      buffered: buffered ?? this.buffered,
+      total: total ?? this.total,
+      volume: volume ?? this.volume,
+      speed: speed ?? this.speed,
+      repeatMode: repeatMode ?? this.repeatMode,
+      isShuffle: isShuffle ?? this.isShuffle,
     );
   }
 }
