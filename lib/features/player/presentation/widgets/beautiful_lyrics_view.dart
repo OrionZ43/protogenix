@@ -137,7 +137,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
       await _scroll.scrollTo(
         index: index,
         duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
+        curve: const _SpringCurve(),
         alignment: 0.5,
       );
     } catch (_) {}

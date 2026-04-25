@@ -142,17 +142,17 @@ class _EmptyFavorites extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.favorite_outline_rounded,
             size: 80,
             color: Colors.white12,
           ),
-          const SizedBox(height: 20),
-          const Text(
+          SizedBox(height: 20),
+          Text(
             'Нет избранных треков',
             style: TextStyle(
               color: Colors.white70,
@@ -160,8 +160,8 @@ class _EmptyFavorites extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             'Нажми ♥ у трека, чтобы добавить',
             style: TextStyle(color: Colors.white38, fontSize: 13),
           ),

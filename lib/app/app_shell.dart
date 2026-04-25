@@ -54,7 +54,7 @@ const _tabs = [
 ];
 
 final _screens = <Widget>[
-  LibraryScreen(),
+  const LibraryScreen(),
   const PlaylistsScreen(),
   const FavoritesScreen(),
 ];
