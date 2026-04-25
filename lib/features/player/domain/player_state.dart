@@ -21,6 +21,12 @@ class ProtogenixPlayerState {
   final RepeatMode repeatMode;
   final bool isShuffle;
 
+  final bool eqEnabled;
+  final List<double> eqBandGains;
+
+  final bool sleepTimerActive;
+  final bool stopAfterTrack;
+
   const ProtogenixPlayerState({
     this.currentTrack,
     this.queue = const [],
@@ -35,6 +41,10 @@ class ProtogenixPlayerState {
     this.speed = 1.0,
     this.repeatMode = RepeatMode.none,
     this.isShuffle = false,
+    this.eqEnabled = false,
+    this.eqBandGains = const [],
+    this.sleepTimerActive = false,
+    this.stopAfterTrack = false,
   });
 
   double get progress {
@@ -59,6 +69,10 @@ class ProtogenixPlayerState {
     double? speed,
     RepeatMode? repeatMode,
     bool? isShuffle,
+    bool? eqEnabled,
+    List<double>? eqBandGains,
+    bool? sleepTimerActive,
+    bool? stopAfterTrack,
   }) {
     return ProtogenixPlayerState(
       currentTrack: currentTrack ?? this.currentTrack,
@@ -74,6 +88,10 @@ class ProtogenixPlayerState {
       speed: speed ?? this.speed,
       repeatMode: repeatMode ?? this.repeatMode,
       isShuffle: isShuffle ?? this.isShuffle,
+      eqEnabled: eqEnabled ?? this.eqEnabled,
+      eqBandGains: eqBandGains ?? this.eqBandGains,
+      sleepTimerActive: sleepTimerActive ?? this.sleepTimerActive,
+      stopAfterTrack: stopAfterTrack ?? this.stopAfterTrack,
     );
   }
 }
