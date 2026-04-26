@@ -18,18 +18,18 @@ import '../providers/player_provider.dart';
 
 // Стандартные метки 5-полосного EQ (Android может вернуть другие centerFreq,
 // но будем показывать их из params.bands[i].centerFrequency).
-const _kBandLabels =['60\nHz', '230\nHz', '910\nHz', '4\nkHz', '14\nkHz'];
+const _kBandLabels = ['60\nHz', '230\nHz', '910\nHz', '4\nkHz', '14\nkHz'];
 
 /// Открывает EQ BottomSheet.
 void showEqSheet(BuildContext context, WidgetRef ref) {
   showModalBottomSheet(
-    context:            context,
+    context: context,
     isScrollControlled: true,
-    backgroundColor:    Colors.transparent,
-    barrierColor:       Colors.black.withAlpha(100),
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withAlpha(100),
     builder: (_) => ProviderScope(
       parent: ProviderScope.containerOf(context),
-      child:  const _EqSheet(),
+      child: const _EqSheet(),
     ),
   );
 }
@@ -56,7 +56,7 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
   Future<void> _loadParams() async {
     try {
       final handler = audioHandler as ProtogenixAudioHandler;
-      final params  = await handler.equalizer.parameters;
+      final params = await handler.equalizer?.parameters;
       if (mounted) setState(() => _params = params);
     } catch (e) {
       if (mounted) setState(() => _loadError = e.toString());
@@ -65,7 +65,7 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final player  = ref.watch(playerProvider);
+    final player = ref.watch(playerProvider);
     final palette = ref.watch(paletteProvider);
     final notifier = ref.read(playerProvider.notifier);
 
@@ -86,12 +86,13 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children:[
+            children: [
               // ── Drag handle ──────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.only(top: 12, bottom: 20),
                 child: Container(
-                  width: 36, height: 4,
+                  width: 36,
+                  height: 4,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(2),
                     color: Colors.white.withAlpha(40),
@@ -101,15 +102,15 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
 
               // ── Заголовок + переключатель ─────────────────────────────
               Row(
-                children:[
+                children: [
                   Icon(Icons.tune_rounded, color: accentColor, size: 20),
                   const SizedBox(width: 10),
                   const Text(
                     'EQUALIZER',
                     style: TextStyle(
-                      color:         Colors.white,
-                      fontSize:      13,
-                      fontWeight:    FontWeight.w700,
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 2.5,
                     ),
                   ),
@@ -119,7 +120,8 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
                     onTap: () => notifier.setEqEnabled(!player.eqEnabled),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 250),
-                      width: 48, height: 26,
+                      width: 48,
+                      height: 26,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(13),
                         color: player.eqEnabled
@@ -138,7 +140,8 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
                         child: Padding(
                           padding: const EdgeInsets.all(3),
                           child: Container(
-                            width: 18, height: 18,
+                            width: 18,
+                            height: 18,
                             decoration: const BoxDecoration(
                               shape: BoxShape.circle,
                               color: Colors.white,
@@ -162,10 +165,10 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
               GestureDetector(
                 onTap: player.eqEnabled
                     ? () async {
-                  for (int i = 0; i < 5; i++) {
-                    await notifier.setEqBandGain(i, 0.0);
-                  }
-                }
+                        for (int i = 0; i < 5; i++) {
+                          await notifier.setEqBandGain(i, 0.0);
+                        }
+                      }
                     : null,
                 child: Opacity(
                   opacity: player.eqEnabled ? 1.0 : 0.3,
@@ -174,15 +177,15 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
                         horizontal: 20, vertical: 10),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
-                      color:  Colors.white.withAlpha(12),
+                      color: Colors.white.withAlpha(12),
                       border: Border.all(color: Colors.white.withAlpha(20)),
                     ),
                     child: const Text(
                       'СБРОСИТЬ',
                       style: TextStyle(
-                        color:         Colors.white60,
-                        fontSize:      11,
-                        fontWeight:    FontWeight.w700,
+                        color: Colors.white60,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 2,
                       ),
                     ),
@@ -197,10 +200,10 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
   }
 
   Widget _buildSliders(
-      ProtogenixPlayerState player,
-      PlayerNotifier notifier,
-      Color accentColor,
-      ) {
+    ProtogenixPlayerState player,
+    PlayerNotifier notifier,
+    Color accentColor,
+  ) {
     // Состояние загрузки
     if (_loadError != null) {
       return Center(
@@ -222,12 +225,12 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
       );
     }
 
-    final bandCount  = _params!.bands.length.clamp(0, 5);
+    final bandCount = _params!.bands.length.clamp(0, 5);
 
     // ИСПРАВЛЕНИЕ: minDecibels и maxDecibels находятся прямо у параметров,
     // а не у конкретной полосы.
-    final minDb      = _params!.minDecibels;
-    final maxDb      = _params!.maxDecibels;
+    final minDb = _params!.minDecibels;
+    final maxDb = _params!.maxDecibels;
 
     return Opacity(
       opacity: player.eqEnabled ? 1.0 : 0.35,
@@ -235,20 +238,19 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: List.generate(bandCount, (i) {
-          final gain    = i < player.eqBandGains.length
-              ? player.eqBandGains[i]
-              : 0.0;
-          final freqHz  = _params!.bands[i].centerFrequency;
+          final gain =
+              i < player.eqBandGains.length ? player.eqBandGains[i] : 0.0;
+          final freqHz = _params!.bands[i].centerFrequency;
           final freqLabel = _formatFreq(freqHz);
 
           return _BandColumn(
-            freqLabel:   freqLabel,
-            gain:        gain,
-            minDb:       minDb,
-            maxDb:       maxDb,
+            freqLabel: freqLabel,
+            gain: gain,
+            minDb: minDb,
+            maxDb: maxDb,
             accentColor: accentColor,
-            enabled:     player.eqEnabled,
-            onChanged:   (v) => notifier.setEqBandGain(i, v),
+            enabled: player.eqEnabled,
+            onChanged: (v) => notifier.setEqBandGain(i, v),
           );
         }),
       ),
@@ -279,24 +281,23 @@ class _BandColumn extends StatelessWidget {
     required this.onChanged,
   });
 
-  final String  freqLabel;
-  final double  gain;
-  final double  minDb;
-  final double  maxDb;
-  final Color   accentColor;
-  final bool    enabled;
+  final String freqLabel;
+  final double gain;
+  final double minDb;
+  final double maxDb;
+  final Color accentColor;
+  final bool enabled;
   final ValueChanged<double> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final showPositive = gain > 0.5;
     final showNegative = gain < -0.5;
-    final gainLabel = gain >= 0
-        ? '+${gain.toStringAsFixed(1)}'
-        : gain.toStringAsFixed(1);
+    final gainLabel =
+        gain >= 0 ? '+${gain.toStringAsFixed(1)}' : gain.toStringAsFixed(1);
 
     return Column(
-      children:[
+      children: [
         // Значение gain
         Text(
           gainLabel,
@@ -304,9 +305,9 @@ class _BandColumn extends StatelessWidget {
             color: showPositive
                 ? accentColor
                 : showNegative
-                ? Colors.white38
-                : Colors.white54,
-            fontSize:   10,
+                    ? Colors.white38
+                    : Colors.white54,
+            fontSize: 10,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -315,16 +316,16 @@ class _BandColumn extends StatelessWidget {
 
         // Вертикальный слайдер через RotatedBox
         SizedBox(
-          width:  44,
+          width: 44,
           height: 140,
           child: RotatedBox(
             quarterTurns: 3, // -90° → вертикальный
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                trackHeight:       3,
-                activeTrackColor:  accentColor.withAlpha(enabled ? 255 : 100),
+                trackHeight: 3,
+                activeTrackColor: accentColor.withAlpha(enabled ? 255 : 100),
                 inactiveTrackColor: Colors.white.withAlpha(30),
-                thumbColor:        accentColor,
+                thumbColor: accentColor,
                 thumbShape: RoundSliderThumbShape(
                   enabledThumbRadius: enabled ? 8 : 6,
                 ),
@@ -334,9 +335,9 @@ class _BandColumn extends StatelessWidget {
               child: SizedBox(
                 width: 140,
                 child: Slider(
-                  value:     gain.clamp(minDb, maxDb),
-                  min:       minDb,
-                  max:       maxDb,
+                  value: gain.clamp(minDb, maxDb),
+                  min: minDb,
+                  max: maxDb,
                   divisions: ((maxDb - minDb) * 2).round(), // шаг 0.5 dB
                   onChanged: enabled ? onChanged : null,
                 ),
@@ -349,7 +350,8 @@ class _BandColumn extends StatelessWidget {
 
         // Центральный маркер (0 dB)
         Container(
-          width: 1, height: 8,
+          width: 1,
+          height: 8,
           color: Colors.white.withAlpha(25),
         ),
 
@@ -360,12 +362,12 @@ class _BandColumn extends StatelessWidget {
           freqLabel,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color:    Colors.white.withAlpha(70),
+            color: Colors.white.withAlpha(70),
             fontSize: 9.5,
-            height:   1.4,
+            height: 1.4,
           ),
         ),
       ],
     );
   }
-} 
+}

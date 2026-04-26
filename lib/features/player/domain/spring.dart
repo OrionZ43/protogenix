@@ -29,7 +29,7 @@ class LyricSpring {
         _dampingRatio = dampingRatio,
         _frequency = frequency {
     assert(dampingRatio * frequency >= 0,
-    'Spring does not converge: dampingRatio=$dampingRatio frequency=$frequency');
+        'Spring does not converge: dampingRatio=$dampingRatio frequency=$frequency');
   }
 
   /// Шаг симуляции на [dt] секунд. Возвращает новую позицию.
@@ -45,7 +45,7 @@ class LyricSpring {
       newPos =
           ((offset * (1 + radialFreq * dt) + _velocity * dt) * decay) + goal;
       newVel = ((_velocity * (1 - radialFreq * dt) -
-          offset * (radialFreq * radialFreq * dt)) *
+              offset * (radialFreq * radialFreq * dt)) *
           decay);
     } else if (d < 1.0) {
       final c = math.sqrt(1 - d * d);
@@ -138,9 +138,7 @@ class SyllableSprings {
     required double glowDamping,
     required double glowFrequency,
   })  : scale = LyricSpring(
-      initial: 0,
-      dampingRatio: scaleDamping,
-      frequency: scaleFrequency),
+            initial: 0, dampingRatio: scaleDamping, frequency: scaleFrequency),
         yOffset = LyricSpring(
             initial: 0,
             dampingRatio: yOffsetDamping,

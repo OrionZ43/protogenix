@@ -30,11 +30,11 @@ enum LyricsFormat { yrc, enhancedLrc, syncedLrc, plain }
 
 extension LyricsFormatExt on LyricsFormat {
   String get label => switch (this) {
-    LyricsFormat.yrc => 'YRC (Syllable)',
-    LyricsFormat.enhancedLrc => 'Enhanced LRC (Word)',
-    LyricsFormat.syncedLrc => 'Synced LRC (Line)',
-    LyricsFormat.plain => 'Plain',
-  };
+        LyricsFormat.yrc => 'YRC (Syllable)',
+        LyricsFormat.enhancedLrc => 'Enhanced LRC (Word)',
+        LyricsFormat.syncedLrc => 'Synced LRC (Line)',
+        LyricsFormat.plain => 'Plain',
+      };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,12 +117,12 @@ class LyricLine {
       words.isNotEmpty && words.any((w) => w.syllables.isNotEmpty);
 
   LyricLine copyWith({int? endMs}) => LyricLine(
-    startMs: startMs,
-    endMs: endMs ?? this.endMs,
-    words: words,
-    isOpposite: isOpposite,
-    isBackgroundLine: isBackgroundLine,
-  );
+        startMs: startMs,
+        endMs: endMs ?? this.endMs,
+        words: words,
+        isOpposite: isOpposite,
+        isBackgroundLine: isBackgroundLine,
+      );
 }
 
 class ParsedLyrics {
@@ -158,7 +158,7 @@ class AdvancedLrcParser {
 
   /// Enhanced LRC тег слова: <mm:ss.xx>text
   static final _enhancedWordRx =
-  RegExp(r'<(\d{1,2}):(\d{2})\.(\d{2,3})>([^<]*)');
+      RegExp(r'<(\d{1,2}):(\d{2})\.(\d{2,3})>([^<]*)');
 
   /// LRC метатег: [ti:Title]
   static final _metaTagRx = RegExp(r'^\[([a-zA-Z]+):(.+)\]$');
@@ -182,7 +182,7 @@ class AdvancedLrcParser {
 
   static LyricsFormat _detectFormat(String content) {
     final lines =
-    content.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty);
+        content.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty);
 
     int yrcCount = 0;
     int lrcCount = 0;
@@ -200,15 +200,15 @@ class AdvancedLrcParser {
     final format = yrcCount > 0
         ? LyricsFormat.yrc
         : enhancedCount > 0
-        ? LyricsFormat.enhancedLrc
-        : lrcCount > 0
-        ? LyricsFormat.syncedLrc
-        : LyricsFormat.plain;
+            ? LyricsFormat.enhancedLrc
+            : lrcCount > 0
+                ? LyricsFormat.syncedLrc
+                : LyricsFormat.plain;
 
     // ── DEBUG: итог детекции ──────────────────────────────────────────────
     debugPrint(
       '[AdvancedLrcParser] detectFormat → ${format.label} '
-          '(yrc=$yrcCount lrc=$lrcCount enhanced=$enhancedCount)',
+      '(yrc=$yrcCount lrc=$lrcCount enhanced=$enhancedCount)',
     );
     return format;
   }
@@ -298,7 +298,8 @@ class AdvancedLrcParser {
 
       // Слоги с пустым текстом (только скобки) пропускаем
       if (r.text.trim().isNotEmpty) {
-        rawSyls.add((start: start, dur: dur, text: r.text, isBackground: r.isBg));
+        rawSyls
+            .add((start: start, dur: dur, text: r.text, isBackground: r.isBg));
       }
     }
 
@@ -309,16 +310,17 @@ class AdvancedLrcParser {
 
     final syllables = rawSyls
         .map((s) => LyricSyllable(
-      text: s.text,
-      startMs: s.start,
-      durationMs: s.dur > 0 ? s.dur : 100,
-      isPartOfWord: false,
-      isBackground: s.isBackground,
-    ))
+              text: s.text,
+              startMs: s.start,
+              durationMs: s.dur > 0 ? s.dur : 100,
+              isPartOfWord: false,
+              isBackground: s.isBackground,
+            ))
         .toList();
 
     final words = _groupSyllablesIntoWords(syllables);
-    final isBackgroundLine = words.isNotEmpty && words.every((w) => w.isBackground);
+    final isBackgroundLine =
+        words.isNotEmpty && words.every((w) => w.isBackground);
 
     debugPrint(
       '[YRC] @$lineStartMs: ${words.map((w) => '"${w.text}"${w.isBackground ? '[bg]' : ''}').join(' | ')}',
@@ -400,7 +402,7 @@ class AdvancedLrcParser {
 
         final wEnd = i + 1 < wordMatches.length
             ? _lrcMs(wordMatches[i + 1].group(1)!, wordMatches[i + 1].group(2)!,
-            wordMatches[i + 1].group(3)!)
+                wordMatches[i + 1].group(3)!)
             : wStart + 800;
 
         final syl = LyricSyllable(
@@ -462,7 +464,7 @@ class AdvancedLrcParser {
       if (lrcMatch == null) continue;
 
       final startMs =
-      _lrcMs(lrcMatch.group(1)!, lrcMatch.group(2)!, lrcMatch.group(3)!);
+          _lrcMs(lrcMatch.group(1)!, lrcMatch.group(2)!, lrcMatch.group(3)!);
       var payload = lrcMatch.group(4)!;
 
       bool isOpposite = false;
@@ -488,7 +490,8 @@ class AdvancedLrcParser {
         final r = _processWithState(rawWord, bgState);
         bgState = r.nextState;
         if (r.text.isEmpty) continue;
-        parsedWords.add(_plainWord(r.text, startMs, 4000, isBackground: r.isBg));
+        parsedWords
+            .add(_plainWord(r.text, startMs, 4000, isBackground: r.isBg));
       }
 
       if (parsedWords.isEmpty) continue;
@@ -556,7 +559,8 @@ class AdvancedLrcParser {
         curMs += letterDurMs;
       }
 
-      words.add(LyricWord(syllables: List.unmodifiable(syllables), isBackground: isBg));
+      words.add(LyricWord(
+          syllables: List.unmodifiable(syllables), isBackground: isBg));
 
       if (wi < line.words.length - 1) {
         curMs += (msPerW * spaceW).round();
@@ -605,7 +609,7 @@ class AdvancedLrcParser {
 
       debugPrint(
         '[Plain] "${parsedWords.map((w) => '"${w.text}"${w.isBackground ? '[bg]' : ''}').join(' | ')}"'
-            '${isLineBackground ? ' → ALL-BG' : ''}',
+        '${isLineBackground ? ' → ALL-BG' : ''}',
       );
 
       result.add(LyricLine(
@@ -640,9 +644,9 @@ class AdvancedLrcParser {
   ///
   /// Аллокации: только один StringBuffer на вызов; никаких RegExp.
   static ({String text, bool isBg, bool nextState}) _processWithState(
-      String rawText,
-      bool isBackground,
-      ) {
+    String rawText,
+    bool isBackground,
+  ) {
     final buf = StringBuffer();
     bool? firstCharBg; // состояние в момент первого реального символа
 
@@ -660,12 +664,11 @@ class AdvancedLrcParser {
     }
 
     return (
-    text: buf.toString(),
-    isBg: firstCharBg ?? isBackground,
-    nextState: isBackground,
+      text: buf.toString(),
+      isBg: firstCharBg ?? isBackground,
+      nextState: isBackground,
     );
   }
-
 
   /// Группирует плоский список слогов в LyricWord по пробелам.
   static List<LyricWord> _groupSyllablesIntoWords(
@@ -711,11 +714,11 @@ class AdvancedLrcParser {
   }
 
   static LyricWord _plainWord(
-      String text,
-      int startMs,
-      int durationMs, {
-        bool isBackground = false,
-      }) {
+    String text,
+    int startMs,
+    int durationMs, {
+    bool isBackground = false,
+  }) {
     return LyricWord(
       syllables: [
         LyricSyllable(
@@ -774,6 +777,6 @@ class AdvancedLrcParser {
   }
 
   static int currentLineIndexFromDuration(
-      List<LyricLine> lines, Duration position) =>
+          List<LyricLine> lines, Duration position) =>
       currentLineIndex(lines, position.inMilliseconds);
 }

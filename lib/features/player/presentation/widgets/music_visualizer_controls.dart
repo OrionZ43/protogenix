@@ -229,28 +229,28 @@ class _CapsuleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: () {
-      HapticFeedback.lightImpact();
-      onTap();
-    },
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withAlpha(18),
-        border: Border.all(color: Colors.white.withAlpha(35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 15),
-          const SizedBox(width: 6),
-          Text(label,
-              style: const TextStyle(color: Colors.white60, fontSize: 12)),
-        ],
-      ),
-    ),
-  );
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: Colors.white.withAlpha(18),
+            border: Border.all(color: Colors.white.withAlpha(35)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 15),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12)),
+            ],
+          ),
+        ),
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -316,7 +316,7 @@ class _TrackInfo extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isFav =
-    showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
+        showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
 
     final titleStyle = TextStyle(
       color: Colors.white,
@@ -508,11 +508,11 @@ class _CtrlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap, // haptics управляются каждым вызывающим кодом отдельно
-    behavior: HitTestBehavior.opaque,
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Icon(icon, color: color, size: size),
-    ),
-  );
+        onTap: onTap, // haptics управляются каждым вызывающим кодом отдельно
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Icon(icon, color: color, size: size),
+        ),
+      );
 }

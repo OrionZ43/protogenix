@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:window_manager/window_manager.dart';
 // lib/features/player/presentation/screens/expanded_player_screen.dart
 //
 // Полноэкранный плеер для Fold / планшета.
@@ -41,7 +43,10 @@ class ExpandedPlayerScreen extends ConsumerWidget {
           child: Column(
             children: [
               // ── Топ-бар с кнопкой "назад" ─────────────────────────────────
-              _TopBar(track: track),
+              if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+                DragToMoveArea(child: _TopBar(track: track))
+              else
+                _TopBar(track: track),
 
               // ── Основной контент ──────────────────────────────────────────
               Expanded(

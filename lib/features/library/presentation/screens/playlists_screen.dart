@@ -38,12 +38,12 @@ class PlaylistsScreen extends ConsumerWidget {
         child: SafeArea(
           bottom: false,
           child: CustomScrollView(
-            slivers:[
+            slivers: [
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                   child: Row(
-                    children:[
+                    children: [
                       const Text(
                         'Плейлисты',
                         style: TextStyle(
@@ -76,7 +76,8 @@ class PlaylistsScreen extends ConsumerWidget {
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
@@ -129,7 +130,7 @@ class _CreateFab extends StatelessWidget {
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
-          children:[
+          children: [
             Icon(Icons.add_rounded, color: Colors.white, size: 20),
             SizedBox(width: 8),
             Text(
@@ -158,7 +159,7 @@ class _EmptyPlaylists extends StatelessWidget {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children:[
+        children: [
           const Icon(
             Icons.queue_music_rounded,
             size: 80,
@@ -196,7 +197,7 @@ class _EmptyPlaylists extends StatelessWidget {
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
-                children:[
+                children: [
                   Icon(
                     Icons.add_rounded,
                     color: Colors.white70,
@@ -215,7 +216,10 @@ class _EmptyPlaylists extends StatelessWidget {
             ),
           ),
         ],
-      ).animate().fadeIn(duration: 600.ms).scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
+      )
+          .animate()
+          .fadeIn(duration: 600.ms)
+          .scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
     );
   }
 }
@@ -244,7 +248,7 @@ class _PlaylistCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children:[
+          children: [
             Container(
               width: 44,
               height: 44,
@@ -271,7 +275,7 @@ class _PlaylistCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Row(
-              children:[
+              children: [
                 GestureDetector(
                   onTap: onRename,
                   child: const Icon(
@@ -333,7 +337,7 @@ Future<void> _createPlaylistDialog(BuildContext context, WidgetRef ref) async {
                 ),
               ),
             ),
-            actions:[
+            actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
                 child: const Text(
@@ -394,7 +398,7 @@ Future<void> _renameDialog(
                 ),
               ),
             ),
-            actions:[
+            actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
                 child: const Text(
@@ -452,7 +456,7 @@ class _GlassDialog extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children:[
+                  children: [
                     Text(
                       title,
                       style: const TextStyle(
@@ -525,13 +529,13 @@ class _PlaylistContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return CustomScrollView(
-      slivers:[
+      slivers: [
         // Заголовок
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
             child: Row(
-              children:[
+              children: [
                 IconButton(
                   icon: const Icon(
                     Icons.arrow_back_rounded,
@@ -586,7 +590,7 @@ class _PlaylistContent extends ConsumerWidget {
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children:[
+                    children: [
                       Icon(
                         Icons.play_arrow_rounded,
                         color: Colors.white,
@@ -667,7 +671,7 @@ class _PlaylistTrackTile extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
-          children:[
+          children: [
             Text(
               '${index + 1}',
               style: TextStyle(
@@ -696,7 +700,7 @@ class _PlaylistTrackTile extends ConsumerWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children:[
+                children: [
                   Text(
                     track.title,
                     maxLines: 1,
@@ -784,7 +788,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children:[
+          children: [
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
               width: 40,
@@ -799,7 +803,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Row(
-                children:[
+                children: [
                   Expanded(
                     child: Text(
                       track.title,
@@ -873,7 +877,7 @@ class _OptionTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
-          children:[
+          children: [
             Icon(icon, color: iconColor ?? Colors.white70, size: 22),
             const SizedBox(width: 16),
             Text(

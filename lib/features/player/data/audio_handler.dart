@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -15,13 +16,16 @@ Future<void> initAudioService() async {
   );
 }
 
-class ProtogenixAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
-  final AndroidEqualizer _equalizer = AndroidEqualizer();
+class ProtogenixAudioHandler extends BaseAudioHandler
+    with QueueHandler, SeekHandler {
+  final AndroidEqualizer? _equalizer =
+      Platform.isAndroid ? AndroidEqualizer() : null;
   late final AudioPlayer _player;
 
   ProtogenixAudioHandler() {
     _player = AudioPlayer(
-      audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer]),
+      audioPipeline: AudioPipeline(
+          androidAudioEffects: [if (_equalizer != null) _equalizer]),
     );
     _init();
   }
@@ -29,12 +33,13 @@ class ProtogenixAudioHandler extends BaseAudioHandler with QueueHandler, SeekHan
   void _init() {
     _player.playbackEventStream.listen(_broadcastState);
     _player.currentIndexStream.listen((index) {
-      if (index != null && index < queue.value.length) mediaItem.add(queue.value[index]);
+      if (index != null && index < queue.value.length)
+        mediaItem.add(queue.value[index]);
     });
   }
 
   AudioPlayer get player => _player;
-  AndroidEqualizer get equalizer => _equalizer; // Геттер, который требовал код
+  AndroidEqualizer? get equalizer => _equalizer; // Геттер, который требовал код
 
   @override
   Future<void> play() => _player.play();

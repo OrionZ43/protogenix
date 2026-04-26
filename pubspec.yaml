@@ -37,6 +37,8 @@ dependencies:
 
   # HTTP (нужен importer_service)
   http: ^1.2.1
+  sqflite_common_ffi: ^2.4.0+3
+  window_manager: ^0.5.1
 
 dev_dependencies:
   flutter_test:
