@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:window_manager/window_manager.dart';
 // lib/app/app_shell.dart
 //
 // Главный навигационный каркас приложения.
@@ -219,6 +221,13 @@ class _ExpandedShell extends ConsumerWidget {
             color: Colors.white.withAlpha(6),
             child: Column(
               children: [
+                if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+                  SizedBox(
+                    height: 40,
+                    child: DragToMoveArea(
+                      child: Container(color: Colors.transparent),
+                    ),
+                  ),
                 const SizedBox(height: 24),
 
                 // Лого
@@ -280,9 +289,47 @@ class _ExpandedShell extends ConsumerWidget {
 
           // ── Контент справа ────────────────────────────────────────────────
           Expanded(
-            child: IndexedStack(
-              index: tabIndex,
-              children: _screens,
+            child: Column(
+              children: [
+                if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+                  SizedBox(
+                    height: 40,
+                    child: DragToMoveArea(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.minimize,
+                                color: Colors.white54, size: 18),
+                            onPressed: () => windowManager.minimize(),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.crop_square,
+                                color: Colors.white54, size: 18),
+                            onPressed: () async {
+                              if (await windowManager.isMaximized()) {
+                                windowManager.unmaximize();
+                              } else {
+                                windowManager.maximize();
+                              }
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close,
+                                color: Colors.white54, size: 18),
+                            onPressed: () => windowManager.close(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: IndexedStack(
+                    index: tabIndex,
+                    children: _screens,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
