@@ -49,7 +49,7 @@ class _EmptyState extends StatelessWidget {
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children:[
+          children: [
             const Icon(
               Icons.library_music_rounded,
               size: 80,
@@ -72,13 +72,10 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 32),
             _ImportButton(onTap: onImport),
           ],
-        )
-        .animate()
-        .fadeIn(duration: 600.ms)
-        .scale(
-          begin: const Offset(0.9, 0.9),
-          curve: Curves.easeOutCubic,
-        ),
+        ).animate().fadeIn(duration: 600.ms).scale(
+              begin: const Offset(0.9, 0.9),
+              curve: Curves.easeOutCubic,
+            ),
       ),
     );
   }
@@ -101,7 +98,7 @@ class _ImportButton extends StatelessWidget {
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
-          children:[
+          children: [
             Icon(Icons.add_rounded, color: Colors.white70),
             SizedBox(width: 8),
             Text(
@@ -128,13 +125,13 @@ class _TrackList extends ConsumerWidget {
     return SafeArea(
       bottom: false,
       child: CustomScrollView(
-        slivers:[
+        slivers: [
           // ── Заголовок ────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Row(
-                children:[
+                children: [
                   const Text(
                     'Треки',
                     style: TextStyle(
@@ -217,7 +214,7 @@ class _TrackTile extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        // Оптимизация производительности: используем Iterable (map) без toList(), 
+        // Оптимизация производительности: используем Iterable (map) без toList(),
         // чтобы избежать блокировки UI-потока перед запуском плеера.
         final models = tracks.map((t) => t.toTrackModel());
         ref.read(playerProvider.notifier).loadPlaylist(
@@ -239,11 +236,11 @@ class _TrackTile extends ConsumerWidget {
           color: isPlaying ? Colors.white.withAlpha(8) : Colors.transparent,
         ),
         child: Row(
-          children:[
+          children: [
             // Обложка / playing indicator
             Stack(
               alignment: Alignment.center,
-              children:[
+              children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: Image(
@@ -278,7 +275,7 @@ class _TrackTile extends ConsumerWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children:[
+                children: [
                   Text(
                     track.title,
                     maxLines: 1,

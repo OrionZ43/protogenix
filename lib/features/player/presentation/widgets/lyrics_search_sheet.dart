@@ -119,14 +119,11 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
     Navigator.of(context).pop();
 
     // 3. Сохраняем .lrc файл и обновляем БД (fire-and-forget, UI не блокируется)
-    LyricsService.instance
-        .saveLrc(content, trackId)
-        .then((lrcPath) {
-          libraryNotifier.updateLrcPath(trackId, lrcPath);
-        })
-        .catchError((e) {
-          debugPrint('[LyricsSearch] Не удалось сохранить .lrc: $e');
-        });
+    LyricsService.instance.saveLrc(content, trackId).then((lrcPath) {
+      libraryNotifier.updateLrcPath(trackId, lrcPath);
+    }).catchError((e) {
+      debugPrint('[LyricsSearch] Не удалось сохранить .lrc: $e');
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -215,7 +212,6 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
                       onSubmitted: (_) => _search(),
                     ),
                     const SizedBox(height: 14),
-
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -234,9 +230,10 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF7B5EA7),
                           foregroundColor: Colors.white,
-                          padding: const Duration(milliseconds: 300) > Duration.zero 
-                              ? const EdgeInsets.symmetric(vertical: 14) 
-                              : EdgeInsets.zero,
+                          padding:
+                              const Duration(milliseconds: 300) > Duration.zero
+                                  ? const EdgeInsets.symmetric(vertical: 14)
+                                  : EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),

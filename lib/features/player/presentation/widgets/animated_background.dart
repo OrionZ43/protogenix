@@ -166,7 +166,8 @@ class _BlobState {
     nx = 0.5 + math.cos(angle) * orbitRadius;
     ny = 0.5 + math.sin(angle * 0.7 + phaseOffset) * orbitRadius;
 
-    scale = 1.0 + math.sin(t * (math.pi * 2 / breathPeriod) + phaseOffset) * breathAmp;
+    scale = 1.0 +
+        math.sin(t * (math.pi * 2 / breathPeriod) + phaseOffset) * breathAmp;
   }
 }
 

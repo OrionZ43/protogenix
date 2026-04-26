@@ -70,7 +70,7 @@ const _kSingingYOffsetEmph = -0.65;
 // Бэк-вокал: мягче и тише — не отвлекает от основной строки
 const _kBgSingingScale = 1.07;
 const _kBgSingingYOffset = -0.22; // почти не прыгает
-const _kBgSingingGlow = 0.85;    // чуть приглушённее
+const _kBgSingingGlow = 0.85; // чуть приглушённее
 
 // ── Машина состояний слога ─────────────────────────────────────────────────
 enum _SylState { waiting, singing, passed }
@@ -148,7 +148,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     } catch (_) {}
     Future.delayed(
       const Duration(milliseconds: 140),
-          () => _autoScrolling = false,
+      () => _autoScrolling = false,
     );
   }
 
@@ -168,7 +168,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     if (!karaoke.isLoaded) {
       return Center(
         child:
-        CircularProgressIndicator(color: palette.primary, strokeWidth: 2),
+            CircularProgressIndicator(color: palette.primary, strokeWidth: 2),
       );
     }
 
@@ -225,10 +225,10 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                 final blurAmount = _userScrolling
                     ? 0.0
                     : isCurrent
-                    ? 0.0
-                    : (distance / _kDistanceToMaxBlur).clamp(0.0, 1.0) *
-                    _kBlurScale *
-                    8.0;
+                        ? 0.0
+                        : (distance / _kDistanceToMaxBlur).clamp(0.0, 1.0) *
+                            _kBlurScale *
+                            8.0;
 
                 return RepaintBoundary(
                   child: _LineItem(
@@ -239,8 +239,8 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                     blurAmount: blurAmount,
                     palette: palette,
                     userScrolling: _userScrolling,
-                    positionMs: _positionMs,    // ← ValueNotifier, без Riverpod
-                    hasWordSync: hasWordSync,    // ← тип анимации
+                    positionMs: _positionMs, // ← ValueNotifier, без Riverpod
+                    hasWordSync: hasWordSync, // ← тип анимации
                   ),
                 );
               },
@@ -278,7 +278,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                 },
                 child: Container(
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
                     color: Colors.white.withAlpha(18),
@@ -296,7 +296,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                       SizedBox(width: 7),
                       Text('К текущей строке',
                           style:
-                          TextStyle(color: Colors.white70, fontSize: 13)),
+                              TextStyle(color: Colors.white70, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -332,9 +332,11 @@ class _LineItem extends StatelessWidget {
   final double blurAmount;
   final PaletteState palette;
   final bool userScrolling;
+
   /// Позиция плеера — ValueNotifier обновляется каждый кадр через ticker.
   /// Нет Riverpod-watch здесь → нет rebuild-каскада при смене позиции.
   final ValueNotifier<double> positionMs;
+
   /// true = YRC/Enhanced → буквенная пружинная анимация
   /// false = syncedLrc → подсветка всей строки целиком
   final bool hasWordSync;
@@ -404,8 +406,8 @@ class _LineItem extends StatelessWidget {
         builder: (context, ref, child) => GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => ref.read(playerProvider.notifier).seekTo(
-            Duration(milliseconds: line.startMs),
-          ),
+                Duration(milliseconds: line.startMs),
+              ),
           child: child,
         ),
         child: content,
@@ -420,12 +422,12 @@ class _LineItem extends StatelessWidget {
         opacity: userScrolling
             ? (isCurrent ? 1.0 : 0.65)
             : isCurrent
-            ? 1.0
-            : distance == 1
-            ? 0.45
-            : distance == 2
-            ? 0.25
-            : 0.12,
+                ? 1.0
+                : distance == 1
+                    ? 0.45
+                    : distance == 2
+                        ? 0.25
+                        : 0.12,
         child: content,
       ),
     );
@@ -475,7 +477,7 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
 
   // Визуальные значения, читаемые в build()
   final Map<LyricSyllable, ({double scale, double yOffset, double glow})>
-  _vals = {};
+      _vals = {};
 
   @override
   void initState() {
@@ -483,7 +485,7 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
     _allSyls = widget.line.allSyllables;
     // Один раз делим на main/bg — в build() только читаем
     _mainSyls = _allSyls.where((s) => !s.isBackground).toList();
-    _bgSyls   = _allSyls.where((s) => s.isBackground).toList();
+    _bgSyls = _allSyls.where((s) => s.isBackground).toList();
 
     _springs = {
       for (final syl in _allSyls)
@@ -494,9 +496,9 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
     for (final syl in _allSyls) {
       _states[syl] = _SylState.waiting;
       _vals[syl] = (
-      scale: _kWaitingScale,
-      yOffset: _kWaitingYOffset,
-      glow: _kWaitingGlow,
+        scale: _kWaitingScale,
+        yOffset: _kWaitingYOffset,
+        glow: _kWaitingGlow,
       );
     }
 
@@ -517,7 +519,7 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
     for (final syl in _allSyls) {
       final springs = _springs[syl]!;
       final newState =
-      _stateFor(ms, syl.startMs.toDouble(), syl.endMs.toDouble());
+          _stateFor(ms, syl.startMs.toDouble(), syl.endMs.toDouble());
       final oldState = _states[syl];
 
       if (newState != oldState) {
@@ -544,9 +546,9 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
         if (!springs.isSleeping) anyActive = true;
       } else {
         _vals[syl] = (
-        scale: springs.scale.position,
-        yOffset: springs.yOffset.position,
-        glow: springs.glow.position,
+          scale: springs.scale.position,
+          yOffset: springs.yOffset.position,
+          glow: springs.glow.position,
         );
       }
     }
@@ -578,9 +580,9 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
         } else {
           final vals = _vals[syl] ??
               (
-              scale: _kWaitingScale,
-              yOffset: _kWaitingYOffset,
-              glow: _kWaitingGlow
+                scale: _kWaitingScale,
+                yOffset: _kWaitingYOffset,
+                glow: _kWaitingGlow
               );
 
           child = _LetterWidget(
@@ -715,15 +717,15 @@ class _HighlightedLineWidgetState extends State<_HighlightedLineWidget>
         height: 1.25,
         shadows: shadowAlpha > 8
             ? [
-          Shadow(
-            color: Colors.white.withAlpha(shadowAlpha),
-            blurRadius: blurR,
-          ),
-          Shadow(
-            color: widget.palette.primary.withAlpha(shadowAlpha ~/ 2),
-            blurRadius: blurR * 2,
-          ),
-        ]
+                Shadow(
+                  color: Colors.white.withAlpha(shadowAlpha),
+                  blurRadius: blurR,
+                ),
+                Shadow(
+                  color: widget.palette.primary.withAlpha(shadowAlpha ~/ 2),
+                  blurRadius: blurR * 2,
+                ),
+              ]
             : null,
       ),
     );
@@ -743,7 +745,7 @@ class _LetterSlot {
     required this.startMs,
     required this.endMs,
   })  : springs = SyllableSprings()
-    ..setAllImmediate(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow),
+          ..setAllImmediate(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow),
         state = _SylState.waiting,
         scale = _kWaitingScale,
         yOffset = _kWaitingYOffset,
@@ -824,7 +826,7 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
             slot.springs
                 .setAll(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow);
           case _SylState.singing:
-          // Emphasized прыгает сильнее обычного слога
+            // Emphasized прыгает сильнее обычного слога
             slot.springs.setAll(
               _kSingingScaleEmph,
               _kSingingYOffsetEmph,
@@ -908,7 +910,7 @@ class _LetterWidget extends StatelessWidget {
 
     final fontSize = isBackground ? _kBgFontSize : _kFontSize;
     final shadowAlpha =
-    isBackground ? (g * 0.22 * 255).round() : (g * 0.45 * 255).round();
+        isBackground ? (g * 0.22 * 255).round() : (g * 0.45 * 255).round();
     final blurRadius = 4.0 + 6.0 * g;
 
     return Transform.translate(
@@ -929,16 +931,15 @@ class _LetterWidget extends StatelessWidget {
               height: 1.25,
               shadows: shadowAlpha > 8
                   ? [
-                Shadow(
-                  color: Colors.white.withAlpha(shadowAlpha),
-                  blurRadius: blurRadius,
-                ),
-                Shadow(
-                  color:
-                  palette.primary.withAlpha(shadowAlpha ~/ 2),
-                  blurRadius: blurRadius * 2.0,
-                ),
-              ]
+                      Shadow(
+                        color: Colors.white.withAlpha(shadowAlpha),
+                        blurRadius: blurRadius,
+                      ),
+                      Shadow(
+                        color: palette.primary.withAlpha(shadowAlpha ~/ 2),
+                        blurRadius: blurRadius * 2.0,
+                      ),
+                    ]
                   : null,
             ),
           ),
@@ -963,23 +964,19 @@ class _InactiveLine extends StatelessWidget {
 
   // Масштаб соответствует старым fontSize: 25/32, 22/32, 19/32
   static double _scaleFor(int d) => switch (d) {
-    1 => 0.78,
-    2 => 0.69,
-    _ => 0.59,
-  };
+        1 => 0.78,
+        2 => 0.69,
+        _ => 0.59,
+      };
 
   @override
   Widget build(BuildContext context) {
     final scale = _scaleFor(distance);
 
-    final mainText = line.words
-        .where((w) => !w.isBackground)
-        .map((w) => w.text)
-        .join(' ');
-    final bgText = line.words
-        .where((w) => w.isBackground)
-        .map((w) => w.text)
-        .join(' ');
+    final mainText =
+        line.words.where((w) => !w.isBackground).map((w) => w.text).join(' ');
+    final bgText =
+        line.words.where((w) => w.isBackground).map((w) => w.text).join(' ');
 
     // Базовый стиль всегда на _kFontSize — layout одинаков на любой distance.
     // AnimatedScale даёт плавное визуальное уменьшение без layout-пересчёта.
@@ -1079,23 +1076,23 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.lyrics_rounded,
-            size: 52, color: Colors.white.withAlpha(30)),
-        const SizedBox(height: 14),
-        Text(
-          'Текст не найден',
-          style: TextStyle(
-            color: Colors.white.withAlpha(45),
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lyrics_rounded,
+                size: 52, color: Colors.white.withAlpha(30)),
+            const SizedBox(height: 14),
+            Text(
+              'Текст не найден',
+              style: TextStyle(
+                color: Colors.white.withAlpha(45),
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1185,11 +1182,11 @@ class _AmbientPainter extends CustomPainter {
   }
 
   void _blob(
-      Canvas c, {
-        required Offset center,
-        required double radius,
-        required Color color,
-      }) {
+    Canvas c, {
+    required Offset center,
+    required double radius,
+    required Color color,
+  }) {
     c.drawCircle(
       center,
       radius,
@@ -1214,26 +1211,26 @@ class _Fade extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Positioned(
-    top: top ? 0 : null,
-    bottom: top ? null : 0,
-    left: 0,
-    right: 0,
-    height: 110,
-    child: IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: top ? Alignment.topCenter : Alignment.bottomCenter,
-            end: top ? Alignment.bottomCenter : Alignment.topCenter,
-            colors: [
-              Colors.black,
-              Colors.black.withAlpha(190),
-              Colors.transparent,
-            ],
-            stops: const [0.0, 0.55, 1.0],
+        top: top ? 0 : null,
+        bottom: top ? null : 0,
+        left: 0,
+        right: 0,
+        height: 110,
+        child: IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+                end: top ? Alignment.bottomCenter : Alignment.topCenter,
+                colors: [
+                  Colors.black,
+                  Colors.black.withAlpha(190),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.55, 1.0],
+              ),
+            ),
           ),
         ),
-      ),
-    ),
-  );
+      );
 }
