@@ -26,17 +26,10 @@
 //   FEAT  Interactive Lyrics Seeking: при _userScrolling текст разблюривается,
 //         каждая строка оборачивается в GestureDetector — тап перематывает
 //         воспроизведение к этой строке.
-//
-// CHANGELOG v3.2 — Whisper Effect (бэк-вокал / ад-либы):
-//   FEAT  LyricSyllable.isBackground → _LetterWidget рендерит фоновые слоги
-//         меньшим шрифтом (22px), курсивом, базовой непрозрачностью 0.4.
-//   FEAT  SyllableSprings для фоновых слогов создаются с уменьшенным
-//         overshoot: dampingRatio=0.85, frequency=0.55 — плавное проявление
-//         без перетягивания внимания.
-//   FEAT  _InactiveLine отображает фоновые слова меньшим шрифтом + opacity.
 
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -45,6 +38,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../domain/advanced_lrc_parser.dart';
 import '../../domain/spring.dart';
+import '../../../../core/utils/haptic_patterns.dart';
 import '../providers/karaoke_provider.dart';
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
@@ -54,12 +48,7 @@ const _kDistanceToMaxBlur = 4;
 const _kBlurScale = 1.25;
 const _kUserScrollStopMs = 750;
 const _kFontSize = 32.0;
-
-/// Размер шрифта для бэк-вокала / ад-либов
-const _kBgFontSize = 22.0;
-
-/// Базовая непрозрачность фоновых слогов в состоянии WAITING
-const _kBgBaseOpacity = 0.4;
+const _kBgFontSize = _kFontSize * 0.62; // бэк-вокал: 62% от основного
 
 // ── Цели пружин для каждого состояния ─────────────────────────────────────
 const _kWaitingScale = 1.00;
@@ -78,10 +67,10 @@ const _kPassedGlow = 1.00;
 const _kSingingScaleEmph = 1.20;
 const _kSingingYOffsetEmph = -0.65;
 
-// Фоновые слоги — сниженный overshoot, плавное проявление
-const _kBgSingingScale = 1.06;
-const _kBgSingingYOffset = -0.20;
-const _kBgSingingGlow = 0.75;
+// Бэк-вокал: мягче и тише — не отвлекает от основной строки
+const _kBgSingingScale = 1.07;
+const _kBgSingingYOffset = -0.22; // почти не прыгает
+const _kBgSingingGlow = 0.85;    // чуть приглушённее
 
 // ── Машина состояний слога ─────────────────────────────────────────────────
 enum _SylState { waiting, singing, passed }
@@ -90,23 +79,6 @@ _SylState _stateFor(double currentMs, double startMs, double endMs) {
   if (currentMs < startMs) return _SylState.waiting;
   if (currentMs < endMs) return _SylState.singing;
   return _SylState.passed;
-}
-
-/// Создаёт SyllableSprings с параметрами, зависящими от isBackground.
-/// Фоновые слоги: высокий damping + низкая frequency → мягкое проявление.
-SyllableSprings _makeSprings({required bool isBackground}) {
-  if (!isBackground) {
-    return SyllableSprings();
-  }
-  // Пружины для бэк-вокала: почти критически затухшие, медленнее
-  return SyllableSprings.withParams(
-    scaleDamping: 0.85,
-    scaleFrequency: 0.55,
-    yOffsetDamping: 0.80,
-    yOffsetFrequency: 0.80,
-    glowDamping: 0.70,
-    glowFrequency: 0.65,
-  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -121,34 +93,42 @@ class BeautifulLyricsView extends ConsumerStatefulWidget {
       _BeautifulLyricsViewState();
 }
 
-class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
-    with SingleTickerProviderStateMixin {
+class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
   final ItemScrollController _scroll = ItemScrollController();
   final ItemPositionsListener _positions = ItemPositionsListener.create();
 
   bool _userScrolling = false;
   bool _autoScrolling = false;
 
-  late final Ticker _ambientTicker;
-  double _ambientPulse = 0.78;
+  /// Позиция плеера — обновляется каждый кадр через SchedulerBinding.
+  /// Только ValueNotifier.value меняется → нет setState → нет rebuild дерева.
+  final ValueNotifier<double> _positionMs = ValueNotifier(0.0);
+  bool _frameCallbackScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _ambientTicker = createTicker(_onAmbientTick)..start();
+    _scheduleFrame();
   }
 
-  void _onAmbientTick(Duration elapsed) {
+  void _scheduleFrame() {
+    if (_frameCallbackScheduled) return;
+    _frameCallbackScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback(_onFrame);
+  }
+
+  void _onFrame(Duration _) {
+    _frameCallbackScheduled = false;
     if (!mounted) return;
-    final phase = elapsed.inMilliseconds / 2400.0 * 2 * math.pi;
-    setState(() {
-      _ambientPulse = 0.78 + 0.22 * (math.sin(phase) * 0.5 + 0.5);
-    });
+    _positionMs.value =
+        ref.read(playerProvider).position.inMilliseconds.toDouble();
+    _scheduleFrame();
   }
 
   @override
   void dispose() {
-    _ambientTicker.dispose();
+    _frameCallbackScheduled = false;
+    _positionMs.dispose();
     super.dispose();
   }
 
@@ -160,13 +140,14 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
     try {
       await _scroll.scrollTo(
         index: index,
-        duration: const Duration(milliseconds: 550),
-        curve: Curves.easeInOutCubic,
-        alignment: 0.5,
+        // Плавный easeOutCubic — предсказуем, без переботка spring
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOutCubic,
+        alignment: 0.45, // чуть выше центра — текущая строка читается лучше
       );
     } catch (_) {}
     Future.delayed(
-      const Duration(milliseconds: 120),
+      const Duration(milliseconds: 140),
           () => _autoScrolling = false,
     );
   }
@@ -177,7 +158,11 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
     final palette = ref.watch(paletteProvider);
 
     ref.listen(karaokeProvider.select((s) => s.currentIndex), (prev, next) {
-      if (prev != next && next >= 0 && !_userScrolling) _scrollTo(next);
+      if (prev != next && next >= 0) {
+        if (!_userScrolling) _scrollTo(next);
+        // Тактильный тик при каждой смене строки
+        HapticPatterns.lyricsLine();
+      }
     });
 
     if (!karaoke.isLoaded) {
@@ -194,21 +179,18 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
     }
 
     final activeIndex = karaoke.currentIndex;
+    // Для line-synced форматов (syncedLrc) не рисуем буквенную анимацию —
+    // только подсветка всей строки. YRC / enhancedLrc — полная анимация.
+    final hasWordSync = karaoke.format == LyricsFormat.yrc ||
+        karaoke.format == LyricsFormat.enhancedLrc;
 
     return RepaintBoundary(
       child: Stack(
         children: [
-          RepaintBoundary(
-            child: CustomPaint(
-              painter: _AmbientPainter(
-                c1: palette.primary,
-                c2: palette.secondary,
-                pulse: _ambientPulse,
-              ),
-              child: const SizedBox.expand(),
-            ),
-          ),
+          // Фон со своим тикером — не трогает rebuild списка строк
+          _AmbientBackground(palette: palette),
 
+          // Список строк
           NotificationListener<ScrollNotification>(
             onNotification: (n) {
               if (n is UserScrollNotification) {
@@ -248,14 +230,18 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
                     _kBlurScale *
                     8.0;
 
-                return _LineItem(
-                  key: ValueKey('line_$index'),
-                  line: karaoke.lines[index],
-                  isCurrent: isCurrent,
-                  distance: distance,
-                  blurAmount: blurAmount,
-                  palette: palette,
-                  userScrolling: _userScrolling,
+                return RepaintBoundary(
+                  child: _LineItem(
+                    key: ValueKey('line_$index'),
+                    line: karaoke.lines[index],
+                    isCurrent: isCurrent,
+                    distance: distance,
+                    blurAmount: blurAmount,
+                    palette: palette,
+                    userScrolling: _userScrolling,
+                    positionMs: _positionMs,    // ← ValueNotifier, без Riverpod
+                    hasWordSync: hasWordSync,    // ← тип анимации
+                  ),
                 );
               },
             ),
@@ -327,7 +313,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView>
 // LINE ITEM
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _LineItem extends ConsumerWidget {
+class _LineItem extends StatelessWidget {
   const _LineItem({
     super.key,
     required this.line,
@@ -336,6 +322,8 @@ class _LineItem extends ConsumerWidget {
     required this.blurAmount,
     required this.palette,
     required this.userScrolling,
+    required this.positionMs,
+    required this.hasWordSync,
   });
 
   final LyricLine line;
@@ -344,33 +332,65 @@ class _LineItem extends ConsumerWidget {
   final double blurAmount;
   final PaletteState palette;
   final bool userScrolling;
+  /// Позиция плеера — ValueNotifier обновляется каждый кадр через ticker.
+  /// Нет Riverpod-watch здесь → нет rebuild-каскада при смене позиции.
+  final ValueNotifier<double> positionMs;
+  /// true = YRC/Enhanced → буквенная пружинная анимация
+  /// false = syncedLrc → подсветка всей строки целиком
+  final bool hasWordSync;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    Widget content;
+  Widget build(BuildContext context) {
+    // Ключ для AnimatedSwitcher: меняется при переходе между режимами
+    final bool useSpring = isCurrent || distance <= 1;
 
-    // ── КРИТИЧНО: держим _SpringLineWidget живым при distance <= 1 ──────
-    // Это предотвращает резкое "исчезновение" анимации последнего слова
-    // при переходе на новую строку. Для только что прошедшей строки
-    // (distance == 1, line.endMs < posMs) все слоги окажутся в состоянии
-    // PASSED и пружины плавно осядут. Для следующей строки — WAITING.
-    if (isCurrent || distance == 1) {
-      final posMs = ref.watch(
-        playerProvider.select((s) => s.position.inMilliseconds.toDouble()),
-      );
-      content = TweenAnimationBuilder<double>(
-        tween: Tween(begin: posMs, end: posMs),
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.linear,
-        builder: (_, smoothMs, __) => _SpringLineWidget(
+    Widget activeContent;
+    if (useSpring) {
+      if (hasWordSync) {
+        activeContent = _SpringLineWidget(
+          key: ValueKey('spring_${line.startMs}'),
           line: line,
-          currentMs: smoothMs,
+          positionMs: positionMs,
           palette: palette,
-        ),
-      );
+        );
+      } else {
+        activeContent = _HighlightedLineWidget(
+          key: ValueKey('highlight_${line.startMs}'),
+          line: line,
+          positionMs: positionMs,
+          palette: palette,
+        );
+      }
     } else {
-      content = _InactiveLine(line: line, distance: distance);
+      activeContent = _InactiveLine(
+        key: ValueKey('inactive_${line.startMs}'),
+        line: line,
+        distance: distance,
+      );
     }
+
+    // AnimatedSwitcher даёт плавный crossfade при переходе
+    // _SpringLineWidget (all-passed) → _InactiveLine.
+    // FadeTransition — минимальные аллокации, нет layout-pass во время fade.
+    Widget content = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 380),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      // По умолчанию Stack внутри AnimatedSwitcher использует Alignment.center —
+      // это центрирует уходящий виджет внутри бокса входящего. Фиксируем topLeft.
+      layoutBuilder: (currentChild, previousChildren) => Stack(
+        alignment: Alignment.topLeft,
+        children: [
+          ...previousChildren,
+          if (currentChild != null) currentChild,
+        ],
+      ),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: child,
+      ),
+      child: activeContent,
+    );
 
     if (blurAmount > 0) {
       content = ImageFiltered(
@@ -380,10 +400,13 @@ class _LineItem extends ConsumerWidget {
     }
 
     if (userScrolling) {
-      content = GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => ref.read(playerProvider.notifier).seekTo(
-          Duration(milliseconds: line.startMs),
+      content = Consumer(
+        builder: (context, ref, child) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => ref.read(playerProvider.notifier).seekTo(
+            Duration(milliseconds: line.startMs),
+          ),
+          child: child,
         ),
         child: content,
       );
@@ -393,15 +416,16 @@ class _LineItem extends ConsumerWidget {
       padding: EdgeInsets.only(bottom: isCurrent ? 32 : 20),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
         opacity: userScrolling
             ? (isCurrent ? 1.0 : 0.65)
             : isCurrent
             ? 1.0
             : distance == 1
-            ? 0.48
+            ? 0.45
             : distance == 2
-            ? 0.28
-            : 0.14,
+            ? 0.25
+            : 0.12,
         child: content,
       ),
     );
@@ -410,17 +434,25 @@ class _LineItem extends ConsumerWidget {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SPRING LINE WIDGET
+// Активная строка с goal-based физикой.
+//
+// КЛЮЧЕВОЕ ИЗМЕНЕНИЕ v3.2:
+//   Принимает ValueListenable<double> вместо double currentMs.
+//   Ticker читает positionMs.value НАПРЯМУЮ без rebuild родителя.
+//   → Только _SpringLineWidget.setState() вызывается на каждый кадр,
+//     а не вся цепочка Riverpod → _LineItem → TweenAnimationBuilder → виджет.
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _SpringLineWidget extends StatefulWidget {
   const _SpringLineWidget({
+    super.key,
     required this.line,
-    required this.currentMs,
+    required this.positionMs,
     required this.palette,
   });
 
   final LyricLine line;
-  final double currentMs;
+  final ValueListenable<double> positionMs;
   final PaletteState palette;
 
   @override
@@ -433,10 +465,15 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
   Duration? _lastElapsed;
 
   late final List<LyricSyllable> _allSyls;
+  // Кешируем разбивку — _allSyls не меняется за время жизни виджета
+  late final List<LyricSyllable> _mainSyls;
+  late final List<LyricSyllable> _bgSyls;
 
+  // Пружины и текущие состояния per-слог
   late final Map<LyricSyllable, SyllableSprings> _springs;
   final Map<LyricSyllable, _SylState> _states = {};
 
+  // Визуальные значения, читаемые в build()
   final Map<LyricSyllable, ({double scale, double yOffset, double glow})>
   _vals = {};
 
@@ -444,10 +481,13 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
   void initState() {
     super.initState();
     _allSyls = widget.line.allSyllables;
+    // Один раз делим на main/bg — в build() только читаем
+    _mainSyls = _allSyls.where((s) => !s.isBackground).toList();
+    _bgSyls   = _allSyls.where((s) => s.isBackground).toList();
 
     _springs = {
       for (final syl in _allSyls)
-        syl: _makeSprings(isBackground: syl.isBackground)
+        syl: SyllableSprings()
           ..setAllImmediate(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow),
     };
 
@@ -471,7 +511,7 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
         : (elapsed - _lastElapsed!).inMicroseconds / 1e6;
     _lastElapsed = elapsed;
 
-    final ms = widget.currentMs;
+    final ms = widget.positionMs.value;
     var anyActive = false;
 
     for (final syl in _allSyls) {
@@ -482,17 +522,17 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
 
       if (newState != oldState) {
         _states[syl] = newState;
+        // Бэк-вокал получает более мягкие цели пружин
+        final isBg = syl.isBackground;
         switch (newState) {
           case _SylState.waiting:
             springs.setAll(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow);
           case _SylState.singing:
-          // Фоновые слоги — меньший «прыжок»
-            if (syl.isBackground) {
-              springs.setAll(
-                  _kBgSingingScale, _kBgSingingYOffset, _kBgSingingGlow);
-            } else {
-              springs.setAll(_kSingingScale, _kSingingYOffset, _kSingingGlow);
-            }
+            springs.setAll(
+              isBg ? _kBgSingingScale : _kSingingScale,
+              isBg ? _kBgSingingYOffset : _kSingingYOffset,
+              isBg ? _kBgSingingGlow : _kSingingGlow,
+            );
           case _SylState.passed:
             springs.setAll(_kPassedScale, _kPassedYOffset, _kPassedGlow);
         }
@@ -520,23 +560,19 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  /// Собирает Wrap из слогов. [syls] — уже отфильтрованный список.
+  Widget _buildWrap(List<LyricSyllable> syls) {
     return Wrap(
-      runSpacing: 8,
-      // Выравниваем по нижнему краю (аппроксимация baseline для разных размеров
-      // шрифта: основной 32px + фоновый 22px). Transform.scale с alignment =
-      // Alignment.bottomCenter масштабирует вверх → нижние края совпадают.
+      runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.end,
-      children: _allSyls.map((syl) {
+      children: syls.map((syl) {
         Widget child;
 
         if (syl.isEmphasized && !syl.isBackground) {
-          // Emphasized только для основного вокала — бэк-вокал не акцентируем
           child = _EmphasizedSyllable(
             key: ValueKey('emph_${syl.startMs}'),
             syllable: syl,
-            currentMs: widget.currentMs,
+            positionMs: widget.positionMs,
             palette: widget.palette,
           );
         } else {
@@ -557,9 +593,12 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
           );
         }
 
+        // Пробел между словами через правый padding на последнем слоге слова
         if (!syl.isPartOfWord) {
           return Padding(
-            padding: const EdgeInsets.only(right: 10.0),
+            padding: EdgeInsets.only(
+              right: syl.isBackground ? 6.0 : 10.0,
+            ),
             child: child,
           );
         }
@@ -568,12 +607,136 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
       }).toList(),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    // _mainSyls и _bgSyls закешированы в initState — нет аллокаций в build()
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_mainSyls.isNotEmpty) _buildWrap(_mainSyls),
+        if (_bgSyls.isNotEmpty) ...[
+          const SizedBox(height: 5),
+          _buildWrap(_bgSyls),
+        ],
+      ],
+    );
+  }
+} // end _SpringLineWidgetState
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HIGHLIGHTED LINE WIDGET (Task 3)
+// Для синхронизированных, но не пословных форматов (syncedLrc).
+// Вся строка подсвечивается целиком — никакой "фейковой" буквенной анимации.
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _HighlightedLineWidget extends StatefulWidget {
+  const _HighlightedLineWidget({
+    super.key,
+    required this.line,
+    required this.positionMs,
+    required this.palette,
+  });
+
+  final LyricLine line;
+  final ValueListenable<double> positionMs;
+  final PaletteState palette;
+
+  @override
+  State<_HighlightedLineWidget> createState() => _HighlightedLineWidgetState();
+}
+
+class _HighlightedLineWidgetState extends State<_HighlightedLineWidget>
+    with SingleTickerProviderStateMixin {
+  late final Ticker _ticker;
+
+  // Пружина для glow текущей строки
+  late final SyllableSprings _spring;
+  _SylState _state = _SylState.waiting;
+  double _glow = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _spring = SyllableSprings()
+      ..setAllImmediate(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow);
+    _ticker = createTicker(_onTick)..start();
+  }
+
+  void _onTick(Duration elapsed) {
+    if (!mounted) return;
+    final ms = widget.positionMs.value;
+    final newState = _stateFor(
+      ms,
+      widget.line.startMs.toDouble(),
+      widget.line.endMs.toDouble(),
+    );
+
+    if (newState != _state) {
+      _state = newState;
+      switch (newState) {
+        case _SylState.waiting:
+          _spring.setAll(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow);
+        case _SylState.singing:
+          _spring.setAll(_kSingingScale, _kSingingYOffset, _kSingingGlow);
+        case _SylState.passed:
+          _spring.setAll(_kPassedScale, _kPassedYOffset, _kPassedGlow);
+      }
+    }
+
+    final stepResult = _spring.step(1 / 60.0);
+    final g = stepResult.$3; // только glow; scale и yOffset для строки не нужны
+    if (_glow != g) {
+      _glow = g;
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final g = _glow.clamp(0.0, 1.0);
+    final color = Color.lerp(Colors.white.withAlpha(75), Colors.white, g)!;
+    final shadowAlpha = (g * 0.45 * 255).round();
+    final blurR = 4.0 + 6.0 * g;
+
+    return Text(
+      widget.line.plainText,
+      style: TextStyle(
+        fontSize: _kFontSize,
+        fontWeight: FontWeight.w800,
+        color: color,
+        height: 1.25,
+        shadows: shadowAlpha > 8
+            ? [
+          Shadow(
+            color: Colors.white.withAlpha(shadowAlpha),
+            blurRadius: blurR,
+          ),
+          Shadow(
+            color: widget.palette.primary.withAlpha(shadowAlpha ~/ 2),
+            blurRadius: blurR * 2,
+          ),
+        ]
+            : null,
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EMPHASIZED SYLLABLE
+// Длинный слог → каждая буква получает равный временной слот и собственные
+// пружины. Буквы прыгают по очереди — stagger-эффект Apple Music.
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Данные одной буквы в emphasized-слоге
 class _LetterSlot {
   _LetterSlot({
     required this.char,
@@ -601,12 +764,12 @@ class _EmphasizedSyllable extends StatefulWidget {
   const _EmphasizedSyllable({
     super.key,
     required this.syllable,
-    required this.currentMs,
+    required this.positionMs,
     required this.palette,
   });
 
   final LyricSyllable syllable;
-  final double currentMs;
+  final ValueListenable<double> positionMs;
   final PaletteState palette;
 
   @override
@@ -628,6 +791,7 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
     final sylEnd = widget.syllable.endMs.toDouble();
     final slotDur = (sylEnd - sylStart) / chars.length.clamp(1, 999);
 
+    // Строим равномерную временну́ю сетку по буквам
     _slots = List.generate(chars.length, (i) {
       return _LetterSlot(
         char: chars[i],
@@ -647,7 +811,7 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
         : (elapsed - _lastElapsed!).inMicroseconds / 1e6;
     _lastElapsed = elapsed;
 
-    final ms = widget.currentMs;
+    final ms = widget.positionMs.value;
     var anyActive = false;
 
     for (final slot in _slots) {
@@ -660,6 +824,7 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
             slot.springs
                 .setAll(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow);
           case _SylState.singing:
+          // Emphasized прыгает сильнее обычного слога
             slot.springs.setAll(
               _kSingingScaleEmph,
               _kSingingYOffsetEmph,
@@ -704,7 +869,6 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
           scale: slot.scale,
           yOffset: slot.yOffset,
           glow: slot.glow,
-          isBackground: false,
           palette: widget.palette,
         );
       }).toList(),
@@ -714,13 +878,6 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LETTER WIDGET — одна буква / слог
-//
-// Whisper Effect:
-//   isBackground = true →
-//     • fontSize уменьшен до _kBgFontSize (22px)
-//     • базовая непрозрачность _kBgBaseOpacity (0.4) в состоянии WAITING
-//     • FontStyle.italic для визуального отделения
-//     • Свечение при пении слабее (glow умножается на 0.6)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _LetterWidget extends StatelessWidget {
@@ -729,49 +886,36 @@ class _LetterWidget extends StatelessWidget {
     required this.scale,
     required this.yOffset,
     required this.glow,
-    required this.isBackground,
     required this.palette,
+    this.isBackground = false,
   });
 
   final String text;
   final double scale;
   final double yOffset;
   final double glow;
-  final bool isBackground;
   final PaletteState palette;
+  final bool isBackground;
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = isBackground ? _kBgFontSize : _kFontSize;
-
-    // Для бэк-вокала приглушаем glow и базовую белизну
-    final effectiveGlow = isBackground ? glow * 0.6 : glow;
-    final g = effectiveGlow.clamp(0.0, 1.0);
-
-    // WAITING-состояние: у фоновых слогов непрозрачность 0.4, у основных 75/255
-    final waitingAlpha = isBackground ? (255 * _kBgBaseOpacity).round() : 75;
+    final g = glow.clamp(0.0, 1.0);
     final color = Color.lerp(
-      Colors.white.withAlpha(waitingAlpha),
+      Colors.white.withAlpha(75),
       Colors.white,
       g,
     )!;
 
-    // Свечение для фона слабее
-    final shadowAlpha = isBackground
-        ? (g * 0.25 * 255).round()
-        : (g * 0.45 * 255).round();
-    final blurRadius = isBackground
-        ? 2.0 + 4.0 * g
-        : 4.0 + 6.0 * g;
+    final fontSize = isBackground ? _kBgFontSize : _kFontSize;
+    final shadowAlpha =
+    isBackground ? (g * 0.22 * 255).round() : (g * 0.45 * 255).round();
+    final blurRadius = 4.0 + 6.0 * g;
 
     return Transform.translate(
-      offset: Offset(0, fontSize * yOffset),
+      offset: Offset(0, _kFontSize * yOffset),
       child: Transform.scale(
         scale: scale.clamp(0.8, 1.8),
         alignment: Alignment.bottomCenter,
-        // Baseline гарантирует, что при разных fontSize алфавитная базовая линия
-        // выровнена относительно родителя (Wrap с WrapCrossAlignment.end).
-        // baseline ≈ 0.8 * fontSize — типичное положение alphabetic baseline.
         child: Baseline(
           baseline: fontSize * 0.82,
           baselineType: TextBaseline.alphabetic,
@@ -790,7 +934,8 @@ class _LetterWidget extends StatelessWidget {
                   blurRadius: blurRadius,
                 ),
                 Shadow(
-                  color: palette.primary.withAlpha(shadowAlpha ~/ 2),
+                  color:
+                  palette.primary.withAlpha(shadowAlpha ~/ 2),
                   blurRadius: blurRadius * 2.0,
                 ),
               ]
@@ -805,102 +950,75 @@ class _LetterWidget extends StatelessWidget {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INACTIVE LINE
+// Все строки рендерятся при _kFontSize (32px) → перенос слов одинаков всегда.
+// Визуальное уменьшение — Transform.scale, который НЕ влияет на layout.
+// Нет рефлоу при приближении строки = нет прыжков высоты.
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _InactiveLine extends StatelessWidget {
-  const _InactiveLine({required this.line, required this.distance});
+  const _InactiveLine({super.key, required this.line, required this.distance});
 
   final LyricLine line;
   final int distance;
 
+  // Масштаб соответствует старым fontSize: 25/32, 22/32, 19/32
+  static double _scaleFor(int d) => switch (d) {
+    1 => 0.78,
+    2 => 0.69,
+    _ => 0.59,
+  };
+
   @override
   Widget build(BuildContext context) {
-    final baseFontSize = distance == 1
-        ? 25.0
-        : distance == 2
-        ? 22.0
-        : 19.0;
+    final scale = _scaleFor(distance);
 
-    // Если вся строка — бэк-вокал, показываем её меньше и курсивом
-    if (line.isBackgroundLine) {
-      return AnimatedDefaultTextStyle(
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeOutCubic,
-        style: TextStyle(
-          fontSize: (baseFontSize * 0.75).clamp(13.0, 20.0),
-          fontWeight: FontWeight.w400,
-          fontStyle: FontStyle.italic,
-          color: Colors.white.withOpacity(_kBgBaseOpacity),
-          height: 1.35,
-        ),
-        child: Text(line.plainText, softWrap: true),
-      );
-    }
+    final mainText = line.words
+        .where((w) => !w.isBackground)
+        .map((w) => w.text)
+        .join(' ');
+    final bgText = line.words
+        .where((w) => w.isBackground)
+        .map((w) => w.text)
+        .join(' ');
 
-    // Смешанная строка (часть слов фоновая) — строим RichText
-    final hasAnyBackground = line.words.any((w) => w.isBackground);
-    if (hasAnyBackground) {
-      return _MixedInactiveLine(line: line, baseFontSize: baseFontSize);
-    }
-
-    // Обычная строка
-    return AnimatedDefaultTextStyle(
-      duration: const Duration(milliseconds: 450),
+    // Базовый стиль всегда на _kFontSize — layout одинаков на любой distance.
+    // AnimatedScale даёт плавное визуальное уменьшение без layout-пересчёта.
+    return AnimatedScale(
+      scale: scale,
+      duration: const Duration(milliseconds: 400),
       curve: Curves.easeOutCubic,
-      style: TextStyle(
-        fontSize: baseFontSize,
-        fontWeight: FontWeight.w500,
-        color: Colors.white,
-        height: 1.35,
+      alignment: Alignment.topLeft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (mainText.isNotEmpty)
+            Text(
+              mainText,
+              softWrap: true,
+              style: const TextStyle(
+                fontSize: _kFontSize,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                height: 1.35,
+              ),
+            ),
+          if (bgText.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              bgText,
+              softWrap: true,
+              style: TextStyle(
+                fontSize: _kBgFontSize,
+                fontWeight: FontWeight.w400,
+                fontStyle: FontStyle.italic,
+                color: Colors.white.withAlpha(140),
+                height: 1.3,
+              ),
+            ),
+          ],
+        ],
       ),
-      child: Text(line.plainText, softWrap: true),
-    );
-  }
-}
-
-/// Неактивная строка со смешанным содержимым (часть слов — бэк-вокал).
-class _MixedInactiveLine extends StatelessWidget {
-  const _MixedInactiveLine({
-    required this.line,
-    required this.baseFontSize,
-  });
-
-  final LyricLine line;
-  final double baseFontSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final spans = <InlineSpan>[];
-
-    for (var i = 0; i < line.words.length; i++) {
-      final word = line.words[i];
-      if (i > 0) spans.add(const TextSpan(text: ' '));
-
-      if (word.isBackground) {
-        spans.add(TextSpan(
-          text: word.text,
-          style: TextStyle(
-            fontSize: (baseFontSize * 0.75).clamp(13.0, 20.0),
-            fontWeight: FontWeight.w400,
-            fontStyle: FontStyle.italic,
-            color: Colors.white.withOpacity(_kBgBaseOpacity),
-          ),
-        ));
-      } else {
-        spans.add(TextSpan(
-          text: word.text,
-          style: TextStyle(
-            fontSize: baseFontSize,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
-        ));
-      }
-    }
-
-    return Text.rich(
-      TextSpan(children: spans),
-      softWrap: true,
     );
   }
 }
@@ -930,84 +1048,23 @@ class _PlainLyricsView extends StatelessWidget {
         ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 60),
           itemCount: lines.length,
-          itemBuilder: (context, i) {
-            final line = lines[i];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: _PlainLineWidget(line: line),
-            );
-          },
+          itemBuilder: (context, i) => Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: Text(
+              lines[i].plainText,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withAlpha(180),
+                height: 1.6,
+              ),
+            ),
+          ),
         ),
         const _Fade(top: true),
         const _Fade(top: false),
       ],
-    );
-  }
-}
-
-/// Рендерит одну строку plain-текста.
-///
-/// • Вся строка фоновая → маленький курсив, приглушённый цвет.
-/// • Смешанная строка (часть слов bg) → RichText с двумя стилями.
-/// • Обычная строка → Text.
-class _PlainLineWidget extends StatelessWidget {
-  const _PlainLineWidget({super.key, required this.line});
-  final LyricLine line;
-
-  static const _mainStyle = TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.w500,
-    fontStyle: FontStyle.normal,
-    color: Color(0xFFB4B4B4), // white @ 180 alpha
-    height: 1.6,
-  );
-
-  static const _bgStyle = TextStyle(
-    fontSize: 13,
-    fontWeight: FontWeight.w400,
-    fontStyle: FontStyle.italic,
-    color: Color(0x5AFFFFFF), // white @ 90 alpha
-    height: 1.6,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    // Вся строка фоновая
-    if (line.isBackgroundLine) {
-      return Text(
-        line.plainText,
-        textAlign: TextAlign.center,
-        style: _bgStyle,
-      );
-    }
-
-    // Проверяем наличие хотя бы одного bg-слова (mixed строка)
-    final hasMixed = line.words.any((w) => w.isBackground);
-    if (!hasMixed) {
-      return Text(
-        line.plainText,
-        textAlign: TextAlign.center,
-        style: _mainStyle,
-      );
-    }
-
-    // Mixed: собираем RichText с inline-переключением стиля
-    final spans = <InlineSpan>[];
-    for (var i = 0; i < line.words.length; i++) {
-      if (i > 0) {
-        // пробел наследует стиль предыдущего слова — визуально нейтрально
-        spans.add(const TextSpan(text: ' '));
-      }
-      final word = line.words[i];
-      spans.add(TextSpan(
-        text: word.text,
-        style: word.isBackground ? _bgStyle : _mainStyle,
-      ));
-    }
-
-    return Text.rich(
-      TextSpan(children: spans),
-      textAlign: TextAlign.center,
     );
   }
 }
@@ -1039,6 +1096,62 @@ class _EmptyState extends StatelessWidget {
       ],
     ),
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AMBIENT BACKGROUND
+// Изолированный виджет с собственным тикером для пульсации фона.
+// setState здесь не затрагивает список строк — только перерисовывает себя.
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _AmbientBackground extends StatefulWidget {
+  const _AmbientBackground({required this.palette});
+  final PaletteState palette;
+
+  @override
+  State<_AmbientBackground> createState() => _AmbientBackgroundState();
+}
+
+class _AmbientBackgroundState extends State<_AmbientBackground>
+    with SingleTickerProviderStateMixin {
+  late final Ticker _ticker;
+  double _pulse = 0.78;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker(_onTick)..start();
+  }
+
+  void _onTick(Duration elapsed) {
+    if (!mounted) return;
+    final phase = elapsed.inMilliseconds / 2400.0 * 2 * math.pi;
+    final newPulse = 0.78 + 0.22 * (math.sin(phase) * 0.5 + 0.5);
+    // Обновляем только если разница заметна — снижаем количество repaint
+    if ((newPulse - _pulse).abs() > 0.002) {
+      setState(() => _pulse = newPulse);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _AmbientPainter(
+          c1: widget.palette.primary,
+          c2: widget.palette.secondary,
+          pulse: _pulse,
+        ),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

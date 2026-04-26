@@ -229,28 +229,28 @@ class _CapsuleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: Colors.white.withAlpha(18),
-            border: Border.all(color: Colors.white.withAlpha(35)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 15),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: const TextStyle(color: Colors.white60, fontSize: 12)),
-            ],
-          ),
-        ),
-      );
+    onTap: () {
+      HapticFeedback.lightImpact();
+      onTap();
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: Colors.white.withAlpha(18),
+        border: Border.all(color: Colors.white.withAlpha(35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 15),
+          const SizedBox(width: 6),
+          Text(label,
+              style: const TextStyle(color: Colors.white60, fontSize: 12)),
+        ],
+      ),
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -316,7 +316,7 @@ class _TrackInfo extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isFav =
-        showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
+    showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
 
     final titleStyle = TextStyle(
       color: Colors.white,
@@ -419,14 +419,22 @@ class _Controls extends StatelessWidget {
           icon: Icons.shuffle_rounded,
           color: player.isShuffle ? palette.primary : Colors.white38,
           size: iconSize,
-          onTap: notifier.toggleShuffle,
+          onTap: () {
+            player.isShuffle
+                ? HapticPatterns.shuffleOff()
+                : HapticPatterns.shuffleOn();
+            notifier.toggleShuffle();
+          },
         ),
         const Spacer(),
         _CtrlButton(
           icon: Icons.skip_previous_rounded,
           color: Colors.white,
           size: iconSize + 4,
-          onTap: notifier.previous,
+          onTap: () {
+            HapticPatterns.previous();
+            notifier.previous();
+          },
         ),
         const SizedBox(width: 16),
         GestureDetector(
@@ -460,7 +468,10 @@ class _Controls extends StatelessWidget {
           icon: Icons.skip_next_rounded,
           color: Colors.white,
           size: iconSize + 4,
-          onTap: notifier.next,
+          onTap: () {
+            HapticPatterns.next();
+            notifier.next();
+          },
         ),
         const Spacer(),
         _CtrlButton(
@@ -473,7 +484,10 @@ class _Controls extends StatelessWidget {
               ? palette.primary
               : Colors.white38,
           size: iconSize,
-          onTap: notifier.toggleRepeat,
+          onTap: () {
+            HapticPatterns.repeat();
+            notifier.toggleRepeat();
+          },
         ),
       ],
     );
@@ -494,14 +508,11 @@ class _CtrlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Icon(icon, color: color, size: size),
-        ),
-      );
+    onTap: onTap, // haptics управляются каждым вызывающим кодом отдельно
+    behavior: HitTestBehavior.opaque,
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Icon(icon, color: color, size: size),
+    ),
+  );
 }

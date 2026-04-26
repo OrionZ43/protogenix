@@ -666,21 +666,6 @@ class AdvancedLrcParser {
     );
   }
 
-  /// Определяет, является ли вся строка фоновой (в скобках).
-  ///
-  /// Используется только для `_parsePlain`. Проверяет ПОЛНОЕ обрамление:
-  /// "(text)" или "[text]". Частичные скобки не считаются фоновыми.
-  static (String text, bool isBackground) _extractBackground(String raw) {
-    final trimmed = raw.trim();
-
-    final round = _bgRoundRx.firstMatch(trimmed);
-    if (round != null) return (round.group(1)!.trim(), true);
-
-    final square = _bgSquareRx.firstMatch(trimmed);
-    if (square != null) return (square.group(1)!.trim(), true);
-
-    return (raw, false);
-  }
 
   /// Группирует плоский список слогов в LyricWord по пробелам.
   static List<LyricWord> _groupSyllablesIntoWords(

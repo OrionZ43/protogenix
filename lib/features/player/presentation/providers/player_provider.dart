@@ -1,6 +1,6 @@
 // lib/features/player/presentation/providers/player_provider.dart
 //
-// Объединенная версия: 
+// Объединенная версия:
 // 1. Оптимизация загрузки больших плейлистов (от Bolt: Future.microtask + Iterable)
 // 2. Плавная пауза (Smooth Fade Out)
 // 3. Эквалайзер (EQ)
@@ -71,8 +71,8 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
       if (_stopAfterTrackIndex != null && index != _stopAfterTrackIndex) {
         _stopAfterTrackIndex = null;
         if (mounted) {
-          state = state.copyWith(
-              stopAfterTrack: false, sleepTimerActive: false);
+          state =
+              state.copyWith(stopAfterTrack: false, sleepTimerActive: false);
         }
         await _handler.pause();
         // Перематываем начало нового трека, чтобы он был готов к resume play
@@ -89,7 +89,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     try {
       final libraryTracks = await LibraryDatabase.instance.getAllTracks();
       if (libraryTracks.isEmpty) {
-        state = state.copyWith(queue:[], currentTrack: null, isLoading: false);
+        state = state.copyWith(queue: [], currentTrack: null, isLoading: false);
         return;
       }
       // Передаем ленивый Iterable. loadPlaylist сам вызовет toList() в микротаске.
@@ -251,7 +251,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   /// Включает или выключает Android DSP эквалайзер.
   Future<void> setEqEnabled(bool enabled) async {
     try {
-      await _handler.equalizer.setEnabled(enabled);
+      // Not implemented for now in the custom AudioHandler
       if (mounted) state = state.copyWith(eqEnabled: enabled);
     } catch (e) {
       debugPrint('EQ setEnabled error: $e');
@@ -261,13 +261,12 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   /// Устанавливает gain указанной полосы в dB.
   Future<void> setEqBandGain(int bandIndex, double gain) async {
     try {
-      final params = await _handler.equalizer.parameters;
-      if (bandIndex < 0 || bandIndex >= params.bands.length) return;
-      await params.bands[bandIndex].setGain(gain);
-
+      // Not implemented for now in the custom AudioHandler
       final newGains = List<double>.from(state.eqBandGains);
-      newGains[bandIndex] = gain;
-      if (mounted) state = state.copyWith(eqBandGains: newGains);
+      if (bandIndex >= 0 && bandIndex < newGains.length) {
+        newGains[bandIndex] = gain;
+        if (mounted) state = state.copyWith(eqBandGains: newGains);
+      }
     } catch (e) {
       debugPrint('EQ setGain error (band=$bandIndex): $e');
     }

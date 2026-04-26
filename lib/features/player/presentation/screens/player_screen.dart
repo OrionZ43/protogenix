@@ -1,13 +1,12 @@
 // lib/features/player/presentation/screens/player_screen.dart
 // Компактный плеер (телефон / узкий режим)
 //
-// UPDATED: 
+// UPDATED:
 // - Фикс TopBar (Stack для идеальной центровки)
 // - Адаптация под Status Bar (SafeArea/Padding)
 // - Поддержка Flex Mode (Tabletop)
 // - Унификация кнопок (EQ + Sleep Timer)
 
-import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,8 +20,6 @@ import '../widgets/protogenix_background.dart';
 import '../widgets/music_visualizer_controls.dart';
 import '../widgets/lyrics_search_sheet.dart';
 import '../widgets/beautiful_lyrics_view.dart';
-import '../widgets/eq_sheet.dart';
-import 'dart:ui';
 import '../../../importer/presentation/importer_sheet.dart';
 
 class PlayerScreen extends ConsumerWidget {
@@ -37,49 +34,6 @@ class PlayerScreen extends ConsumerWidget {
     }
 
     final track = player.currentTrack as TrackModel?;
-    final mediaQuery = MediaQuery.of(context);
-    
-    // Детекция сгиба для Flex Mode (Tabletop)
-    final displayFeatures = mediaQuery.displayFeatures;
-    final hinge = displayFeatures.firstWhere(
-      (f) => f.type == DisplayFeatureType.hinge || f.type == DisplayFeatureType.fold,
-      orElse: () => const DisplayFeature(
-        bounds: Rect.zero,
-        type: DisplayFeatureType.unknown,
-        state: DisplayFeatureState.unknown,
-      ),
-    );
-
-    final isTabletop = hinge.state == DisplayFeatureState.postureHalfOpened && // postureHalfOpened вместо halfOpened
-        hinge.bounds.top > 0 &&
-        hinge.bounds.left == 0;
-
-    if (isTabletop) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: ProtogenixBackground(
-          child: SafeArea(
-            child: Column(
-              children: [
-                _TopBar(track: track),
-                // Верхняя половина: Текст песни
-                const Expanded(child: BeautifulLyricsView()),
-                // Мертвая зона шарнира
-                SizedBox(height: hinge.bounds.height),
-                // Нижняя половина: Управление
-                Expanded(
-                  child: MusicVisualizerControls(
-                    compact: true,
-                    showFavorite: true,
-                  ),
-                ),
-                _BottomRow(track: track),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -87,8 +41,8 @@ class PlayerScreen extends ConsumerWidget {
         child: Column(
           children: [
             _TopBar(track: track),
-            Expanded(
-              child: const MusicVisualizerControls(
+            const Expanded(
+              child: MusicVisualizerControls(
                 compact: false,
                 showFavorite: true,
               ),
@@ -110,8 +64,6 @@ class _TopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = ref.watch(paletteProvider);
-    final eqActive = ref.watch(playerProvider.select((s) => s.eqEnabled));
     final topPadding = MediaQuery.viewPaddingOf(context).top;
 
     return Padding(
@@ -163,21 +115,6 @@ class _TopBar extends ConsumerWidget {
               right: 0,
               child: Row(
                 children: [
-                  if (Platform.isAndroid)
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.mediumImpact();
-                        showEqSheet(context, ref);
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Icon(
-                          Icons.tune_rounded,
-                          color: eqActive ? palette.primary : Colors.white54,
-                          size: 22,
-                        ),
-                      ),
-                    ),
                   if (track != null)
                     GestureDetector(
                       onTap: () {
@@ -186,7 +123,8 @@ class _TopBar extends ConsumerWidget {
                       },
                       child: const Padding(
                         padding: EdgeInsets.all(8.0),
-                        child: Icon(Icons.lyrics_outlined, color: Colors.white54, size: 22),
+                        child: Icon(Icons.lyrics_outlined,
+                            color: Colors.white54, size: 22),
                       ),
                     ),
                 ],
@@ -208,7 +146,8 @@ class _BottomRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = ref.watch(paletteProvider);
-    final timerActive = ref.watch(playerProvider.select((s) => s.sleepTimerActive));
+    final timerActive =
+        ref.watch(playerProvider.select((s) => s.sleepTimerActive));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -297,7 +236,8 @@ void _showLyricsSheet(BuildContext context, WidgetRef ref) {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.manage_search_rounded, color: Colors.white54),
+                          icon: const Icon(Icons.manage_search_rounded,
+                              color: Colors.white54),
                           onPressed: () {
                             final track = ref.read(playerProvider).currentTrack;
                             if (track != null) {
@@ -337,7 +277,7 @@ class _CapsuleBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isActive ? (accentColor ?? Colors.white) : Colors.white60;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Opacity(
@@ -348,7 +288,8 @@ class _CapsuleBtn extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             color: isActive ? color.withAlpha(30) : Colors.white.withAlpha(12),
             border: Border.all(
-              color: isActive ? color.withAlpha(100) : Colors.white.withAlpha(25),
+              color:
+                  isActive ? color.withAlpha(100) : Colors.white.withAlpha(25),
             ),
           ),
           child: Row(
@@ -358,7 +299,10 @@ class _CapsuleBtn extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: TextStyle(color: color, fontSize: 12, fontWeight: isActive ? FontWeight.w600 : FontWeight.normal),
+                style: TextStyle(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal),
               ),
             ],
           ),
@@ -383,11 +327,15 @@ class _EmptyLibraryScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.library_music_rounded, size: 80, color: Colors.white24),
+                const Icon(Icons.library_music_rounded,
+                    size: 80, color: Colors.white24),
                 const SizedBox(height: 24),
                 const Text(
                   'Библиотека пуста',
-                  style: TextStyle(color: Colors.white70, fontSize: 22, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -401,7 +349,8 @@ class _EmptyLibraryScreen extends StatelessWidget {
                     showImporterSheet(context);
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 28, vertical: 14),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       color: Colors.white.withAlpha(20),
@@ -412,13 +361,16 @@ class _EmptyLibraryScreen extends StatelessWidget {
                       children: [
                         Icon(Icons.add_rounded, color: Colors.white70),
                         SizedBox(width: 8),
-                        Text('Добавить трек', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                        Text('Добавить трек',
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 16)),
                       ],
                     ),
                   ),
                 ),
               ],
-            ).animate().fadeIn(duration: 600.ms).scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
+            ).animate().fadeIn(duration: 600.ms).scale(
+                begin: const Offset(0.9, 0.9), curve: Curves.easeOutCubic),
           ),
         ),
       ),

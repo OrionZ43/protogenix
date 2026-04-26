@@ -1,4 +1,4 @@
-// lib/features/player/domain/player_state.dart
+// Убрали импорты just_audio — они здесь не нужны
 
 enum RepeatMode { none, one, all }
 
@@ -17,14 +17,13 @@ class ProtogenixPlayerState {
 
   final double volume;
   final double speed;
+
   final RepeatMode repeatMode;
   final bool isShuffle;
 
-  // ── Эквалайзер ─────────────────────────────────────────────────────────────
   final bool eqEnabled;
   final List<double> eqBandGains;
 
-  // ── Таймер сна ──────────────────────────────────────────────────────────────
   final bool sleepTimerActive;
   final bool stopAfterTrack;
 
@@ -43,7 +42,7 @@ class ProtogenixPlayerState {
     this.repeatMode = RepeatMode.none,
     this.isShuffle = false,
     this.eqEnabled = false,
-    this.eqBandGains = const [0.0, 0.0, 0.0, 0.0, 0.0],
+    this.eqBandGains = const [],
     this.sleepTimerActive = false,
     this.stopAfterTrack = false,
   });
