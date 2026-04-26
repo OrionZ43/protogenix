@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'package:window_manager/window_manager.dart';
 // lib/app/app_shell.dart
 //
 // Главный навигационный каркас приложения.
@@ -221,13 +219,6 @@ class _ExpandedShell extends ConsumerWidget {
             color: Colors.white.withAlpha(6),
             child: Column(
               children: [
-                if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
-                  SizedBox(
-                    height: 40,
-                    child: DragToMoveArea(
-                      child: Container(color: Colors.transparent),
-                    ),
-                  ),
                 const SizedBox(height: 24),
 
                 // Лого
@@ -289,47 +280,9 @@ class _ExpandedShell extends ConsumerWidget {
 
           // ── Контент справа ────────────────────────────────────────────────
           Expanded(
-            child: Column(
-              children: [
-                if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
-                  SizedBox(
-                    height: 40,
-                    child: DragToMoveArea(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.minimize,
-                                color: Colors.white54, size: 18),
-                            onPressed: () => windowManager.minimize(),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.crop_square,
-                                color: Colors.white54, size: 18),
-                            onPressed: () async {
-                              if (await windowManager.isMaximized()) {
-                                windowManager.unmaximize();
-                              } else {
-                                windowManager.maximize();
-                              }
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close,
-                                color: Colors.white54, size: 18),
-                            onPressed: () => windowManager.close(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                Expanded(
-                  child: IndexedStack(
-                    index: tabIndex,
-                    children: _screens,
-                  ),
-                ),
-              ],
+            child: IndexedStack(
+              index: tabIndex,
+              children: _screens,
             ),
           ),
         ],
@@ -403,7 +356,7 @@ class _BottomBar extends StatelessWidget {
 // RAIL ICON
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _RailIcon extends StatelessWidget {
+class _RailIcon extends StatefulWidget {
   const _RailIcon({
     required this.tab,
     required this.selected,
@@ -414,28 +367,44 @@ class _RailIcon extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_RailIcon> createState() => _RailIconState();
+}
+
+class _RailIconState extends State<_RailIcon> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          border: selected
-              ? const Border(
-                  left: BorderSide(
-                    color: Colors.white,
-                    width: 2,
-                  ),
-                )
-              : null,
-        ),
-        child: Icon(
-          selected ? tab.activeIcon : tab.icon,
-          color: selected ? Colors.white : Colors.white38,
-          size: 22,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedScale(
+          scale: _isHovered ? 1.1 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              border: widget.selected
+                  ? const Border(
+                      left: BorderSide(
+                        color: Colors.white,
+                        width: 2,
+                      ),
+                    )
+                  : null,
+            ),
+            child: Icon(
+              widget.selected ? widget.tab.activeIcon : widget.tab.icon,
+              color: widget.selected ? Colors.white : Colors.white38,
+              size: 22,
+            ),
+          ),
         ),
       ),
     );
@@ -474,3 +443,7 @@ class _TabItem {
   final IconData activeIcon;
   final String label;
 }
+
+class PlayPauseIntent extends Intent { const PlayPauseIntent(); static const key = Key('play_pause'); }
+class NextTrackIntent extends Intent { const NextTrackIntent(); static const key = Key('next_track'); }
+class PreviousTrackIntent extends Intent { const PreviousTrackIntent(); static const key = Key('previous_track'); }

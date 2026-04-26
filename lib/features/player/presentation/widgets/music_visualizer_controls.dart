@@ -215,7 +215,7 @@ class _CompactLayout extends StatelessWidget {
 // CAPSULE BUTTON
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CapsuleButton extends StatelessWidget {
+class _CapsuleButton extends StatefulWidget {
   const _CapsuleButton({
     required this.icon,
     required this.label,
@@ -228,29 +228,50 @@ class _CapsuleButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  State<_CapsuleButton> createState() => _CapsuleButtonState();
+}
+
+class _CapsuleButtonState extends State<_CapsuleButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
         onTap: () {
           HapticFeedback.lightImpact();
-          onTap();
+          widget.onTap();
         },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: Colors.white.withAlpha(18),
-            border: Border.all(color: Colors.white.withAlpha(35)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 15),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: const TextStyle(color: Colors.white60, fontSize: 12)),
-            ],
+        child: AnimatedScale(
+          scale: _isHovered ? 1.05 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: _isHovered
+                  ? Colors.white.withAlpha(25)
+                  : Colors.white.withAlpha(18),
+              border: Border.all(color: Colors.white.withAlpha(35)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(widget.icon, color: widget.color, size: 15),
+                const SizedBox(width: 6),
+                Text(widget.label,
+                    style:
+                        const TextStyle(color: Colors.white60, fontSize: 12)),
+              ],
+            ),
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -416,6 +437,7 @@ class _Controls extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _CtrlButton(
+          tooltip: 'Shuffle',
           icon: Icons.shuffle_rounded,
           color: player.isShuffle ? palette.primary : Colors.white38,
           size: iconSize,
@@ -428,6 +450,7 @@ class _Controls extends StatelessWidget {
         ),
         const Spacer(),
         _CtrlButton(
+          tooltip: 'Previous',
           icon: Icons.skip_previous_rounded,
           color: Colors.white,
           size: iconSize + 4,
@@ -437,34 +460,46 @@ class _Controls extends StatelessWidget {
           },
         ),
         const SizedBox(width: 16),
-        GestureDetector(
-          onTap: () {
-            HapticPatterns.playPause();
-            notifier.playPause();
-          },
-          child: Container(
-            width: playSize,
-            height: playSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: palette.primary,
-              boxShadow: [
-                BoxShadow(
-                  color: palette.primary.withAlpha(80),
-                  blurRadius: 16,
-                  spreadRadius: 2,
+        Tooltip(
+          message: playing ? 'Pause' : 'Play',
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(200),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          textStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () {
+                HapticPatterns.playPause();
+                notifier.playPause();
+              },
+              child: Container(
+                width: playSize,
+                height: playSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: palette.primary,
+                  boxShadow: [
+                    BoxShadow(
+                      color: palette.primary.withAlpha(80),
+                      blurRadius: 16,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Icon(
-              playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              color: Colors.white,
-              size: playSize * 0.5,
+                child: Icon(
+                  playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: playSize * 0.5,
+                ),
+              ),
             ),
           ),
         ),
         const SizedBox(width: 16),
         _CtrlButton(
+          tooltip: 'Next',
           icon: Icons.skip_next_rounded,
           color: Colors.white,
           size: iconSize + 4,
@@ -475,6 +510,7 @@ class _Controls extends StatelessWidget {
         ),
         const Spacer(),
         _CtrlButton(
+          tooltip: 'Repeat',
           icon: switch (player.repeatMode) {
             ps.RepeatMode.none => Icons.repeat_rounded,
             ps.RepeatMode.all => Icons.repeat_rounded,
@@ -494,25 +530,61 @@ class _Controls extends StatelessWidget {
   }
 }
 
-class _CtrlButton extends StatelessWidget {
+class _CtrlButton extends StatefulWidget {
   const _CtrlButton({
     required this.icon,
     required this.color,
     required this.size,
     required this.onTap,
+    this.tooltip,
   });
   final IconData icon;
   final Color color;
   final double size;
   final VoidCallback onTap;
+  final String? tooltip;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap, // haptics управляются каждым вызывающим кодом отдельно
-        behavior: HitTestBehavior.opaque,
+  State<_CtrlButton> createState() => _CtrlButtonState();
+}
+
+class _CtrlButtonState extends State<_CtrlButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget child = GestureDetector(
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isHovered ? 1.1 : 1.0,
+        duration: const Duration(milliseconds: 150),
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Icon(icon, color: color, size: size),
+          child: Icon(widget.icon, color: widget.color, size: widget.size),
         ),
+      ),
+    );
+
+    child = MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: child,
+    );
+
+    if (widget.tooltip != null) {
+      child = Tooltip(
+        message: widget.tooltip!,
+        decoration: BoxDecoration(
+          color: Colors.black.withAlpha(200),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        textStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+        child: child,
       );
+    }
+
+    return child;
+  }
 }
