@@ -52,8 +52,8 @@ class ProtogenixPlayerState {
     return (position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
   }
 
-  bool get hasNext => currentIndex < queue.length - 1;
-  bool get hasPrevious => currentIndex > 0;
+  bool get hasNext => currentIndex < queue.length;
+  bool get hasPrevious => currentIndex >= 0;
 
   ProtogenixPlayerState copyWith({
     dynamic currentTrack,
