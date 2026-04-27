@@ -1,3 +1,4 @@
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 // lib/main.dart
 import 'dart:io';
@@ -40,6 +41,11 @@ Future<void> main() async {
       await windowManager.show();
       await windowManager.focus();
     });
+  }
+
+  // For Windows/Linux desktop audio we must initialize media_kit for just_audio
+  if (Platform.isWindows || Platform.isLinux) {
+    JustAudioMediaKit.ensureInitialized();
   }
 
   // Инициализируем фоновое воспроизведение ПЕРЕД runApp
