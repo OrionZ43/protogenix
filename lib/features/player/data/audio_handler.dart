@@ -33,8 +33,9 @@ class ProtogenixAudioHandler extends BaseAudioHandler
   void _init() {
     _player.playbackEventStream.listen(_broadcastState);
     _player.currentIndexStream.listen((index) {
-      if (index != null && index < queue.value.length)
+      if (index != null && index < queue.value.length) {
         mediaItem.add(queue.value[index]);
+      }
     });
   }
 
@@ -52,6 +53,12 @@ class ProtogenixAudioHandler extends BaseAudioHandler
     await _player.stop();
     await super.stop();
   }
+
+  @override
+  Future<void> skipToNext() => _player.seekToNext();
+
+  @override
+  Future<void> skipToPrevious() => _player.seekToPrevious();
 
   Future<void> loadPlaylist({
     required List<MediaItem> items,
