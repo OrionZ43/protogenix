@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
 import '../data/importer_service.dart';
 import '../../library/presentation/library_provider.dart';
 import '../../player/presentation/providers/player_provider.dart';
@@ -14,7 +15,14 @@ class ImporterSheet extends ConsumerStatefulWidget {
   ConsumerState<ImporterSheet> createState() => _ImporterSheetState();
 }
 
+enum _ImportMode { selection, input, local }
+enum _Service { none, youtube, spotify, yandex }
+
 class _ImporterSheetState extends ConsumerState<ImporterSheet> {
+  _ImportMode _mode = _ImportMode.selection;
+  _Service _selectedService = _Service.none;
+
+
   final _controller = TextEditingController();
   ImportProgress _progress = ImportProgress.idle;
   bool _isImporting = false;
@@ -95,20 +103,36 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                           ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Вставь ссылку',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
+                    Row(
+                      children: [
+                        if (_mode != _ImportMode.selection)
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                            onPressed: () {
+                              setState(() {
+                                _mode = _ImportMode.selection;
+                                _selectedService = _Service.none;
+                                _progress = ImportProgress.idle;
+                                _controller.clear();
+                              });
+                            },
                           ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'YouTube, Яндекс.Музыка, прямые ссылки на MP3/FLAC',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white38,
+                        Expanded(
+                          child: Text(
+                            _mode == _ImportMode.selection
+                                ? 'Выбери источник'
+                                : _selectedService == _Service.youtube
+                                    ? 'Импорт из YouTube'
+                                    : _selectedService == _Service.spotify
+                                        ? 'Импорт из Spotify'
+                                        : 'Импорт из Яндекс.Музыки',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  color: Colors.white,
+                                ),
                           ),
+                        ),
+                      ],
                     ),
-
                     const SizedBox(height: 24),
 
                     // Поле ввода
@@ -124,8 +148,8 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                             child: TextField(
                               controller: _controller,
                               style: const TextStyle(color: Colors.white),
-                              decoration: const InputDecoration(
-                                hintText: 'https://youtube.com/..., https://music.yandex.ru/...',
+                              decoration: InputDecoration(
+                                hintText: _selectedService == _Service.youtube ? 'https://youtube.com/watch?v=...' : _selectedService == _Service.spotify ? 'https://open.spotify.com/track/...' : 'https://music.yandex.ru/album/...',
                                 hintStyle: TextStyle(color: Colors.white24),
                                 border: InputBorder.none,
                                 contentPadding: EdgeInsets.symmetric(
@@ -171,8 +195,12 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                         child: ElevatedButton(
                           onPressed: _isImporting ? null : _startImport,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF7B5EA7),
-                            foregroundColor: Colors.white,
+                            backgroundColor: _selectedService == _Service.youtube
+                                ? Colors.redAccent
+                                : _selectedService == _Service.spotify
+                                    ? const Color(0xFF1DB954)
+                                    : const Color(0xFFFFCC00),
+                            foregroundColor: _selectedService == _Service.yandex ? Colors.black : Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
@@ -203,6 +231,111 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+      Future<void> _pickLocalFiles() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final paths = result.files
+            .where((f) => f.path != null)
+            .map((f) => f.path!)
+            .where((p) => p.endsWith('.mp3') || p.endsWith('.flac') || p.endsWith('.m4a') || p.endsWith('.wav'))
+            .toList();
+
+        if (paths.isNotEmpty) {
+          setState(() => _isImporting = true);
+
+          await ImporterService.instance.importLocalFiles(
+            paths: paths,
+            onProgress: (progress) {
+              if (mounted) setState(() => _progress = progress);
+            },
+          );
+
+          if (_progress.status == ImportStatus.done) {
+            ref.read(libraryProvider.notifier).reload();
+            ref.read(playerProvider.notifier).reloadFromLibrary();
+          }
+
+          if (mounted) setState(() => _isImporting = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _progress = ImportProgress(
+            status: ImportStatus.error,
+            message: 'Ошибка выбора файлов',
+            error: e.toString(),
+          );
+        });
+      }
+    }
+  }
+
+  Widget _buildSelectionGrid() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        _buildServiceCard('YouTube', Icons.play_arrow_rounded, Colors.redAccent, () {
+          setState(() {
+            _mode = _ImportMode.input;
+            _selectedService = _Service.youtube;
+          });
+        }),
+        _buildServiceCard('Spotify', Icons.music_note_rounded, const Color(0xFF1DB954), () {
+          setState(() {
+            _mode = _ImportMode.input;
+            _selectedService = _Service.spotify;
+          });
+        }),
+        _buildServiceCard('Yandex', Icons.library_music_rounded, const Color(0xFFFFCC00), () {
+          setState(() {
+            _mode = _ImportMode.input;
+            _selectedService = _Service.yandex;
+          });
+        }),
+        _buildServiceCard('Локальные', Icons.folder_rounded, const Color(0xFF7B5EA7), () {
+          _pickLocalFiles();
+        }),
+      ],
+    );
+  }
+
+  Widget _buildServiceCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: (MediaQuery.of(context).size.width - 48 - 12) / 2, // 2 columns
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: color.withAlpha(20),
+          border: Border.all(color: color.withAlpha(60)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+          ],
         ),
       ),
     );
