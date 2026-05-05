@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../player/presentation/widgets/glass_card.dart';
 import 'package:file_picker/file_picker.dart';
 import '../data/importer_service.dart';
 import '../../library/presentation/library_provider.dart';
@@ -85,14 +86,16 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                 ),
               ),
 
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  24,
-                  0,
-                  24,
-                  MediaQuery.of(context).viewInsets.bottom + 24,
-                ),
-                child: Column(
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      24,
+                      0,
+                      24,
+                      MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 24,
+                    ),
+                    child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -189,13 +192,7 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
 
                                 const SizedBox(height: 16),
 
-                                // Прогресс
-                                if (_progress.status != ImportStatus.idle)
-                                  _buildProgress().animate().fadeIn(duration: 300.ms),
-
-                                const SizedBox(height: 16),
-
-                                // Кнопка импорт
+// Кнопка импорт
                                 SizedBox(
                                   width: double.infinity,
                                   child: AnimatedContainer(
@@ -237,7 +234,14 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                               ],
                             ),
                     ),
+
+                    if (_progress.status != ImportStatus.idle) ...[
+                      const SizedBox(height: 16),
+                      _buildProgress().animate().fadeIn(duration: 300.ms),
+                    ],
                   ],
+                ),
+              ),
                 ),
               ),
             ],
@@ -293,9 +297,14 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
   }
 
   Widget _buildSelectionGrid() {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 1.3,
+      padding: EdgeInsets.zero,
       children: [
         _buildServiceCard('YouTube', Icons.play_arrow_rounded, Colors.redAccent, () {
           setState(() {
@@ -326,27 +335,41 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: (MediaQuery.of(context).size.width - 48 - 12) / 2, // 2 columns
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: color.withAlpha(20),
-          border: Border.all(color: color.withAlpha(60)),
           borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-              ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withAlpha(15),
+              blurRadius: 20,
+              spreadRadius: 2,
             ),
           ],
+        ),
+        child: GlassCard(
+          borderRadius: 20.0,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: color.withAlpha(10),
+              border: Border.all(color: color.withAlpha(40)),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: color, size: 36),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
