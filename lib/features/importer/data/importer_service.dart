@@ -54,7 +54,9 @@ class ImporterService {
     required void Function(ImportProgress) onProgress,
   }) async {
     try {
-      if (_isYandexMusic(url)) {
+      if (_isSpotify(url)) {
+        await _importSpotify(url: url, onProgress: onProgress);
+      } else if (_isYandexMusic(url)) {
         await _importYandexMusic(url: url, onProgress: onProgress);
       } else if (_isYouTube(url)) {
         await _importYouTube(url: url, onProgress: onProgress);
@@ -293,6 +295,117 @@ class ImporterService {
         .trim();
   }
 
+  // ── Spotify ───────────────────────────────────────────────────────────────
+
+  Future<void> _importSpotify({
+    required String url,
+    required void Function(ImportProgress) onProgress,
+  }) async {
+    onProgress(const ImportProgress(
+      status: ImportStatus.fetchingMeta,
+      message: 'Получение данных со Spotify...',
+      progress: 0.1,
+    ));
+
+    try {
+      final response = await _dio.get(
+        url,
+        options: Options(headers: {
+          'User-Agent': 'curl/7.81.0',
+          'Accept': '*/*',
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Ошибка загрузки страницы Spotify');
+      }
+
+      final html = response.data.toString();
+
+      final titleRegex = RegExp(r'<meta property="og:title" content="([^"]+)"');
+      final descRegex = RegExp(r'<meta name="description" content="([^"]+)"');
+
+      final titleMatch = titleRegex.firstMatch(html);
+      final descMatch = descRegex.firstMatch(html);
+
+      if (titleMatch == null || descMatch == null) {
+        throw Exception('Не удалось извлечь метаданные Spotify');
+      }
+
+      final pageTitle = titleMatch.group(1)!;
+      final pageDesc = descMatch.group(1)!;
+
+      String trackTitle = pageTitle;
+      String artist = 'Unknown Artist';
+
+      // Если это трек, описание обычно выглядит так: "Listen to [Title] on Spotify. Song · [Artist] · [Year]"
+      if (pageDesc.contains('Song ·')) {
+         final parts = pageDesc.split('·');
+         if (parts.length >= 2) {
+           artist = parts[1].trim();
+         }
+      } else if (pageDesc.contains('Playlist ·')) {
+         throw Exception('Поддерживается только импорт одиночных треков Spotify');
+      } else if (pageDesc.contains('Album ·')) {
+         throw Exception('Поддерживается только импорт одиночных треков Spotify');
+      }
+
+      final query = "$artist - $trackTitle";
+
+      onProgress(ImportProgress(
+        status: ImportStatus.fetchingMeta,
+        message: 'Поиск: $query',
+        progress: 0.3,
+      ));
+
+      final yt = YoutubeExplode();
+      try {
+        final searchResults = await yt.search.search(query);
+        if (searchResults.isEmpty) {
+          throw Exception('Трек не найден на YouTube');
+        }
+
+        var video = searchResults.first;
+        final maxResults = searchResults.length > 10 ? 10 : searchResults.length;
+        for (int j = 0; j < maxResults; j++) {
+          final v = searchResults.elementAt(j);
+          final authorLow = v.author.toLowerCase();
+          final titleLow = v.title.toLowerCase();
+
+          if (authorLow.contains('topic') ||
+              authorLow.contains('vevo') ||
+              titleLow.contains('(official audio)')) {
+            video = v;
+            debugPrint('[Spotify] Выбрано приоритетное аудио: ${v.title} (${v.author})');
+            break;
+          }
+        }
+
+        await _downloadYouTubeVideo(
+          yt: yt,
+          video: video,
+          cleanTitle: trackTitle,
+          albumName: 'Spotify Import',
+          onProgress: (p) => onProgress(ImportProgress(
+            status: p.status,
+            message: p.message,
+            progress: 0.3 + (p.progress * 0.7),
+          )),
+        );
+
+      } finally {
+        yt.close();
+      }
+
+    } catch (e) {
+      onProgress(ImportProgress(
+        status: ImportStatus.error,
+        message: 'Ошибка импорта Spotify',
+        error: e.toString(),
+      ));
+    }
+  }
+
   // ── Yandex Music ──────────────────────────────────────────────────────────
 
   Future<void> _importYandexMusic({
@@ -409,6 +522,13 @@ class ImporterService {
       final downloadedTrackIds = <String>[];
       int i = 0;
 
+      onProgress(ImportProgress(
+        status: ImportStatus.done,
+        message: 'Создание плейлиста "$playlistName"...',
+        progress: 0.05,
+      ));
+      final playlist = await PlaylistDatabase.instance.createPlaylist(playlistName);
+
       try {
         for (final track in parsedTracks) {
           i++;
@@ -427,7 +547,23 @@ class ImporterService {
               continue;
             }
 
-            final video = searchResults.first;
+            var video = searchResults.first;
+
+            // Smart YouTube Search (Topic & Audio Priority)
+            final maxResults = searchResults.length > 10 ? 10 : searchResults.length;
+            for (int j = 0; j < maxResults; j++) {
+              final v = searchResults.elementAt(j);
+              final authorLow = v.author.toLowerCase();
+              final titleLow = v.title.toLowerCase();
+
+              if (authorLow.contains('topic') ||
+                  authorLow.contains('vevo') ||
+                  titleLow.contains('(official audio)')) {
+                video = v;
+                debugPrint('Выбрано приоритетное аудио: ${v.title} (${v.author})');
+                break;
+              }
+            }
 
             // Re-use standard YouTube download flow
             final trackId = await _downloadYouTubeVideo(
@@ -446,6 +582,10 @@ class ImporterService {
             );
 
             downloadedTrackIds.add(trackId);
+            await PlaylistDatabase.instance.addTrackToPlaylist(
+              playlistId: playlist.id,
+              trackId: trackId,
+            );
           } catch (e) {
             debugPrint('Ошибка загрузки $query: $e');
             // Continue to next track
@@ -455,22 +595,7 @@ class ImporterService {
         yt.close();
       }
 
-      // Создаем плейлист, если хоть что-то скачалось
-      if (downloadedTrackIds.isNotEmpty) {
-        onProgress(ImportProgress(
-          status: ImportStatus.done,
-          message: 'Создание плейлиста "$playlistName"...',
-          progress: 0.99,
-        ));
 
-        final playlist = await PlaylistDatabase.instance.createPlaylist(playlistName);
-        for (final trackId in downloadedTrackIds) {
-          await PlaylistDatabase.instance.addTrackToPlaylist(
-            playlistId: playlist.id,
-            trackId: trackId,
-          );
-        }
-      }
 
       onProgress(ImportProgress(
         status: ImportStatus.done,
@@ -576,12 +701,80 @@ class ImporterService {
     ));
   }
 
+  // ── Local Files ───────────────────────────────────────────────────────────
+
+  Future<void> importLocalFiles({
+    required List<String> paths,
+    required void Function(ImportProgress) onProgress,
+  }) async {
+    int i = 0;
+    final imported = <String>[];
+
+    for (final path in paths) {
+      i++;
+      final file = File(path);
+      if (!await file.exists()) continue;
+
+      final fileName = p.basename(path);
+      final title = p.basenameWithoutExtension(path);
+      // Create a clean alphanumeric id for the DB
+      final id = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+
+      onProgress(ImportProgress(
+        status: ImportStatus.downloading,
+        message: 'Копирование: $title ($i из ${paths.length})',
+        progress: i / paths.length,
+      ));
+
+      try {
+        final savePath = await _getTrackPath(fileName);
+
+        // Only copy if it's not already in the music directory
+        if (file.path != savePath) {
+          await file.copy(savePath);
+        }
+
+        // Search for existing LRC if available in the same source folder
+        String? lrcPath;
+        final srcLrc = File(path.replaceAll(p.extension(path), '.lrc'));
+        if (await srcLrc.exists()) {
+           final lrcContent = await srcLrc.readAsString();
+           lrcPath = await LyricsService.instance.saveLrc(lrcContent, id);
+        }
+
+        await LibraryDatabase.instance.insertTrack(LibraryTrack(
+          id: id,
+          title: title,
+          artist: 'Unknown Artist',
+          album: 'Local Import',
+          filePath: savePath,
+          lrcPath: lrcPath,
+          durationMs: 0,
+          source: 'local',
+          addedAt: DateTime.now(),
+        ));
+
+        imported.add(id);
+      } catch (e) {
+        debugPrint('Ошибка локального импорта $fileName: $e');
+      }
+    }
+
+    onProgress(ImportProgress(
+      status: ImportStatus.done,
+      message: '✓ Импортировано ${imported.length} локальных файлов',
+      progress: 1.0,
+    ));
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   bool _isYouTube(String url) =>
       url.contains('youtube.com') || url.contains('youtu.be');
 
   bool _isSoundCloud(String url) => url.contains('soundcloud.com');
+
+  bool _isSpotify(String url) => url.contains('open.spotify.com');
 
   bool _isYandexMusic(String url) =>
       url.contains('music.yandex.ru') &&
