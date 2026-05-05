@@ -139,6 +139,7 @@ class ImporterService {
     required String cleanTitle,
     required String albumName,
     required void Function(ImportProgress) onProgress,
+    String? artistOverride,
   }) async {
     final id = video.id.value;
 
@@ -190,7 +191,7 @@ class ImporterService {
     await LibraryDatabase.instance.insertTrack(LibraryTrack(
       id: id,
       title: cleanTitle,
-      artist: video.author,
+      artist: artistOverride ?? video.author,
       album: albumName,
       filePath: savePath,
       coverPath: coverPath,
@@ -392,6 +393,7 @@ class ImporterService {
           video: video,
           cleanTitle: trackTitle,
           albumName: 'Spotify Import',
+          artistOverride: artist, // use Spotify artist!
           onProgress: (p) => onProgress(ImportProgress(
             status: p.status,
             message: p.message,
@@ -577,6 +579,7 @@ class ImporterService {
               video: video,
               cleanTitle: track['title'] ?? video.title, // use Yandex title!
               albumName: playlistName,
+              artistOverride: track['artist'], // use Yandex artist!
               onProgress: (p) {
                 // Wrapper progress to show playlist context
                 onProgress(ImportProgress(
