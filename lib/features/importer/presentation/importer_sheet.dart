@@ -103,7 +103,7 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'YouTube, прямые ссылки на MP3/FLAC',
+                      'YouTube, Яндекс.Музыка, прямые ссылки на MP3/FLAC',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.white38,
                           ),
@@ -125,7 +125,7 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                               controller: _controller,
                               style: const TextStyle(color: Colors.white),
                               decoration: const InputDecoration(
-                                hintText: 'https://youtube.com/watch?v=...',
+                                hintText: 'https://youtube.com/..., https://music.yandex.ru/...',
                                 hintStyle: TextStyle(color: Colors.white24),
                                 border: InputBorder.none,
                                 contentPadding: EdgeInsets.symmetric(

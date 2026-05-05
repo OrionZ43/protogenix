@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../../library/data/library_database.dart';
+import '../../library/data/playlist_database.dart';
 import '../../library/data/lyrics_service.dart';
 import '../../library/domain/library_track.dart';
 
@@ -53,7 +54,9 @@ class ImporterService {
     required void Function(ImportProgress) onProgress,
   }) async {
     try {
-      if (_isYouTube(url)) {
+      if (_isYandexMusic(url)) {
+        await _importYandexMusic(url: url, onProgress: onProgress);
+      } else if (_isYouTube(url)) {
         await _importYouTube(url: url, onProgress: onProgress);
       } else if (_isSoundCloud(url)) {
         await _importSoundCloud(url: url, onProgress: onProgress);
@@ -92,7 +95,6 @@ class ImporterService {
 
     try {
       final video = await yt.videos.get(url);
-      final id = video.id.value;
       final title = _cleanYouTubeTitle(video.title);
 
       onProgress(ImportProgress(
@@ -101,65 +103,13 @@ class ImporterService {
         progress: 0.1,
       ));
 
-      // Пробуем клиентов по очереди до первого успешного скачивания
-      bool downloaded = false;
-      String? savePath;
-      Exception? lastError;
-
-      for (final client in _clientFallbackOrder) {
-        debugPrint('[YT] Пробуем клиент: $client');
-        try {
-          savePath = await _tryDownloadWithClient(
-            yt: yt,
-            videoId: id,
-            client: client,
-            onProgress: (p, msg) => onProgress(ImportProgress(
-              status: ImportStatus.downloading,
-              message: msg,
-              progress: p,
-            )),
-          );
-          downloaded = true;
-          debugPrint('[YT] Успех с клиентом: $client');
-          break;
-        } on _DownloadThrottledException catch (e) {
-          debugPrint('[YT] Клиент $client завис (throttled): $e');
-          lastError = e;
-          // Продолжаем к следующему клиенту
-        } on _NoStreamsException catch (e) {
-          debugPrint('[YT] Клиент $client не вернул потоки: $e');
-          lastError = e;
-          // Продолжаем к следующему клиенту
-        } catch (e) {
-          debugPrint('[YT] Клиент $client — ошибка: $e');
-          lastError = Exception(e.toString());
-          // При неизвестной ошибке тоже пробуем дальше
-        }
-      }
-
-      if (!downloaded || savePath == null) {
-        throw lastError ?? Exception('Все клиенты YouTube исчерпаны');
-      }
-
-      onProgress(const ImportProgress(
-        status: ImportStatus.downloading,
-        message: 'Сохранение в библиотеку...',
-        progress: 0.92,
-      ));
-
-      final coverPath = await _downloadCover(video.thumbnails.highResUrl, id);
-
-      await LibraryDatabase.instance.insertTrack(LibraryTrack(
-        id: id,
-        title: title,
-        artist: video.author,
-        album: 'YouTube',
-        filePath: savePath,
-        coverPath: coverPath,
-        durationMs: video.duration?.inMilliseconds ?? 0,
-        source: 'youtube',
-        addedAt: DateTime.now(),
-      ));
+      await _downloadYouTubeVideo(
+        yt: yt,
+        video: video,
+        cleanTitle: title,
+        albumName: 'YouTube',
+        onProgress: onProgress,
+      );
 
       onProgress(ImportProgress(
         status: ImportStatus.done,
@@ -175,6 +125,75 @@ class ImporterService {
   /// Пытается скачать с конкретным клиентом.
   /// Бросает [_DownloadThrottledException] если поток завис.
   /// Бросает [_NoStreamsException] если клиент не дал аудио-потоков.
+    Future<String> _downloadYouTubeVideo({
+    required YoutubeExplode yt,
+    required Video video,
+    required String cleanTitle,
+    required String albumName,
+    required void Function(ImportProgress) onProgress,
+  }) async {
+    final id = video.id.value;
+
+    // Пробуем клиентов по очереди до первого успешного скачивания
+    bool downloaded = false;
+    String? savePath;
+    Exception? lastError;
+
+    for (final client in _clientFallbackOrder) {
+      debugPrint('[YT] Пробуем клиент: $client');
+      try {
+        savePath = await _tryDownloadWithClient(
+          yt: yt,
+          videoId: id,
+          client: client,
+          onProgress: (p, msg) => onProgress(ImportProgress(
+            status: ImportStatus.downloading,
+            message: msg,
+            progress: p,
+          )),
+        );
+        downloaded = true;
+        debugPrint('[YT] Успех с клиентом: $client');
+        break;
+      } on _DownloadThrottledException catch (e) {
+        debugPrint('[YT] Клиент $client завис (throttled): $e');
+        lastError = e;
+      } on _NoStreamsException catch (e) {
+        debugPrint('[YT] Клиент $client не вернул потоки: $e');
+        lastError = e;
+      } catch (e) {
+        debugPrint('[YT] Клиент $client — ошибка: $e');
+        lastError = Exception(e.toString());
+      }
+    }
+
+    if (!downloaded || savePath == null) {
+      throw lastError ?? Exception('Все клиенты YouTube исчерпаны');
+    }
+
+    onProgress(const ImportProgress(
+      status: ImportStatus.downloading,
+      message: 'Сохранение в библиотеку...',
+      progress: 0.92,
+    ));
+
+    final coverPath = await _downloadCover(video.thumbnails.highResUrl, id);
+
+    await LibraryDatabase.instance.insertTrack(LibraryTrack(
+      id: id,
+      title: cleanTitle,
+      artist: video.author,
+      album: albumName,
+      filePath: savePath,
+      coverPath: coverPath,
+      durationMs: video.duration?.inMilliseconds ?? 0,
+      source: 'youtube',
+      addedAt: DateTime.now(),
+    ));
+
+    return id;
+  }
+
   Future<String> _tryDownloadWithClient({
     required YoutubeExplode yt,
     required String videoId,
@@ -274,6 +293,200 @@ class ImporterService {
         .trim();
   }
 
+  // ── Yandex Music ──────────────────────────────────────────────────────────
+
+  Future<void> _importYandexMusic({
+    required String url,
+    required void Function(ImportProgress) onProgress,
+  }) async {
+    onProgress(const ImportProgress(
+      status: ImportStatus.fetchingMeta,
+      message: 'Получение данных с Яндекс.Музыки...',
+      progress: 0.05,
+    ));
+
+    try {
+      final uri = Uri.parse(url);
+      List<dynamic> tracksJson = [];
+      String playlistName = 'Yandex Playlist';
+
+      // Setup headers to pretend we are a browser
+      final headers = {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      };
+
+      if (url.contains('/album/')) {
+        // Extract album id
+        final pathSegments = uri.pathSegments;
+        final albumIndex = pathSegments.indexOf('album');
+        if (albumIndex != -1 && albumIndex + 1 < pathSegments.length) {
+          final albumId = pathSegments[albumIndex + 1];
+          final response = await _dio.get(
+            'https://music.yandex.ru/handlers/album.jsx?album=$albumId',
+            options: Options(headers: headers),
+          );
+
+          if (response.statusCode == 200) {
+            final data = response.data;
+            playlistName = data['title'] ?? 'Yandex Album';
+            if (data['volumes'] != null) {
+              for (var volume in data['volumes']) {
+                tracksJson.addAll(volume);
+              }
+            }
+          } else {
+            throw Exception('Не удалось загрузить альбом (Код: ${response.statusCode})');
+          }
+        } else {
+          throw Exception('Неверный URL альбома');
+        }
+      } else if (url.contains('/playlists/')) {
+        // Extract owner and kind
+        final pathSegments = uri.pathSegments;
+        final usersIndex = pathSegments.indexOf('users');
+        final playlistsIndex = pathSegments.indexOf('playlists');
+
+        if (usersIndex != -1 && playlistsIndex != -1 &&
+            usersIndex + 1 < pathSegments.length &&
+            playlistsIndex + 1 < pathSegments.length) {
+
+          final owner = pathSegments[usersIndex + 1];
+          final kind = pathSegments[playlistsIndex + 1];
+
+          final response = await _dio.get(
+            'https://music.yandex.ru/handlers/playlist.jsx?owner=$owner&kinds=$kind',
+            options: Options(headers: headers),
+          );
+
+          if (response.statusCode == 200) {
+            final playlist = response.data['playlist'];
+            if (playlist != null) {
+              playlistName = playlist['title'] ?? 'Yandex Playlist';
+              tracksJson = playlist['tracks'] ?? [];
+            } else {
+              throw Exception('Плейлист не найден');
+            }
+          } else {
+            throw Exception('Не удалось загрузить плейлист (Код: ${response.statusCode})');
+          }
+        } else {
+          throw Exception('Неверный URL плейлиста');
+        }
+      }
+
+      if (tracksJson.isEmpty) {
+        throw Exception('В плейлисте/альбоме нет треков');
+      }
+
+      // Parse metadata off main thread via microtask
+      await Future.microtask(() {});
+
+      final parsedTracks = <Map<String, String>>[];
+      for (var track in tracksJson) {
+        if (track['available'] == false) continue;
+
+        final title = track['title']?.toString() ?? 'Unknown Title';
+        final artistsList = track['artists'] as List?;
+        final artist = (artistsList != null && artistsList.isNotEmpty)
+            ? artistsList.map((a) => a['name']).join(', ')
+            : 'Unknown Artist';
+
+        // Use default cover from first track if available? We just leave it empty for now, YouTube will provide a cover
+        parsedTracks.add({
+          'title': title,
+          'artist': artist,
+        });
+      }
+
+      if (parsedTracks.isEmpty) {
+        throw Exception('Нет доступных треков для скачивания');
+      }
+
+      // Download each track using YouTube fallback
+      final yt = YoutubeExplode();
+      final downloadedTrackIds = <String>[];
+      int i = 0;
+
+      try {
+        for (final track in parsedTracks) {
+          i++;
+          final query = "${track['artist']} - ${track['title']}";
+
+          onProgress(ImportProgress(
+            status: ImportStatus.fetchingMeta,
+            message: 'Поиск: $query ($i из ${parsedTracks.length})',
+            progress: i / parsedTracks.length,
+          ));
+
+          try {
+            final searchResults = await yt.search.search(query);
+            if (searchResults.isEmpty) {
+              debugPrint('Не найдено на YouTube: $query');
+              continue;
+            }
+
+            final video = searchResults.first;
+
+            // Re-use standard YouTube download flow
+            final trackId = await _downloadYouTubeVideo(
+              yt: yt,
+              video: video,
+              cleanTitle: track['title'] ?? video.title, // use Yandex title!
+              albumName: playlistName,
+              onProgress: (p) {
+                // Wrapper progress to show playlist context
+                onProgress(ImportProgress(
+                  status: p.status,
+                  message: '$i/${parsedTracks.length}: ${p.message}',
+                  progress: (i - 1) / parsedTracks.length + (p.progress * (1 / parsedTracks.length)),
+                ));
+              },
+            );
+
+            downloadedTrackIds.add(trackId);
+          } catch (e) {
+            debugPrint('Ошибка загрузки $query: $e');
+            // Continue to next track
+          }
+        }
+      } finally {
+        yt.close();
+      }
+
+      // Создаем плейлист, если хоть что-то скачалось
+      if (downloadedTrackIds.isNotEmpty) {
+        onProgress(ImportProgress(
+          status: ImportStatus.done,
+          message: 'Создание плейлиста "$playlistName"...',
+          progress: 0.99,
+        ));
+
+        final playlist = await PlaylistDatabase.instance.createPlaylist(playlistName);
+        for (final trackId in downloadedTrackIds) {
+          await PlaylistDatabase.instance.addTrackToPlaylist(
+            playlistId: playlist.id,
+            trackId: trackId,
+          );
+        }
+      }
+
+      onProgress(ImportProgress(
+        status: ImportStatus.done,
+        message: '✓ Импортировано ${downloadedTrackIds.length} из ${parsedTracks.length} треков ("$playlistName")',
+        progress: 1.0,
+      ));
+
+    } catch (e) {
+      onProgress(ImportProgress(
+        status: ImportStatus.error,
+        message: 'Ошибка парсинга Яндекс.Музыки',
+        error: e.toString(),
+      ));
+    }
+  }
+
   // ── Прямая ссылка ─────────────────────────────────────────────────────────
 
   Future<void> _importDirectUrl({
@@ -369,6 +582,10 @@ class ImporterService {
       url.contains('youtube.com') || url.contains('youtu.be');
 
   bool _isSoundCloud(String url) => url.contains('soundcloud.com');
+
+  bool _isYandexMusic(String url) =>
+      url.contains('music.yandex.ru') &&
+      (url.contains('/playlists/') || url.contains('/album/'));
 
   bool _isDirectAudio(String url) =>
       url.endsWith('.mp3') ||
