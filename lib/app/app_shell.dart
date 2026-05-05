@@ -12,6 +12,9 @@
 //   MiniPlayer встроен в нижнюю часть Rail
 //   Тап мини-плеера → ExpandedPlayerScreen через Navigator.push (НЕ modal)
 //
+// Desktop (Windows / Linux / macOS):
+//   WindowTitleBar поверх любого режима — кнопки закрыть/свернуть/развернуть
+//
 // ── Исправленные баги ──────────────────────────────────────────────────────
 //   Bug 2: Убрана дублирующая кнопка «вниз» из _FullPlayerSheet.
 //          Теперь _TopBar в PlayerScreen единолично отвечает за закрытие.
@@ -20,10 +23,12 @@
 //          При складывании/раскладывании в планшетный режим открытый
 //          модальный плеер принудительно закрывается.
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/utils/fold_layout.dart';
+import '../core/widgets/window_title_bar.dart';
 import '../features/library/presentation/screens/library_screen.dart';
 import '../features/library/presentation/screens/playlists_screen.dart';
 import '../features/library/presentation/screens/favorites_screen.dart';
@@ -59,6 +64,11 @@ final _screens = <Widget>[
   const FavoritesScreen(),
 ];
 
+// ── Хелпер: десктопная платформа? ────────────────────────────────────────────
+
+bool get _isDesktop =>
+    Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,10 +78,22 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return FoldLayout(
+    final shell = FoldLayout(
       compactBuilder: (ctx, _) => const _CompactShell(),
       expandedBuilder: (ctx, _) => const _ExpandedShell(),
     );
+
+    // На десктопе оборачиваем в колонку: тайтлбар + контент
+    if (_isDesktop) {
+      return Column(
+        children: [
+          const WindowTitleBar(),
+          Expanded(child: shell),
+        ],
+      );
+    }
+
+    return shell;
   }
 }
 
@@ -221,18 +243,19 @@ class _ExpandedShell extends ConsumerWidget {
               children: [
                 const SizedBox(height: 24),
 
-                // Лого
-                const Text(
-                  'PX',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.5,
+                // Лого (скрыто на десктопе — уже есть в тайтлбаре)
+                if (!_isDesktop)
+                  const Text(
+                    'PX',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: 32),
+                if (!_isDesktop) const SizedBox(height: 32),
 
                 // Иконки вкладок
                 ...List.generate(_tabs.length, (i) {
@@ -335,7 +358,7 @@ class _BottomBar extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight:
-                                selected ? FontWeight.w600 : FontWeight.w400,
+                            selected ? FontWeight.w600 : FontWeight.w400,
                             color: selected ? Colors.white : Colors.white38,
                           ),
                         ),
@@ -392,11 +415,11 @@ class _RailIconState extends State<_RailIcon> {
             decoration: BoxDecoration(
               border: widget.selected
                   ? const Border(
-                      left: BorderSide(
-                        color: Colors.white,
-                        width: 2,
-                      ),
-                    )
+                left: BorderSide(
+                  color: Colors.white,
+                  width: 2,
+                ),
+              )
                   : null,
             ),
             child: Icon(
