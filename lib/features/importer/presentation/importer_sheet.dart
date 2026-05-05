@@ -136,95 +136,106 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                     const SizedBox(height: 24),
 
                     // Поле ввода
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        color: Colors.white.withAlpha(10),
-                        border: Border.all(color: Colors.white.withAlpha(25)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _controller,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                hintText: _selectedService == _Service.youtube ? 'https://youtube.com/watch?v=...' : _selectedService == _Service.spotify ? 'https://open.spotify.com/track/...' : 'https://music.yandex.ru/album/...',
-                                hintStyle: TextStyle(color: Colors.white24),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 14,
-                                ),
-                              ),
-                              onSubmitted: (_) => _startImport(),
-                            ),
-                          ),
-                          // Кнопка вставить
-                          IconButton(
-                            icon: const Icon(
-                              Icons.content_paste_rounded,
-                              color: Colors.white38,
-                            ),
-                            onPressed: () async {
-                              final data = await Clipboard.getData(
-                                'text/plain',
-                              );
-                              if (data?.text != null) {
-                                _controller.text = data!.text!;
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Прогресс
-                    if (_progress.status != ImportStatus.idle)
-                      _buildProgress().animate().fadeIn(duration: 300.ms),
-
-                    const SizedBox(height: 16),
-
-                    // Кнопка импорт
-                    SizedBox(
-                      width: double.infinity,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        child: ElevatedButton(
-                          onPressed: _isImporting ? null : _startImport,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _selectedService == _Service.youtube
-                                ? Colors.redAccent
-                                : _selectedService == _Service.spotify
-                                    ? const Color(0xFF1DB954)
-                                    : const Color(0xFFFFCC00),
-                            foregroundColor: _selectedService == _Service.yandex ? Colors.black : Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isImporting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _mode == _ImportMode.selection
+                          ? _buildSelectionGrid()
+                          : Column(
+                              key: const ValueKey('input_mode'),
+                              children: [
+                                // Поле ввода
+                                Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    color: Colors.white.withAlpha(10),
+                                    border: Border.all(color: Colors.white.withAlpha(25)),
                                   ),
-                                )
-                              : const Text(
-                                  'Импортировать',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: _controller,
+                                          style: const TextStyle(color: Colors.white),
+                                          decoration: InputDecoration(
+                                            hintText: _selectedService == _Service.youtube ? 'https://youtube.com/watch?v=...' : _selectedService == _Service.spotify ? 'https://open.spotify.com/track/...' : 'https://music.yandex.ru/album/...',
+                                            hintStyle: const TextStyle(color: Colors.white24),
+                                            border: InputBorder.none,
+                                            contentPadding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 14,
+                                            ),
+                                          ),
+                                          onSubmitted: (_) => _startImport(),
+                                        ),
+                                      ),
+                                      // Кнопка вставить
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.content_paste_rounded,
+                                          color: Colors.white38,
+                                        ),
+                                        onPressed: () async {
+                                          final data = await Clipboard.getData(
+                                            'text/plain',
+                                          );
+                                          if (data?.text != null) {
+                                            _controller.text = data!.text!;
+                                          }
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 ),
-                        ),
-                      ),
+
+                                const SizedBox(height: 16),
+
+                                // Прогресс
+                                if (_progress.status != ImportStatus.idle)
+                                  _buildProgress().animate().fadeIn(duration: 300.ms),
+
+                                const SizedBox(height: 16),
+
+                                // Кнопка импорт
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    child: ElevatedButton(
+                                      onPressed: _isImporting ? null : _startImport,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: _selectedService == _Service.youtube
+                                            ? Colors.redAccent
+                                            : _selectedService == _Service.spotify
+                                                ? const Color(0xFF1DB954)
+                                                : const Color(0xFFFFCC00),
+                                        foregroundColor: _selectedService == _Service.yandex ? Colors.black : Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: _isImporting
+                                          ? SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                color: _selectedService == _Service.yandex ? Colors.black : Colors.white,
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Импортировать',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ],
                 ),

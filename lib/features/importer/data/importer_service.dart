@@ -118,6 +118,12 @@ class ImporterService {
         message: '✓ "$title" добавлен!',
         progress: 1.0,
       ));
+    } catch (e) {
+      onProgress(ImportProgress(
+        status: ImportStatus.error,
+        message: 'Ошибка скачивания YouTube',
+        error: e.toString(),
+      ));
     } finally {
       // Всегда закрываем — освобождает HTTP-сессию и предотвращает утечки
       yt.close();
@@ -588,7 +594,7 @@ class ImporterService {
             );
           } catch (e) {
             debugPrint('Ошибка загрузки $query: $e');
-            // Continue to next track
+            // Continue to next track, but optionally notify? No, just continue to not break the whole playlist.
           }
         }
       } finally {
