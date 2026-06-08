@@ -1,3 +1,19 @@
+// lib/features/library/data/lyrics_service.dart
+//
+// Scoring Engine v2 — исправленные веса:
+//   Title:  до +150 баллов  (было: 40)
+//   Artist: до +80  баллов  (было: 20)
+//   Format: тайбрейкер      (было: до +60)
+//     syllable → +15  (было: 60)
+//     enhanced → +10  (было: 45)
+//     synced   → +5   (было: 25)
+//     plain    → +0   (было: 5)
+//
+// Математика победы:
+//   Точное совпадение plain = 150 + 80 + 0 = 230 баллов
+//   50% совпадение + syllable = 75 + 40 + 15 = 130 баллов
+//   → Правильная песня в plain ВСЕГДА выигрывает у чужой в syllable.
+
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,7 +27,6 @@ import 'providers/netease_provider.dart';
 
 class LyricsService {
   LyricsService._() {
-    // Регистрируем провайдеры по умолчанию
     _providers = [
       LrcLibProvider(),
       NetEaseProvider(),
@@ -56,7 +71,7 @@ class LyricsService {
           type: _classifyContent(local),
           source: 'local',
         );
-        return [ScoredLyric(metadata: meta, score: 100.0)];
+        return [ScoredLyric(metadata: meta, score: 999.0)];
       }
     }
 
@@ -78,8 +93,8 @@ class LyricsService {
 
     debugPrint(
       '[LyricsService] Параллельных запросов: '
-      '${_providers.length} провайдера × ${queries.length} запросов '
-      '= ${allFutures.length}',
+          '${_providers.length} провайдера × ${queries.length} запросов '
+          '= ${allFutures.length}',
     );
 
     final allLists = await Future.wait(allFutures);
@@ -90,7 +105,6 @@ class LyricsService {
 
     for (final list in allLists) {
       for (final meta in list) {
-        // Дедупликация по id провайдера
         if (seen.add(meta.id)) {
           unique.add(meta);
         }
@@ -126,9 +140,9 @@ class LyricsService {
       final s = top10[i];
       debugPrint(
         '[LyricsService] #${i + 1} '
-        '"${s.metadata.artistName} — ${s.metadata.trackName}" '
-        '| ${s.metadata.type} | ${s.metadata.source} '
-        '| score=${s.scoreLabel}',
+            '"${s.metadata.artistName} — ${s.metadata.trackName}" '
+            '| ${s.metadata.type} | ${s.metadata.source} '
+            '| score=${s.scoreLabel}',
       );
     }
 
@@ -136,8 +150,19 @@ class LyricsService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // SCORING ENGINE
+  // SCORING ENGINE v2
   // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Принцип: соответствие названию и артисту — ГЛАВНЫЙ критерий.
+  // Формат — ТАЙБРЕЙКЕР среди одинаково релевантных результатов.
+  //
+  // Максимумы:
+  //   title:   150 баллов  (sim ∈ [0..1] × 150)
+  //   artist:   80 баллов  (sim ∈ [0..1] × 80)
+  //   duration: 15 баллов  (точное совпадение ±3 сек)
+  //   format:   15 баллов  (syllable, тайбрейкер)
+  //
+  // Итого max ≈ 260 баллов при идеальном совпадении.
 
   double _calculateScore({
     required LyricsMetadata meta,
@@ -153,17 +178,17 @@ class LyricsService {
     final normMTitle = _normalize(meta.trackName);
     final normMArtist = _normalize(meta.artistName);
 
-    // ── Схожесть названия: до +40 баллов ─────────────────────────────────
+    // ── Схожесть названия: до +150 баллов ────────────────────────────────
     final titleSim = normTitle.isNotEmpty && normMTitle.isNotEmpty
         ? normTitle.similarityTo(normMTitle)
         : 0.0;
-    score += titleSim * 40.0;
+    score += titleSim * 150.0;
 
-    // ── Схожесть артиста: до +20 баллов ──────────────────────────────────
+    // ── Схожесть артиста: до +80 баллов ──────────────────────────────────
     final artistSim = normArtist.isNotEmpty && normMArtist.isNotEmpty
         ? normArtist.similarityTo(normMArtist)
         : 0.0;
-    score += artistSim * 20.0;
+    score += artistSim * 80.0;
 
     // ── Бонус за длительность: до +15 баллов ─────────────────────────────
     if (trackDurationMs != null && meta.durationMs != null) {
@@ -174,35 +199,37 @@ class LyricsService {
         score += 15.0;
         debugPrint(
           '[SCORE] "${meta.trackName}" +15.0 (длит. совпадает, '
-          'diff=${diffSec.toStringAsFixed(1)}s)',
+              'diff=${diffSec.toStringAsFixed(1)}s)',
         );
       } else if (diffSec < 10.0) {
         score += 5.0;
       } else if (diffSec > 60.0) {
-        // Сильный штраф — явно другой трек
+        // Штраф — явно другой трек
         score -= 10.0;
         debugPrint(
           '[SCORE] "${meta.trackName}" -10.0 '
-          '(длит. сильно отличается, diff=${diffSec.toStringAsFixed(0)}s)',
+              '(длит. сильно отличается, diff=${diffSec.toStringAsFixed(0)}s)',
         );
       }
     }
 
-    // ── Бонус за формат ───────────────────────────────────────────────────
+    // ── Бонус за формат (тайбрейкер): до +15 баллов ──────────────────────
+    // Помогает выбирать лучший формат ТОЛЬКО среди равно релевантных треков.
+    // НЕ перебивает совпадение названия/артиста.
     final formatBonus = switch (meta.type) {
-      LyricsType.syllable => 60.0,
-      LyricsType.enhanced => 45.0,
-      LyricsType.synced => 25.0,
-      LyricsType.plain => 5.0,
+      LyricsType.syllable => 15.0,
+      LyricsType.enhanced => 10.0,
+      LyricsType.synced   => 5.0,
+      LyricsType.plain    => 0.0,
     };
     score += formatBonus;
 
     debugPrint(
       '[SCORE] "${meta.artistName} — ${meta.trackName}" '
-      '| title=${(titleSim * 40).toStringAsFixed(1)} '
-      'artist=${(artistSim * 20).toStringAsFixed(1)} '
-      'format=$formatBonus '
-      '| TOTAL=${score.toStringAsFixed(1)} [${meta.type}] [${meta.source}]',
+          '| title=${(titleSim * 150).toStringAsFixed(1)} '
+          'artist=${(artistSim * 80).toStringAsFixed(1)} '
+          'format=$formatBonus '
+          '| TOTAL=${score.toStringAsFixed(1)} [${meta.type}] [${meta.source}]',
     );
 
     return score;
@@ -213,7 +240,7 @@ class LyricsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   /// Нормализует строку для сравнения:
-  /// приводит к нижнему регистру, убирает скобки и лишние пробелы
+  /// приводит к нижнему регистру, убирает скобки и лишние пробелы.
   String _normalize(String s) {
     return s
         .toLowerCase()
@@ -223,7 +250,7 @@ class LyricsService {
         .trim();
   }
 
-  /// Определяет тип текста по содержимому
+  /// Определяет тип текста по содержимому.
   LyricsType _classifyContent(String content) {
     if (RegExp(r'<\d{2}:\d{2}\.\d{2,3}>').hasMatch(content)) {
       return LyricsType.enhanced;
@@ -235,7 +262,7 @@ class LyricsService {
     return LyricsType.plain;
   }
 
-  /// Читает .lrc файл рядом с аудиофайлом
+  /// Читает .lrc файл рядом с аудиофайлом.
   String? _readLocalLrc(String filePath) {
     try {
       final lrcFile = File('${p.withoutExtension(filePath)}.lrc');

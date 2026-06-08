@@ -177,6 +177,12 @@ class _CompactLayout extends StatelessWidget {
                   palette: palette,
                   compact: true,
                 ),
+                const SizedBox(height: 10),
+                _VolumeSlider(
+                  volume: player.volume,
+                  accentColor: palette.primary,
+                  onChanged: notifier.setVolume,
+                ),
               ],
             ),
           ),
@@ -264,7 +270,7 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
                 const SizedBox(width: 6),
                 Text(widget.label,
                     style:
-                        const TextStyle(color: Colors.white60, fontSize: 12)),
+                    const TextStyle(color: Colors.white60, fontSize: 12)),
               ],
             ),
           ),
@@ -337,7 +343,7 @@ class _TrackInfo extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isFav =
-        showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
+    showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
 
     final titleStyle = TextStyle(
       color: Colors.white,
@@ -526,6 +532,61 @@ class _Controls extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VOLUME SLIDER — десктопный ползунок громкости
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _VolumeSlider extends StatelessWidget {
+  const _VolumeSlider({
+    required this.volume,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
+  final double volume;
+  final Color accentColor;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final IconData volIcon = volume == 0
+        ? Icons.volume_off_rounded
+        : volume < 0.4
+        ? Icons.volume_down_rounded
+        : Icons.volume_up_rounded;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Icon(volIcon, color: Colors.white38, size: 16),
+          const SizedBox(width: 4),
+          Expanded(
+            child: SliderTheme(
+              data: SliderThemeData(
+                trackHeight: 2.5,
+                thumbShape:
+                const RoundSliderThumbShape(enabledThumbRadius: 5),
+                overlayShape:
+                const RoundSliderOverlayShape(overlayRadius: 12),
+                activeTrackColor: accentColor.withAlpha(200),
+                inactiveTrackColor: Colors.white.withAlpha(20),
+                thumbColor: Colors.white,
+                overlayColor: accentColor.withAlpha(30),
+              ),
+              child: Slider(
+                value: volume.clamp(0.0, 1.0),
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+          Icon(Icons.volume_up_rounded, color: Colors.white24, size: 16),
+        ],
+      ),
     );
   }
 }
