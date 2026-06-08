@@ -15,7 +15,9 @@ import '../library_provider.dart';
 import '../widgets/track_context_menu.dart';
 import '../../../importer/presentation/importer_sheet.dart';
 import '../../../player/presentation/providers/player_provider.dart';
+import '../../../player/presentation/providers/palette_provider.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
+import 'about_sheet.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -116,12 +118,172 @@ class _ImportButton extends StatelessWidget {
 // TRACK LIST
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _TrackList extends ConsumerWidget {
+class _TrackList extends ConsumerStatefulWidget {
   const _TrackList({required this.tracks});
   final List<LibraryTrack> tracks;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TrackList> createState() => _TrackListState();
+}
+
+void _showSortSheet(BuildContext context, WidgetRef ref) {
+  final currentMode = ref.read(librarySortModeProvider);
+  final palette = ref.read(paletteProvider);
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: const Color(0xFF13131F),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 16),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Сортировка',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            _SortOptionTile(
+              label: 'По дате добавления',
+              isSelected: currentMode == LibrarySortMode.dateAdded,
+              accentColor: palette.primary,
+              onTap: () {
+                ref.read(librarySortModeProvider.notifier).state =
+                    LibrarySortMode.dateAdded;
+                Navigator.pop(ctx);
+              },
+            ),
+            _SortOptionTile(
+              label: 'По названию',
+              isSelected: currentMode == LibrarySortMode.title,
+              accentColor: palette.primary,
+              onTap: () {
+                ref.read(librarySortModeProvider.notifier).state =
+                    LibrarySortMode.title;
+                Navigator.pop(ctx);
+              },
+            ),
+            _SortOptionTile(
+              label: 'По исполнителю',
+              isSelected: currentMode == LibrarySortMode.artist,
+              accentColor: palette.primary,
+              onTap: () {
+                ref.read(librarySortModeProvider.notifier).state =
+                    LibrarySortMode.artist;
+                Navigator.pop(ctx);
+              },
+            ),
+            _SortOptionTile(
+              label: 'По длительности',
+              isSelected: currentMode == LibrarySortMode.duration,
+              accentColor: palette.primary,
+              onTap: () {
+                ref.read(librarySortModeProvider.notifier).state =
+                    LibrarySortMode.duration;
+                Navigator.pop(ctx);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _SortOptionTile extends StatelessWidget {
+  const _SortOptionTile({
+    required this.label,
+    required this.isSelected,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? accentColor : Colors.white70,
+          fontSize: 16,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_rounded, color: accentColor, size: 24)
+          : null,
+    );
+  }
+}
+
+class _TrackListState extends ConsumerState<_TrackList> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ref.watch(paletteProvider);
+
+    var filteredTracks = widget.tracks.where((t) {
+      if (_searchQuery.isEmpty) return true;
+      final q = _searchQuery.toLowerCase();
+      return t.title.toLowerCase().contains(q) ||
+          t.artist.toLowerCase().contains(q);
+    }).toList();
+
+    final sortMode = ref.watch(librarySortModeProvider);
+    switch (sortMode) {
+      case LibrarySortMode.title:
+        filteredTracks.sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        break;
+      case LibrarySortMode.artist:
+        filteredTracks.sort(
+            (a, b) => a.artist.toLowerCase().compareTo(b.artist.toLowerCase()));
+        break;
+      case LibrarySortMode.duration:
+        filteredTracks.sort((a, b) => a.durationMs.compareTo(b.durationMs));
+        break;
+      case LibrarySortMode.dateAdded:
+        // already sorted by date desc in DB
+        break;
+    }
+
     return SafeArea(
       bottom: false,
       child: CustomScrollView(
@@ -143,13 +305,46 @@ class _TrackList extends ConsumerWidget {
                   ),
                   const Spacer(),
                   Text(
-                    '${tracks.length}',
+                    '${widget.tracks.length}',
                     style: const TextStyle(
                       color: Colors.white38,
                       fontSize: 16,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
+                  // Кнопка сортировки
+                  GestureDetector(
+                    onTap: () => _showSortSheet(context, ref),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withAlpha(0),
+                      ),
+                      child: Icon(
+                        Icons.sort_rounded,
+                        size: 20,
+                        color: sortMode != LibrarySortMode.dateAdded
+                            ? palette.primary
+                            : Colors.white24,
+                      ),
+                    ),
+                  ),
+                  // Кнопка о приложении
+                  GestureDetector(
+                    onTap: () => showAboutSheet(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color:
+                            Colors.white.withAlpha(0), // transparent hit area
+                      ),
+                      child: const Icon(Icons.info_outline_rounded,
+                          size: 20, color: Colors.white24),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   // Кнопка импорта
                   GestureDetector(
                     onTap: () => showImporterSheet(context),
@@ -172,17 +367,80 @@ class _TrackList extends ConsumerWidget {
             ),
           ),
 
-          // ── Список ───────────────────────────────────────────────────────
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _TrackTile(
-                track: tracks[index],
-                index: index,
-                tracks: tracks,
+          // ── Поиск ────────────────────────────────────────────────────────
+          if (widget.tracks.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(15),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withAlpha(25)),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    cursorColor: palette.primary,
+                    decoration: InputDecoration(
+                      hintText: 'Поиск треков и исполнителей...',
+                      hintStyle:
+                          const TextStyle(color: Colors.white38, fontSize: 15),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: Colors.white38, size: 20),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close_rounded,
+                                  color: Colors.white54, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                ),
               ),
-              childCount: tracks.length,
             ),
-          ),
+
+          // ── Список ───────────────────────────────────────────────────────
+          if (filteredTracks.isEmpty && _searchQuery.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 60),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const Icon(Icons.search_off_rounded,
+                          size: 48, color: Colors.white24),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Ничего не найдено',
+                        style: TextStyle(
+                            color: Colors.white.withAlpha(150), fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _TrackTile(
+                  track: filteredTracks[index],
+                  index: index,
+                  tracks: filteredTracks,
+                ),
+                childCount: filteredTracks.length,
+              ),
+            ),
 
           // Отступ снизу (под мини-плеер + навбар)
           const SliverToBoxAdapter(child: SizedBox(height: 140)),
@@ -209,8 +467,10 @@ class _TrackTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player = ref.watch(playerProvider);
-    final isPlaying = player.currentTrack?.id == track.id;
+    final currentTrackId =
+        ref.watch(playerProvider.select((s) => s.currentTrack?.id));
+    final isPlaying = currentTrackId == track.id;
+    final palette = ref.watch(paletteProvider);
 
     return InkWell(
       onTap: () {
@@ -260,6 +520,20 @@ class _TrackTile extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(10),
                       color: Colors.black.withAlpha(120),
                     ),
+                    child: Icon(
+                      Icons.equalizer_rounded,
+                      color: palette.primary,
+                      size: 22,
+                    ),
+                  )
+                else
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      color: Colors.black.withAlpha(120),
+                    ),
                     child: const Icon(
                       Icons.volume_up_rounded,
                       color: Colors.white,
@@ -281,7 +555,7 @@ class _TrackTile extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: isPlaying ? Colors.white : Colors.white,
+                      color: isPlaying ? Colors.white : Colors.white70,
                       fontSize: 15,
                       fontWeight: isPlaying ? FontWeight.w600 : FontWeight.w500,
                     ),
@@ -291,8 +565,8 @@ class _TrackTile extends ConsumerWidget {
                     track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white54,
+                    style: TextStyle(
+                      color: isPlaying ? Colors.white : Colors.white54,
                       fontSize: 12,
                     ),
                   ),

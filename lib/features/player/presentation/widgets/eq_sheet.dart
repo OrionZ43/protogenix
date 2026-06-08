@@ -194,6 +194,64 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
                   ),
                 ),
               ),
+
+              const SizedBox(height: 32),
+
+              // ── Скорость воспроизведения ──────────────────────────────────
+              Row(
+                children: [
+                  Icon(Icons.speed_rounded,
+                      color: player.speed != 1.0 ? accentColor : Colors.white54,
+                      size: 20),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'СКОРОСТЬ',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2.5,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '×${player.speed.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: player.speed != 1.0 ? accentColor : Colors.white54,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 4,
+                  activeTrackColor:
+                      player.speed != 1.0 ? accentColor : Colors.white38,
+                  inactiveTrackColor: Colors.white.withAlpha(20),
+                  thumbColor: player.speed != 1.0 ? accentColor : Colors.white,
+                  overlayColor:
+                      (player.speed != 1.0 ? accentColor : Colors.white)
+                          .withAlpha(40),
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 8),
+                  overlayShape:
+                      const RoundSliderOverlayShape(overlayRadius: 16),
+                  valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+                ),
+                child: Slider(
+                  value: player.speed,
+                  min: 0.5,
+                  max: 2.0,
+                  divisions: 6,
+                  label: '×${player.speed.toStringAsFixed(2)}',
+                  onChanged: (val) {
+                    notifier.setSpeed(val);
+                  },
+                ),
+              ),
             ],
           ),
         ),

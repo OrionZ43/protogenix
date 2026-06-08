@@ -20,6 +20,7 @@ import '../widgets/protogenix_background.dart';
 import '../widgets/music_visualizer_controls.dart';
 import '../widgets/lyrics_search_sheet.dart';
 import '../widgets/beautiful_lyrics_view.dart';
+import '../widgets/sleep_timer_sheet.dart';
 import '../../../importer/presentation/importer_sheet.dart';
 
 class PlayerScreen extends ConsumerWidget {
@@ -169,7 +170,7 @@ class _BottomRow extends ConsumerWidget {
             accentColor: palette.primary,
             onTap: () {
               HapticFeedback.lightImpact();
-              // Здесь должна быть логика вызова Sleep Timer диалога
+              showSleepTimerSheet(context, ref);
             },
           ),
           _CapsuleBtn(

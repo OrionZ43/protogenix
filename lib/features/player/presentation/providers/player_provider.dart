@@ -107,6 +107,40 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     }
   }
 
+  // ── Очередь (Play Next / Add to queue) ────────────────────────────────────
+
+  /// Вставить трек следующим в очереди и сразу начать воспроизведение.
+  Future<void> playNext(TrackModel track) async {
+    final newQueue = List<TrackModel>.from(state.queue.cast<TrackModel>());
+
+    if (newQueue.isEmpty) {
+      newQueue.add(track);
+      await loadPlaylist(newQueue, initialIndex: 0);
+      return;
+    }
+
+    final insertIndex = state.currentIndex + 1;
+    newQueue.insert(insertIndex, track);
+    await loadPlaylist(newQueue, initialIndex: insertIndex);
+  }
+
+  /// Добавить трек в конец очереди без прерывания воспроизведения.
+  Future<void> addToQueue(TrackModel track) async {
+    final newQueue = List<TrackModel>.from(state.queue.cast<TrackModel>());
+
+    if (newQueue.isEmpty) {
+      newQueue.add(track);
+      await loadPlaylist(newQueue, initialIndex: 0);
+      return;
+    }
+
+    newQueue.add(track);
+    final currentIdx = state.currentIndex;
+    final currentPos = state.position;
+    await loadPlaylist(newQueue, initialIndex: currentIdx);
+    await seekTo(currentPos);
+  }
+
   // ── Загрузка плейлиста (Оптимизировано Bolt) ──────────────────────────────
 
   Future<void> loadPlaylist(Iterable<TrackModel> tracks,
