@@ -45,7 +45,7 @@ dependencies:
   media_kit_libs_video: ^1.0.7
   audiotags: 1.1.3  # зафиксирована — версии 1.2+ используют native assets и ломают Windows/Android сборку
   file_picker: ^11.0.2
-  url_launcher: ^6.3.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

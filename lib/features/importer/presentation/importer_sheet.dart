@@ -16,7 +16,7 @@ class ImporterSheet extends ConsumerStatefulWidget {
   ConsumerState<ImporterSheet> createState() => _ImporterSheetState();
 }
 
-enum _ImportMode { selection, input, local }
+enum _ImportMode { selection, input }
 
 enum _Service { none, youtube, spotify, yandex }
 

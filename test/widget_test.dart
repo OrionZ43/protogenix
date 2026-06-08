@@ -9,8 +9,8 @@ void main() {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
   testWidgets('App smoke test', skip: true, (WidgetTester tester) async {
-    tester.binding.window.physicalSizeTestValue = const Size(800, 600);
-    tester.binding.window.devicePixelRatioTestValue = 1.0;
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1.0;
     await tester.pumpWidget(const ProviderScope(child: ProtogenixApp()));
     // await tester.pumpAndSettle();
     expect(find.byType(ProtogenixApp), findsOneWidget);

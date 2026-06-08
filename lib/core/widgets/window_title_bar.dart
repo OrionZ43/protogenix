@@ -51,7 +51,7 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
         decoration: BoxDecoration(
           // Лёгкая линия отделит тайтлбар от основного контента
           border: Border(
-            bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
+            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
           ),
         ),
         child: Row(
@@ -106,7 +106,7 @@ class _Logo extends StatelessWidget {
             borderRadius: BorderRadius.circular(5),
             boxShadow:[
               BoxShadow(
-                color: const Color(0xFFCE93D8).withOpacity(0.3),
+                color: const Color(0xFFCE93D8).withValues(alpha: 0.3),
                 blurRadius: 6,
               ),
             ],
@@ -197,7 +197,7 @@ class _WinBtnState extends State<_WinBtn> {
           duration: const Duration(milliseconds: 100),
           width: 40,
           color: _hover
-              ? (widget.isClose ? const Color(0xFFE81123) : Colors.white.withOpacity(0.08))
+              ? (widget.isClose ? const Color(0xFFE81123) : Colors.white.withValues(alpha: 0.08))
               : Colors.transparent,
           child: Icon(
             widget.icon,
@@ -263,8 +263,8 @@ class _MacBtnState extends State<_MacBtn> {
           height: 12,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: _hover ? widget.color : widget.color.withOpacity(0.8),
-            boxShadow: _hover ? [BoxShadow(color: widget.color.withOpacity(0.5), blurRadius: 4)] : null,
+            color: _hover ? widget.color : widget.color.withValues(alpha: 0.8),
+            boxShadow: _hover ? [BoxShadow(color: widget.color.withValues(alpha: 0.5), blurRadius: 4)] : null,
           ),
           child: _hover ? Icon(widget.icon, size: 8, color: Colors.black45) : null,
         ),

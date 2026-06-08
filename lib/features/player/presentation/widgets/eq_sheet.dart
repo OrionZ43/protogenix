@@ -16,10 +16,6 @@ import '../../domain/player_state.dart'; // <-- ИСПРАВЛЕНИЕ: Доба
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
 
-// Стандартные метки 5-полосного EQ (Android может вернуть другие centerFreq,
-// но будем показывать их из params.bands[i].centerFrequency).
-const _kBandLabels = ['60\nHz', '230\nHz', '910\nHz', '4\nkHz', '14\nkHz'];
-
 /// Открывает EQ BottomSheet.
 void showEqSheet(BuildContext context, WidgetRef ref) {
   showModalBottomSheet(
@@ -27,10 +23,7 @@ void showEqSheet(BuildContext context, WidgetRef ref) {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withAlpha(100),
-    builder: (_) => ProviderScope(
-      parent: ProviderScope.containerOf(context),
-      child: const _EqSheet(),
-    ),
+    builder: (_) => const _EqSheet(),
   );
 }
 
@@ -60,8 +53,9 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
       if (mounted) setState(() => _params = params);
     } catch (e) {
       debugPrint('Ошибка загрузки параметров эквалайзера: $e');
-      if (mounted)
+      if (mounted) {
         setState(() => _loadError = 'Ошибка загрузки параметров эквалайзера');
+      }
     }
   }
 

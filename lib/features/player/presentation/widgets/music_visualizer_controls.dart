@@ -584,7 +584,7 @@ class _VolumeSlider extends StatelessWidget {
               ),
             ),
           ),
-          Icon(Icons.volume_up_rounded, color: Colors.white24, size: 16),
+          const Icon(Icons.volume_up_rounded, color: Colors.white24, size: 16),
         ],
       ),
     );
