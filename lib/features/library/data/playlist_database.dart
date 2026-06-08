@@ -114,9 +114,15 @@ class PlaylistDatabase {
 
   Future<Playlist> createPlaylist(String name) async {
     final database = await db;
+    // Sanitize playlist name: remove surrounding whitespace and generic invisible characters
+    final sanitizedName =
+        name.trim().replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '');
+    final finalName =
+        sanitizedName.isNotEmpty ? sanitizedName : 'Unnamed Playlist';
+
     final playlist = Playlist(
-      id: '${DateTime.now().millisecondsSinceEpoch}_${name.hashCode}',
-      name: name,
+      id: '${DateTime.now().millisecondsSinceEpoch}_${finalName.hashCode}',
+      name: finalName,
       createdAt: DateTime.now().millisecondsSinceEpoch,
     );
     await database.insert('playlists', playlist.toMap());
@@ -125,9 +131,14 @@ class PlaylistDatabase {
 
   Future<void> renamePlaylist(String id, String newName) async {
     final database = await db;
+    final sanitizedName =
+        newName.trim().replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '');
+    final finalName =
+        sanitizedName.isNotEmpty ? sanitizedName : 'Unnamed Playlist';
+
     await database.update(
       'playlists',
-      {'name': newName},
+      {'name': finalName},
       where: 'id = ?',
       whereArgs: [id],
     );

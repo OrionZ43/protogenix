@@ -17,12 +17,12 @@ class ImporterSheet extends ConsumerStatefulWidget {
 }
 
 enum _ImportMode { selection, input, local }
+
 enum _Service { none, youtube, spotify, yandex }
 
 class _ImporterSheetState extends ConsumerState<ImporterSheet> {
   _ImportMode _mode = _ImportMode.selection;
   _Service _selectedService = _Service.none;
-
 
   final _controller = TextEditingController();
   ImportProgress _progress = ImportProgress.idle;
@@ -93,155 +93,188 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                       24,
                       0,
                       24,
-                      MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 24,
+                      MediaQuery.of(context).viewInsets.bottom +
+                          MediaQuery.of(context).padding.bottom +
+                          24,
                     ),
                     child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ИМПОРТ ТРЕКА',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Colors.white38,
-                            letterSpacing: 3,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_mode != _ImportMode.selection)
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                            onPressed: () {
-                              setState(() {
-                                _mode = _ImportMode.selection;
-                                _selectedService = _Service.none;
-                                _progress = ImportProgress.idle;
-                                _controller.clear();
-                              });
-                            },
-                          ),
-                        Expanded(
-                          child: Text(
-                            _mode == _ImportMode.selection
-                                ? 'Выбери источник'
-                                : _selectedService == _Service.youtube
-                                    ? 'Импорт из YouTube'
-                                    : _selectedService == _Service.spotify
-                                        ? 'Импорт из Spotify'
-                                        : 'Импорт из Яндекс.Музыки',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: Colors.white,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Поле ввода
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: _mode == _ImportMode.selection
-                          ? _buildSelectionGrid()
-                          : Column(
-                              key: const ValueKey('input_mode'),
-                              children: [
-                                // Поле ввода
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                    color: Colors.white.withAlpha(10),
-                                    border: Border.all(color: Colors.white.withAlpha(25)),
+                        Text(
+                          'ИМПОРТ ТРЕКА',
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: Colors.white38,
+                                    letterSpacing: 3,
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: TextField(
-                                          controller: _controller,
-                                          style: const TextStyle(color: Colors.white),
-                                          decoration: InputDecoration(
-                                            hintText: _selectedService == _Service.youtube ? 'https://youtube.com/watch?v=...' : _selectedService == _Service.spotify ? 'https://open.spotify.com/track/...' : 'https://music.yandex.ru/album/...',
-                                            hintStyle: const TextStyle(color: Colors.white24),
-                                            border: InputBorder.none,
-                                            contentPadding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 14,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            if (_mode != _ImportMode.selection)
+                              IconButton(
+                                icon: const Icon(Icons.arrow_back_rounded,
+                                    color: Colors.white),
+                                onPressed: () {
+                                  setState(() {
+                                    _mode = _ImportMode.selection;
+                                    _selectedService = _Service.none;
+                                    _progress = ImportProgress.idle;
+                                    _controller.clear();
+                                  });
+                                },
+                              ),
+                            Expanded(
+                              child: Text(
+                                _mode == _ImportMode.selection
+                                    ? 'Выбери источник'
+                                    : _selectedService == _Service.youtube
+                                        ? 'Импорт из YouTube'
+                                        : _selectedService == _Service.spotify
+                                            ? 'Импорт из Spotify'
+                                            : 'Импорт из Яндекс.Музыки',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Поле ввода
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: _mode == _ImportMode.selection
+                              ? _buildSelectionGrid()
+                              : Column(
+                                  key: const ValueKey('input_mode'),
+                                  children: [
+                                    // Поле ввода
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(16),
+                                        color: Colors.white.withAlpha(10),
+                                        border: Border.all(
+                                            color: Colors.white.withAlpha(25)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextField(
+                                              controller: _controller,
+                                              style: const TextStyle(
+                                                  color: Colors.white),
+                                              decoration: InputDecoration(
+                                                hintText: _selectedService ==
+                                                        _Service.youtube
+                                                    ? 'https://youtube.com/watch?v=...'
+                                                    : _selectedService ==
+                                                            _Service.spotify
+                                                        ? 'https://open.spotify.com/track/...'
+                                                        : 'https://music.yandex.ru/album/...',
+                                                hintStyle: const TextStyle(
+                                                    color: Colors.white24),
+                                                border: InputBorder.none,
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 14,
+                                                ),
+                                              ),
+                                              onSubmitted: (_) =>
+                                                  _startImport(),
                                             ),
                                           ),
-                                          onSubmitted: (_) => _startImport(),
-                                        ),
+                                          // Кнопка вставить
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.content_paste_rounded,
+                                              color: Colors.white38,
+                                            ),
+                                            onPressed: () async {
+                                              final data =
+                                                  await Clipboard.getData(
+                                                'text/plain',
+                                              );
+                                              if (data?.text != null) {
+                                                _controller.text = data!.text!;
+                                              }
+                                            },
+                                          ),
+                                        ],
                                       ),
-                                      // Кнопка вставить
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.content_paste_rounded,
-                                          color: Colors.white38,
-                                        ),
-                                        onPressed: () async {
-                                          final data = await Clipboard.getData(
-                                            'text/plain',
-                                          );
-                                          if (data?.text != null) {
-                                            _controller.text = data!.text!;
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                    ),
 
-                                const SizedBox(height: 16),
+                                    const SizedBox(height: 16),
 
 // Кнопка импорт
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 300),
-                                    child: ElevatedButton(
-                                      onPressed: _isImporting ? null : _startImport,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: _selectedService == _Service.youtube
-                                            ? Colors.redAccent
-                                            : _selectedService == _Service.spotify
-                                                ? const Color(0xFF1DB954)
-                                                : const Color(0xFFFFCC00),
-                                        foregroundColor: _selectedService == _Service.yandex ? Colors.black : Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 16),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        elevation: 0,
-                                      ),
-                                      child: _isImporting
-                                          ? SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                color: _selectedService == _Service.yandex ? Colors.black : Colors.white,
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Text(
-                                              'Импортировать',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                              ),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 300),
+                                        child: ElevatedButton(
+                                          onPressed: _isImporting
+                                              ? null
+                                              : _startImport,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: _selectedService ==
+                                                    _Service.youtube
+                                                ? Colors.redAccent
+                                                : _selectedService ==
+                                                        _Service.spotify
+                                                    ? const Color(0xFF1DB954)
+                                                    : const Color(0xFFFFCC00),
+                                            foregroundColor: _selectedService ==
+                                                    _Service.yandex
+                                                ? Colors.black
+                                                : Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 16),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
                                             ),
+                                            elevation: 0,
+                                          ),
+                                          child: _isImporting
+                                              ? SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    color: _selectedService ==
+                                                            _Service.yandex
+                                                        ? Colors.black
+                                                        : Colors.white,
+                                                    strokeWidth: 2,
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  'Импортировать',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                    ),
+                        ),
 
-                    if (_progress.status != ImportStatus.idle) ...[
-                      const SizedBox(height: 16),
-                      _buildProgress().animate().fadeIn(duration: 300.ms),
-                    ],
-                  ],
-                ),
-              ),
+                        if (_progress.status != ImportStatus.idle) ...[
+                          const SizedBox(height: 16),
+                          _buildProgress().animate().fadeIn(duration: 300.ms),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -251,7 +284,7 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
     );
   }
 
-      Future<void> _pickLocalFiles() async {
+  Future<void> _pickLocalFiles() async {
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.any,
@@ -262,7 +295,11 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
         final paths = result.files
             .where((f) => f.path != null)
             .map((f) => f.path!)
-            .where((p) => p.endsWith('.mp3') || p.endsWith('.flac') || p.endsWith('.m4a') || p.endsWith('.wav'))
+            .where((p) =>
+                p.endsWith('.mp3') ||
+                p.endsWith('.flac') ||
+                p.endsWith('.m4a') ||
+                p.endsWith('.wav'))
             .toList();
 
         if (paths.isNotEmpty) {
@@ -284,12 +321,13 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
         }
       }
     } catch (e) {
+      debugPrint('Ошибка выбора файлов: $e');
       if (mounted) {
         setState(() {
-          _progress = ImportProgress(
+          _progress = const ImportProgress(
             status: ImportStatus.error,
             message: 'Ошибка выбора файлов',
-            error: e.toString(),
+            error: 'Произошла ошибка при обработке файлов',
           );
         });
       }
@@ -306,32 +344,37 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
       childAspectRatio: 1.3,
       padding: EdgeInsets.zero,
       children: [
-        _buildServiceCard('YouTube', Icons.play_arrow_rounded, Colors.redAccent, () {
+        _buildServiceCard('YouTube', Icons.play_arrow_rounded, Colors.redAccent,
+            () {
           setState(() {
             _mode = _ImportMode.input;
             _selectedService = _Service.youtube;
           });
         }),
-        _buildServiceCard('Spotify', Icons.music_note_rounded, const Color(0xFF1DB954), () {
+        _buildServiceCard(
+            'Spotify', Icons.music_note_rounded, const Color(0xFF1DB954), () {
           setState(() {
             _mode = _ImportMode.input;
             _selectedService = _Service.spotify;
           });
         }),
-        _buildServiceCard('Yandex', Icons.library_music_rounded, const Color(0xFFFFCC00), () {
+        _buildServiceCard(
+            'Yandex', Icons.library_music_rounded, const Color(0xFFFFCC00), () {
           setState(() {
             _mode = _ImportMode.input;
             _selectedService = _Service.yandex;
           });
         }),
-        _buildServiceCard('Локальные', Icons.folder_rounded, const Color(0xFF7B5EA7), () {
+        _buildServiceCard(
+            'Локальные', Icons.folder_rounded, const Color(0xFF7B5EA7), () {
           _pickLocalFiles();
         }),
       ],
     );
   }
 
-  Widget _buildServiceCard(String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildServiceCard(
+      String title, IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
