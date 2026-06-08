@@ -34,7 +34,6 @@
 
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,7 +89,6 @@ class VisualizerEngine {
 
   // ── Internal state ─────────────────────────────────────────────────────────
 
-  AudioPlayer? _player;
   StreamSubscription<PlayerState>? _stateSub;
   StreamSubscription<dynamic>? _nativeSub; // EventChannel subscription
   StreamSubscription<Duration>? _fallbackSub; // iOS position-stream fallback
@@ -113,7 +111,6 @@ class VisualizerEngine {
   /// Вызывать из PlayerNotifier._init() после создания AudioPlayer.
   void attachPlayer(AudioPlayer player) {
     _detach();
-    _player = player;
 
     _stateSub = player.playerStateStream.listen((state) async {
       final nowPlaying =
@@ -353,7 +350,6 @@ class VisualizerEngine {
     _stateSub = null;
     _nativeSub = null;
     _fallbackSub = null;
-    _player = null;
     _nativeActive = false;
     _cancelDecay();
 
