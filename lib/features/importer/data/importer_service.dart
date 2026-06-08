@@ -54,6 +54,16 @@ class ImporterService {
     required void Function(ImportProgress) onProgress,
   }) async {
     try {
+      if (!url.toLowerCase().startsWith('http://') &&
+          !url.toLowerCase().startsWith('https://')) {
+        onProgress(const ImportProgress(
+          status: ImportStatus.error,
+          message: 'Недопустимая схема URL',
+          error: 'URL должен начинаться с http:// или https://',
+        ));
+        return;
+      }
+
       if (_isSpotify(url)) {
         await _importSpotify(url: url, onProgress: onProgress);
       } else if (_isYandexMusic(url)) {
@@ -72,10 +82,11 @@ class ImporterService {
         ));
       }
     } catch (e) {
-      onProgress(ImportProgress(
+      debugPrint('Ошибка импорта: $e');
+      onProgress(const ImportProgress(
         status: ImportStatus.error,
         message: 'Ошибка импорта',
-        error: e.toString(),
+        error: 'Произошла непредвиденная ошибка во время импорта',
       ));
     }
   }
@@ -119,10 +130,11 @@ class ImporterService {
         progress: 1.0,
       ));
     } catch (e) {
-      onProgress(ImportProgress(
+      debugPrint('Ошибка скачивания YouTube: $e');
+      onProgress(const ImportProgress(
         status: ImportStatus.error,
         message: 'Ошибка скачивания YouTube',
-        error: e.toString(),
+        error: 'Не удалось загрузить трек с YouTube',
       ));
     } finally {
       // Всегда закрываем — освобождает HTTP-сессию и предотвращает утечки
@@ -133,7 +145,7 @@ class ImporterService {
   /// Пытается скачать с конкретным клиентом.
   /// Бросает [_DownloadThrottledException] если поток завис.
   /// Бросает [_NoStreamsException] если клиент не дал аудио-потоков.
-    Future<String> _downloadYouTubeVideo({
+  Future<String> _downloadYouTubeVideo({
     required YoutubeExplode yt,
     required Video video,
     required String cleanTitle,
@@ -172,7 +184,7 @@ class ImporterService {
         lastError = e;
       } catch (e) {
         debugPrint('[YT] Клиент $client — ошибка: $e');
-        lastError = Exception(e.toString());
+        lastError = Exception('Ошибка загрузки через клиент $client');
       }
     }
 
@@ -347,14 +359,16 @@ class ImporterService {
 
       // Если это трек, описание обычно выглядит так: "Listen to [Title] on Spotify. Song · [Artist] · [Year]"
       if (pageDesc.contains('Song ·')) {
-         final parts = pageDesc.split('·');
-         if (parts.length >= 2) {
-           artist = parts[1].trim();
-         }
+        final parts = pageDesc.split('·');
+        if (parts.length >= 2) {
+          artist = parts[1].trim();
+        }
       } else if (pageDesc.contains('Playlist ·')) {
-         throw Exception('Поддерживается только импорт одиночных треков Spotify');
+        throw Exception(
+            'Поддерживается только импорт одиночных треков Spotify');
       } else if (pageDesc.contains('Album ·')) {
-         throw Exception('Поддерживается только импорт одиночных треков Spotify');
+        throw Exception(
+            'Поддерживается только импорт одиночных треков Spotify');
       }
 
       final query = "$artist - $trackTitle";
@@ -373,7 +387,8 @@ class ImporterService {
         }
 
         var video = searchResults.first;
-        final maxResults = searchResults.length > 10 ? 10 : searchResults.length;
+        final maxResults =
+            searchResults.length > 10 ? 10 : searchResults.length;
         for (int j = 0; j < maxResults; j++) {
           final v = searchResults.elementAt(j);
           final authorLow = v.author.toLowerCase();
@@ -383,7 +398,8 @@ class ImporterService {
               authorLow.contains('vevo') ||
               titleLow.contains('(official audio)')) {
             video = v;
-            debugPrint('[Spotify] Выбрано приоритетное аудио: ${v.title} (${v.author})');
+            debugPrint(
+                '[Spotify] Выбрано приоритетное аудио: ${v.title} (${v.author})');
             break;
           }
         }
@@ -400,16 +416,15 @@ class ImporterService {
             progress: 0.3 + (p.progress * 0.7),
           )),
         );
-
       } finally {
         yt.close();
       }
-
     } catch (e) {
-      onProgress(ImportProgress(
+      debugPrint('Ошибка импорта Spotify: $e');
+      onProgress(const ImportProgress(
         status: ImportStatus.error,
         message: 'Ошибка импорта Spotify',
-        error: e.toString(),
+        error: 'Произошла ошибка при обработке Spotify-ссылки',
       ));
     }
   }
@@ -458,7 +473,8 @@ class ImporterService {
               }
             }
           } else {
-            throw Exception('Не удалось загрузить альбом (Код: ${response.statusCode})');
+            throw Exception(
+                'Не удалось загрузить альбом (Код: ${response.statusCode})');
           }
         } else {
           throw Exception('Неверный URL альбома');
@@ -469,10 +485,10 @@ class ImporterService {
         final usersIndex = pathSegments.indexOf('users');
         final playlistsIndex = pathSegments.indexOf('playlists');
 
-        if (usersIndex != -1 && playlistsIndex != -1 &&
+        if (usersIndex != -1 &&
+            playlistsIndex != -1 &&
             usersIndex + 1 < pathSegments.length &&
             playlistsIndex + 1 < pathSegments.length) {
-
           final owner = pathSegments[usersIndex + 1];
           final kind = pathSegments[playlistsIndex + 1];
 
@@ -490,7 +506,8 @@ class ImporterService {
               throw Exception('Плейлист не найден');
             }
           } else {
-            throw Exception('Не удалось загрузить плейлист (Код: ${response.statusCode})');
+            throw Exception(
+                'Не удалось загрузить плейлист (Код: ${response.statusCode})');
           }
         } else {
           throw Exception('Неверный URL плейлиста');
@@ -535,7 +552,8 @@ class ImporterService {
         message: 'Создание плейлиста "$playlistName"...',
         progress: 0.05,
       ));
-      final playlist = await PlaylistDatabase.instance.createPlaylist(playlistName);
+      final playlist =
+          await PlaylistDatabase.instance.createPlaylist(playlistName);
 
       try {
         for (final track in parsedTracks) {
@@ -558,7 +576,8 @@ class ImporterService {
             var video = searchResults.first;
 
             // Smart YouTube Search (Topic & Audio Priority)
-            final maxResults = searchResults.length > 10 ? 10 : searchResults.length;
+            final maxResults =
+                searchResults.length > 10 ? 10 : searchResults.length;
             for (int j = 0; j < maxResults; j++) {
               final v = searchResults.elementAt(j);
               final authorLow = v.author.toLowerCase();
@@ -568,7 +587,8 @@ class ImporterService {
                   authorLow.contains('vevo') ||
                   titleLow.contains('(official audio)')) {
                 video = v;
-                debugPrint('Выбрано приоритетное аудио: ${v.title} (${v.author})');
+                debugPrint(
+                    'Выбрано приоритетное аудио: ${v.title} (${v.author})');
                 break;
               }
             }
@@ -585,7 +605,8 @@ class ImporterService {
                 onProgress(ImportProgress(
                   status: p.status,
                   message: '$i/${parsedTracks.length}: ${p.message}',
-                  progress: (i - 1) / parsedTracks.length + (p.progress * (1 / parsedTracks.length)),
+                  progress: (i - 1) / parsedTracks.length +
+                      (p.progress * (1 / parsedTracks.length)),
                 ));
               },
             );
@@ -604,19 +625,18 @@ class ImporterService {
         yt.close();
       }
 
-
-
       onProgress(ImportProgress(
         status: ImportStatus.done,
-        message: '✓ Импортировано ${downloadedTrackIds.length} из ${parsedTracks.length} треков ("$playlistName")',
+        message:
+            '✓ Импортировано ${downloadedTrackIds.length} из ${parsedTracks.length} треков ("$playlistName")',
         progress: 1.0,
       ));
-
     } catch (e) {
-      onProgress(ImportProgress(
+      debugPrint('Ошибка парсинга Яндекс.Музыки: $e');
+      onProgress(const ImportProgress(
         status: ImportStatus.error,
         message: 'Ошибка парсинга Яндекс.Музыки',
-        error: e.toString(),
+        error: 'Не удалось получить данные с Яндекс.Музыки',
       ));
     }
   }
@@ -747,8 +767,8 @@ class ImporterService {
         String? lrcPath;
         final srcLrc = File(path.replaceAll(p.extension(path), '.lrc'));
         if (await srcLrc.exists()) {
-           final lrcContent = await srcLrc.readAsString();
-           lrcPath = await LyricsService.instance.saveLrc(lrcContent, id);
+          final lrcContent = await srcLrc.readAsString();
+          lrcPath = await LyricsService.instance.saveLrc(lrcContent, id);
         }
 
         await LibraryDatabase.instance.insertTrack(LibraryTrack(
@@ -797,21 +817,26 @@ class ImporterService {
       url.endsWith('.wav');
 
   Future<String> _getTrackPath(String fileName) async {
+    final safeFileName =
+        p.basename(fileName).replaceAll(RegExp(r'[^a-zA-Z0-9\.\-\_]'), '_');
     final dir = await getApplicationDocumentsDirectory();
     final music = Directory(p.join(dir.path, 'music'));
     await music.create(recursive: true);
-    return p.join(music.path, fileName);
+    return p.join(music.path, safeFileName);
   }
 
   Future<String?> _downloadCover(String url, String trackId) async {
     try {
+      final safeTrackId =
+          p.basename(trackId).replaceAll(RegExp(r'[^a-zA-Z0-9\.\-\_]'), '_');
       final dir = await getApplicationDocumentsDirectory();
       final coversDir = Directory(p.join(dir.path, 'covers'));
       await coversDir.create(recursive: true);
-      final path = p.join(coversDir.path, '$trackId.jpg');
+      final path = p.join(coversDir.path, '$safeTrackId.jpg');
       await _dio.download(url, path);
       return path;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Ошибка загрузки обложки: $e');
       return null;
     }
   }

@@ -59,7 +59,9 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
       final params = await handler.equalizer?.parameters;
       if (mounted) setState(() => _params = params);
     } catch (e) {
-      if (mounted) setState(() => _loadError = e.toString());
+      debugPrint('Ошибка загрузки параметров эквалайзера: $e');
+      if (mounted)
+        setState(() => _loadError = 'Ошибка загрузки параметров эквалайзера');
     }
   }
 
