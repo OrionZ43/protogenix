@@ -36,6 +36,7 @@ import '../features/player/presentation/widgets/mini_player.dart';
 import '../features/player/presentation/screens/player_screen.dart';
 import '../features/player/presentation/screens/expanded_player_screen.dart';
 import '../features/player/presentation/providers/player_provider.dart';
+import '../core/widgets/z43_branding.dart';
 
 // ── Провайдер текущей вкладки ─────────────────────────────────────────────────
 
@@ -293,6 +294,12 @@ class _ExpandedShell extends ConsumerWidget {
                     ),
                   ),
 
+                if (_isDesktop)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Z43BrandingBadge(),
+                  ),
+
                 const SizedBox(height: 16),
               ],
             ),
@@ -358,7 +365,7 @@ class _BottomBar extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight:
-                            selected ? FontWeight.w600 : FontWeight.w400,
+                                selected ? FontWeight.w600 : FontWeight.w400,
                             color: selected ? Colors.white : Colors.white38,
                           ),
                         ),
@@ -415,11 +422,11 @@ class _RailIconState extends State<_RailIcon> {
             decoration: BoxDecoration(
               border: widget.selected
                   ? const Border(
-                left: BorderSide(
-                  color: Colors.white,
-                  width: 2,
-                ),
-              )
+                      left: BorderSide(
+                        color: Colors.white,
+                        width: 2,
+                      ),
+                    )
                   : null,
             ),
             child: Icon(
@@ -467,6 +474,17 @@ class _TabItem {
   final String label;
 }
 
-class PlayPauseIntent extends Intent { const PlayPauseIntent(); static const key = Key('play_pause'); }
-class NextTrackIntent extends Intent { const NextTrackIntent(); static const key = Key('next_track'); }
-class PreviousTrackIntent extends Intent { const PreviousTrackIntent(); static const key = Key('previous_track'); }
+class PlayPauseIntent extends Intent {
+  const PlayPauseIntent();
+  static const key = Key('play_pause');
+}
+
+class NextTrackIntent extends Intent {
+  const NextTrackIntent();
+  static const key = Key('next_track');
+}
+
+class PreviousTrackIntent extends Intent {
+  const PreviousTrackIntent();
+  static const key = Key('previous_track');
+}

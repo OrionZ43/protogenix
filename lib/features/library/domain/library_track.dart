@@ -29,6 +29,32 @@ class LibraryTrack {
 
   Duration get duration => Duration(milliseconds: durationMs);
 
+  LibraryTrack copyWith({
+    String? id,
+    String? title,
+    String? artist,
+    String? album,
+    String? filePath,
+    String? coverPath,
+    String? lrcPath,
+    int? durationMs,
+    String? source,
+    DateTime? addedAt,
+  }) {
+    return LibraryTrack(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      artist: artist ?? this.artist,
+      album: album ?? this.album,
+      filePath: filePath ?? this.filePath,
+      coverPath: coverPath ?? this.coverPath,
+      lrcPath: lrcPath ?? this.lrcPath,
+      durationMs: durationMs ?? this.durationMs,
+      source: source ?? this.source,
+      addedAt: addedAt ?? this.addedAt,
+    );
+  }
+
   /// Конвертация в TrackModel для плеера
   TrackModel toTrackModel() {
     return TrackModel(

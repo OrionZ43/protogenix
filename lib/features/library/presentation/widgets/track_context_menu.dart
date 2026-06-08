@@ -14,6 +14,7 @@ import '../library_provider.dart';
 import '../playlist_provider.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/lyrics_search_sheet.dart';
+import 'track_edit_sheet.dart';
 
 // ── Точка входа ───────────────────────────────────────────────────────────────
 
@@ -117,6 +118,30 @@ class _TrackContextMenu extends ConsumerWidget {
 
             // ── Действия ──────────────────────────────────────────────────────
 
+            // Играть сразу
+            _MenuItem(
+              icon: Icons.play_arrow_rounded,
+              label: 'Играть сразу',
+              onTap: () {
+                ref
+                    .read(playerProvider.notifier)
+                    .playNext(track.toTrackModel());
+                Navigator.of(context).pop();
+              },
+            ),
+
+            // В конец очереди
+            _MenuItem(
+              icon: Icons.queue_music_rounded,
+              label: 'В конец очереди',
+              onTap: () {
+                ref
+                    .read(playerProvider.notifier)
+                    .addToQueue(track.toTrackModel());
+                Navigator.of(context).pop();
+              },
+            ),
+
             // Избранное
             _MenuItem(
               icon: isFav
@@ -147,6 +172,16 @@ class _TrackContextMenu extends ConsumerWidget {
               onTap: () {
                 Navigator.of(context).pop();
                 showLyricsSearchSheet(context, ref, track.toTrackModel());
+              },
+            ),
+
+            // Редактировать
+            _MenuItem(
+              icon: Icons.edit_outlined,
+              label: 'Редактировать',
+              onTap: () {
+                Navigator.of(context).pop();
+                showTrackEditSheet(context, ref, track);
               },
             ),
 

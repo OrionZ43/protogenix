@@ -77,6 +77,11 @@ class LibraryNotifier extends StateNotifier<List<LibraryTrack>> {
   }
 }
 
+enum LibrarySortMode { dateAdded, title, artist, duration }
+
+final librarySortModeProvider =
+    StateProvider<LibrarySortMode>((ref) => LibrarySortMode.dateAdded);
+
 final libraryProvider =
     StateNotifierProvider<LibraryNotifier, List<LibraryTrack>>((ref) {
   return LibraryNotifier();
