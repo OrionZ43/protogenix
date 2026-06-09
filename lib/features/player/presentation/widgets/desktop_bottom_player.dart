@@ -25,7 +25,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.sizeOf(context).width;
-    final scale = (width / 1200).clamp(1.0, 1.6);
+    final scale = (width / 1400).clamp(0.9, 1.15);
 
     final player = ref.watch(playerProvider);
     final palette = ref.watch(paletteProvider);
@@ -35,7 +35,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
     if (track == null) return const SizedBox.shrink();
 
     return Container(
-      height: 100 * scale,
+      height: 90,
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.8),
@@ -46,8 +46,8 @@ class DesktopBottomPlayer extends ConsumerWidget {
       child: Row(
         children: [
           // ── Левая зона: Обложка и инфо (ширина ~300) ──────────────
-          SizedBox(
-            width: 300 * scale,
+          Expanded(
+            flex: 3,
             child: Row(
               children: [
                 SizedBox(width: 24 * scale),
@@ -115,6 +115,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
 
           // ── Центральная зона: Контролы и Waveform ──────────────
           Expanded(
+            flex: 4,
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16 * scale),
               child: Column(
@@ -203,16 +204,18 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   ),
                   SizedBox(height: 4 * scale),
                   // Waveform
-                  SizedBox(
-                    height: 24 * scale,
-                    child: LiveWaveformProgressBar(
-                      progress: player.progress,
-                      position: player.position,
-                      total: player.total,
-                      accentColor: palette.primary,
-                      height: 12 * scale,
-                      barCount: 100,
-                      onSeek: (p) => notifier.seekToProgress(p),
+                  Flexible(
+                    child: SizedBox(
+                      height: 24 * scale,
+                      child: LiveWaveformProgressBar(
+                        progress: player.progress,
+                        position: player.position,
+                        total: player.total,
+                        accentColor: palette.primary,
+                        height: 12 * scale,
+                        barCount: 100,
+                        onSeek: (p) => notifier.seekToProgress(p),
+                      ),
                     ),
                   ),
                 ],
@@ -221,8 +224,8 @@ class DesktopBottomPlayer extends ConsumerWidget {
           ),
 
           // ── Правая зона: Громкость, Lyrics, Expand (ширина ~300) ──────────────
-          SizedBox(
-            width: 300 * scale,
+          Expanded(
+            flex: 3,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [

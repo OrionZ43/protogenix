@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:window_manager/window_manager.dart';
+
 // lib/features/player/presentation/screens/expanded_player_screen.dart
 //
 // Полноэкранный плеер для Fold / планшета.
@@ -14,6 +14,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../providers/palette_provider.dart';
 import '../providers/karaoke_provider.dart';

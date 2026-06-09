@@ -540,7 +540,7 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
           child: child,
         ),
         transitionDuration: const Duration(milliseconds: 200),
-        reverseTransitionDuration: const Duration(milliseconds: 150),
+        reverseTransitionDuration: Duration.zero,
       ),
     );
   }
@@ -599,63 +599,70 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
                       duration: const Duration(milliseconds: 350),
                       curve: Curves.easeOutCubic,
                       width: _isRightPanelOpen ? 350 : 0,
-                      child: Row(
-                        children: [
-                          Container(
-                              width: 1,
-                              color: Colors.white.withValues(alpha: 0.1)),
-                          Expanded(
-                            child: Container(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              child: Column(
-                                children: [
-                                  // Toggle for Lyrics / Queue
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 12),
-                                    decoration: BoxDecoration(
-                                      border: Border(
-                                        bottom: BorderSide(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.1)),
+                      child: ClipRect(
+                        child: OverflowBox(
+                          minWidth: 350,
+                          maxWidth: 350,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            children: [
+                              Container(
+                                  width: 1,
+                                  color: Colors.white.withValues(alpha: 0.1)),
+                              Expanded(
+                                child: Container(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  child: Column(
+                                    children: [
+                                      // Toggle for Lyrics / Queue
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 12),
+                                        decoration: BoxDecoration(
+                                          border: Border(
+                                            bottom: BorderSide(
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.1)),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                            _PanelTabButton(
+                                              icon: Icons.lyrics_outlined,
+                                              label: 'Текст',
+                                              isSelected: !_showQueue,
+                                              onTap: () => setState(
+                                                  () => _showQueue = false),
+                                            ),
+                                            _PanelTabButton(
+                                              icon: Icons.queue_music_rounded,
+                                              label: 'Очередь',
+                                              isSelected: _showQueue,
+                                              onTap: () => setState(
+                                                  () => _showQueue = true),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceEvenly,
-                                      children: [
-                                        _PanelTabButton(
-                                          icon: Icons.lyrics_outlined,
-                                          label: 'Текст',
-                                          isSelected: !_showQueue,
-                                          onTap: () => setState(
-                                              () => _showQueue = false),
+                                      // Panel Content
+                                      Expanded(
+                                        child: AnimatedSwitcher(
+                                          duration:
+                                              const Duration(milliseconds: 200),
+                                          child: _showQueue
+                                              ? const QueuePanel()
+                                              : const BeautifulLyricsView(),
                                         ),
-                                        _PanelTabButton(
-                                          icon: Icons.queue_music_rounded,
-                                          label: 'Очередь',
-                                          isSelected: _showQueue,
-                                          onTap: () =>
-                                              setState(() => _showQueue = true),
-                                        ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                  // Panel Content
-                                  Expanded(
-                                    child: AnimatedSwitcher(
-                                      duration:
-                                          const Duration(milliseconds: 200),
-                                      child: _showQueue
-                                          ? const QueuePanel()
-                                          : const BeautifulLyricsView(),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                 ],
