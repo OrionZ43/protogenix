@@ -226,7 +226,7 @@ class _EmptyPlaylists extends StatelessWidget {
 
 // ── Playlist card ─────────────────────────────────────────────────────────────
 
-class _PlaylistCard extends StatelessWidget {
+class _PlaylistCard extends ConsumerStatefulWidget {
   const _PlaylistCard({
     required this.playlist,
     required this.onTap,
@@ -240,65 +240,221 @@ class _PlaylistCard extends StatelessWidget {
   final VoidCallback onRename;
 
   @override
+  ConsumerState<_PlaylistCard> createState() => _PlaylistCardState();
+}
+
+class _PlaylistCardState extends ConsumerState<_PlaylistCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animCtrl;
+  bool _isHovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 15),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _animCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: GlassCard(
-        borderRadius: 18,
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: Colors.white.withAlpha(15),
-              ),
-              child: const Icon(
-                Icons.queue_music_rounded,
-                color: Colors.white60,
-                size: 22,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              playlist.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: onRename,
-                  child: const Icon(
-                    Icons.edit_outlined,
-                    color: Colors.white38,
-                    size: 16,
+    final playlistAsync = ref.watch(playlistTracksProvider(widget.playlist.id));
+
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() => _isHovered = true);
+      },
+      onExit: (_) {
+        setState(() => _isHovered = false);
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: GlassCard(
+          borderRadius: 18,
+          padding: EdgeInsets.zero,
+          child: Stack(
+            children: [
+              // Анимированные обложки (фон)
+              if (playlistAsync is AsyncData)
+                Positioned.fill(
+                  child: _AnimatedCoversBackground(
+                    tracks: playlistAsync.value ?? [],
+                    animation: _animCtrl,
+                    isHovered: _isHovered,
                   ),
                 ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: onDelete,
-                  child: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: Colors.white38,
-                    size: 16,
+
+              // Градиентное затемнение, чтобы текст читался поверх обложек
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withAlpha(0),
+                        Colors.black.withAlpha(200),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+
+              // Контент карточки
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white.withAlpha(
+                          30,
+                        ), // чуть ярче, т.к. фон может быть тёмным
+                      ),
+                      child: const Icon(
+                        Icons.queue_music_rounded,
+                        color: Colors.white70,
+                        size: 22,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      widget.playlist.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: widget.onRename,
+                          child: const Icon(
+                            Icons.edit_outlined,
+                            color: Colors.white54,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: widget.onDelete,
+                          child: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.white54,
+                            size: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+}
+
+class _AnimatedCoversBackground extends StatelessWidget {
+  const _AnimatedCoversBackground({
+    required this.tracks,
+    required this.animation,
+    required this.isHovered,
+  });
+
+  final List<LibraryTrack> tracks;
+  final Animation<double> animation;
+  final bool isHovered;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tracks.isEmpty) return const SizedBox.shrink();
+
+    // Берем до 4 обложек
+    final covers = tracks
+        .where((t) => t.coverPath != null)
+        .map((t) => FileImage(File(t.coverPath!)))
+        .take(4)
+        .toList();
+
+    if (covers.isEmpty) return const SizedBox.shrink();
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Stack(
+            children: List.generate(covers.length, (i) {
+              // Немного разная траектория движения для каждой обложки
+              final offset = _calculateOffset(i, animation.value);
+
+              return AnimatedPositioned(
+                duration: const Duration(milliseconds: 300),
+                left: offset.dx,
+                top: offset.dy,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 300),
+                  scale: isHovered ? 1.2 : 1.0,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 300),
+                    opacity: isHovered ? 0.6 : 0.3,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: covers[i],
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        );
+      },
+    );
+  }
+
+  Offset _calculateOffset(int index, double animValue) {
+    // Базовые позиции
+    final basePositions = [
+      const Offset(-10, -10),
+      const Offset(80, -20),
+      const Offset(-20, 70),
+      const Offset(90, 80),
+    ];
+
+    if (index >= basePositions.length) return Offset.zero;
+
+    final base = basePositions[index];
+
+    // Амплитуда движения (туда-сюда)
+    final dx = base.dx + (index % 2 == 0 ? 20 * animValue : -20 * animValue);
+    final dy = base.dy + (index % 2 != 0 ? 20 * animValue : -20 * animValue);
+
+    return Offset(dx, dy);
   }
 }
 
@@ -509,10 +665,8 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 style: TextStyle(color: Colors.white54),
               ),
             ),
-            data: (tracks) => _PlaylistContent(
-              playlist: playlist,
-              tracks: tracks,
-            ),
+            data: (tracks) =>
+                _PlaylistContent(playlist: playlist, tracks: tracks),
           ),
         ),
       ),
@@ -560,10 +714,7 @@ class _PlaylistContent extends ConsumerWidget {
                 ),
                 Text(
                   '${tracks.length} треков',
-                  style: const TextStyle(
-                    color: Colors.white38,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: Colors.white38, fontSize: 13),
                 ),
               ],
             ),
@@ -663,10 +814,9 @@ class _PlaylistTrackTile extends ConsumerWidget {
       onTap: () {
         // ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ: Без .toList()
         final models = allTracks.map((t) => t.toTrackModel());
-        ref.read(playerProvider.notifier).loadPlaylist(
-              models,
-              initialIndex: index,
-            );
+        ref
+            .read(playerProvider.notifier)
+            .loadPlaylist(models, initialIndex: index);
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -716,10 +866,7 @@ class _PlaylistTrackTile extends ConsumerWidget {
                     track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white38,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white38, fontSize: 12),
                   ),
                 ],
               ),
@@ -732,12 +879,8 @@ class _PlaylistTrackTile extends ConsumerWidget {
               iconSize: 20,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: () => _showPlaylistTrackOptions(
-                context,
-                ref,
-                track,
-                playlistId,
-              ),
+              onPressed: () =>
+                  _showPlaylistTrackOptions(context, ref, track, playlistId),
             ),
           ],
         ),
@@ -760,10 +903,7 @@ void _showPlaylistTrackOptions(
     backgroundColor: Colors.transparent,
     builder: (_) => UncontrolledProviderScope(
       container: ProviderScope.containerOf(context),
-      child: _PlaylistTrackOptionsSheet(
-        track: track,
-        playlistId: playlistId,
-      ),
+      child: _PlaylistTrackOptionsSheet(track: track, playlistId: playlistId),
     ),
   );
 }

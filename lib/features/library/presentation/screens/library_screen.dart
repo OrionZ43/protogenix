@@ -17,7 +17,6 @@ import '../../../importer/presentation/importer_sheet.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/providers/palette_provider.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
-import 'about_sheet.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -330,21 +329,6 @@ class _TrackListState extends ConsumerState<_TrackList> {
                       ),
                     ),
                   ),
-                  // Кнопка о приложении
-                  GestureDetector(
-                    onTap: () => showAboutSheet(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color:
-                            Colors.white.withAlpha(0), // transparent hit area
-                      ),
-                      child: const Icon(Icons.info_outline_rounded,
-                          size: 20, color: Colors.white24),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
                   // Кнопка импорта
                   GestureDetector(
                     onTap: () => showImporterSheet(context),
