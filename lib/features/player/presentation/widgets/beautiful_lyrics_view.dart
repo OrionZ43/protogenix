@@ -152,7 +152,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     } catch (_) {}
     Future.delayed(
       const Duration(milliseconds: 140),
-          () => _autoScrolling = false,
+      () => _autoScrolling = false,
     );
   }
 
@@ -171,7 +171,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     if (!karaoke.isLoaded) {
       return Center(
         child:
-        CircularProgressIndicator(color: palette.primary, strokeWidth: 2),
+            CircularProgressIndicator(color: palette.primary, strokeWidth: 2),
       );
     }
 
@@ -189,7 +189,6 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
       child: Stack(
         children: [
           _AmbientBackground(palette: palette),
-
           NotificationListener<ScrollNotification>(
             onNotification: (n) {
               if (n is UserScrollNotification) {
@@ -224,10 +223,10 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                 final blurAmount = _userScrolling
                     ? 0.0
                     : isCurrent
-                    ? 0.0
-                    : (distance / _kDistanceToMaxBlur).clamp(0.0, 1.0) *
-                    _kBlurScale *
-                    8.0;
+                        ? 0.0
+                        : (distance / _kDistanceToMaxBlur).clamp(0.0, 1.0) *
+                            _kBlurScale *
+                            8.0;
 
                 return RepaintBoundary(
                   child: _LineItem(
@@ -245,10 +244,8 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
               },
             ),
           ),
-
           const _Fade(top: true),
           const _Fade(top: false),
-
           Positioned(
             top: 18,
             left: 24,
@@ -262,7 +259,6 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
               ),
             ),
           ),
-
           AnimatedPositioned(
             duration: const Duration(milliseconds: 350),
             curve: Curves.easeOutCubic,
@@ -277,7 +273,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                 },
                 child: Container(
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
                     color: Colors.white.withAlpha(18),
@@ -295,7 +291,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                       SizedBox(width: 7),
                       Text('К текущей строке',
                           style:
-                          TextStyle(color: Colors.white70, fontSize: 13)),
+                              TextStyle(color: Colors.white70, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -393,8 +389,8 @@ class _LineItem extends StatelessWidget {
         builder: (context, ref, child) => GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => ref.read(playerProvider.notifier).seekTo(
-            Duration(milliseconds: line.startMs),
-          ),
+                Duration(milliseconds: line.startMs),
+              ),
           child: child,
         ),
         child: content,
@@ -409,12 +405,12 @@ class _LineItem extends StatelessWidget {
         opacity: userScrolling
             ? (isCurrent ? 1.0 : 0.65)
             : isCurrent
-            ? 1.0
-            : distance == 1
-            ? 0.45
-            : distance == 2
-            ? 0.25
-            : 0.12,
+                ? 1.0
+                : distance == 1
+                    ? 0.45
+                    : distance == 2
+                        ? 0.25
+                        : 0.12,
         child: content,
       ),
     );
@@ -454,7 +450,7 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
   final Map<LyricSyllable, _SylState> _states = {};
 
   final Map<LyricSyllable, ({double scale, double yOffset, double glow})>
-  _vals = {};
+      _vals = {};
 
   @override
   void initState() {
@@ -472,9 +468,9 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
     for (final syl in _allSyls) {
       _states[syl] = _SylState.waiting;
       _vals[syl] = (
-      scale: _kWaitingScale,
-      yOffset: _kWaitingYOffset,
-      glow: _kWaitingGlow,
+        scale: _kWaitingScale,
+        yOffset: _kWaitingYOffset,
+        glow: _kWaitingGlow,
       );
     }
 
@@ -495,7 +491,7 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
     for (final syl in _allSyls) {
       final springs = _springs[syl]!;
       final newState =
-      _stateFor(ms, syl.startMs.toDouble(), syl.endMs.toDouble());
+          _stateFor(ms, syl.startMs.toDouble(), syl.endMs.toDouble());
       final oldState = _states[syl];
 
       if (newState != oldState) {
@@ -521,9 +517,9 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
         if (!springs.isSleeping) anyActive = true;
       } else {
         _vals[syl] = (
-        scale: springs.scale.position,
-        yOffset: springs.yOffset.position,
-        glow: springs.glow.position,
+          scale: springs.scale.position,
+          yOffset: springs.yOffset.position,
+          glow: springs.glow.position,
         );
       }
     }
@@ -554,9 +550,9 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
         } else {
           final vals = _vals[syl] ??
               (
-              scale: _kWaitingScale,
-              yOffset: _kWaitingYOffset,
-              glow: _kWaitingGlow
+                scale: _kWaitingScale,
+                yOffset: _kWaitingYOffset,
+                glow: _kWaitingGlow
               );
 
           child = _LetterWidget(
@@ -708,24 +704,24 @@ class _HighlightedLineWidgetState extends State<_HighlightedLineWidget>
 
     final mainShadows = mainShadowAlpha > 8
         ? [
-      Shadow(
-        color: Colors.white.withAlpha(mainShadowAlpha),
-        blurRadius: blurR,
-      ),
-      Shadow(
-        color: widget.palette.primary.withAlpha(mainShadowAlpha ~/ 2),
-        blurRadius: blurR * 2,
-      ),
-    ]
+            Shadow(
+              color: Colors.white.withAlpha(mainShadowAlpha),
+              blurRadius: blurR,
+            ),
+            Shadow(
+              color: widget.palette.primary.withAlpha(mainShadowAlpha ~/ 2),
+              blurRadius: blurR * 2,
+            ),
+          ]
         : null;
 
     final bgShadows = bgShadowAlpha > 8
         ? [
-      Shadow(
-        color: Colors.white.withAlpha(bgShadowAlpha),
-        blurRadius: blurR,
-      ),
-    ]
+            Shadow(
+              color: Colors.white.withAlpha(bgShadowAlpha),
+              blurRadius: blurR,
+            ),
+          ]
         : null;
 
     // FIX: Column вместо единого Text(plainText) — bg идёт отдельной строкой
@@ -773,7 +769,7 @@ class _LetterSlot {
     required this.startMs,
     required this.endMs,
   })  : springs = SyllableSprings()
-    ..setAllImmediate(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow),
+          ..setAllImmediate(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow),
         state = _SylState.waiting,
         scale = _kWaitingScale,
         yOffset = _kWaitingYOffset,
@@ -936,7 +932,7 @@ class _LetterWidget extends StatelessWidget {
 
     final fontSize = isBackground ? _kBgFontSize : _kFontSize;
     final shadowAlpha =
-    isBackground ? (g * 0.22 * 255).round() : (g * 0.45 * 255).round();
+        isBackground ? (g * 0.22 * 255).round() : (g * 0.45 * 255).round();
     final blurRadius = 4.0 + 6.0 * g;
 
     return Transform.translate(
@@ -957,15 +953,15 @@ class _LetterWidget extends StatelessWidget {
               height: 1.25,
               shadows: shadowAlpha > 8
                   ? [
-                Shadow(
-                  color: Colors.white.withAlpha(shadowAlpha),
-                  blurRadius: blurRadius,
-                ),
-                Shadow(
-                  color: palette.primary.withAlpha(shadowAlpha ~/ 2),
-                  blurRadius: blurRadius * 2.0,
-                ),
-              ]
+                      Shadow(
+                        color: Colors.white.withAlpha(shadowAlpha),
+                        blurRadius: blurRadius,
+                      ),
+                      Shadow(
+                        color: palette.primary.withAlpha(shadowAlpha ~/ 2),
+                        blurRadius: blurRadius * 2.0,
+                      ),
+                    ]
                   : null,
             ),
           ),
@@ -986,19 +982,19 @@ class _InactiveLine extends StatelessWidget {
   final int distance;
 
   static double _scaleFor(int d) => switch (d) {
-    1 => 0.78,
-    2 => 0.69,
-    _ => 0.59,
-  };
+        1 => 0.78,
+        2 => 0.69,
+        _ => 0.59,
+      };
 
   @override
   Widget build(BuildContext context) {
     final scale = _scaleFor(distance);
 
     final mainText =
-    line.words.where((w) => !w.isBackground).map((w) => w.text).join(' ');
+        line.words.where((w) => !w.isBackground).map((w) => w.text).join(' ');
     final bgText =
-    line.words.where((w) => w.isBackground).map((w) => w.text).join(' ');
+        line.words.where((w) => w.isBackground).map((w) => w.text).join(' ');
 
     return AnimatedScale(
       scale: scale,
@@ -1096,23 +1092,23 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.lyrics_rounded,
-            size: 52, color: Colors.white.withAlpha(30)),
-        const SizedBox(height: 14),
-        Text(
-          'Текст не найден',
-          style: TextStyle(
-            color: Colors.white.withAlpha(45),
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lyrics_rounded,
+                size: 52, color: Colors.white.withAlpha(30)),
+            const SizedBox(height: 14),
+            Text(
+              'Текст не найден',
+              style: TextStyle(
+                color: Colors.white.withAlpha(45),
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1199,11 +1195,11 @@ class _AmbientPainter extends CustomPainter {
   }
 
   void _blob(
-      Canvas c, {
-        required Offset center,
-        required double radius,
-        required Color color,
-      }) {
+    Canvas c, {
+    required Offset center,
+    required double radius,
+    required Color color,
+  }) {
     c.drawCircle(
       center,
       radius,
@@ -1228,26 +1224,26 @@ class _Fade extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Positioned(
-    top: top ? 0 : null,
-    bottom: top ? null : 0,
-    left: 0,
-    right: 0,
-    height: 110,
-    child: IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: top ? Alignment.topCenter : Alignment.bottomCenter,
-            end: top ? Alignment.bottomCenter : Alignment.topCenter,
-            colors: [
-              Colors.black,
-              Colors.black.withAlpha(190),
-              Colors.transparent,
-            ],
-            stops: const [0.0, 0.55, 1.0],
+        top: top ? 0 : null,
+        bottom: top ? null : 0,
+        left: 0,
+        right: 0,
+        height: 110,
+        child: IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+                end: top ? Alignment.bottomCenter : Alignment.topCenter,
+                colors: [
+                  Colors.black,
+                  Colors.black.withAlpha(190),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.55, 1.0],
+              ),
+            ),
           ),
         ),
-      ),
-    ),
-  );
+      );
 }

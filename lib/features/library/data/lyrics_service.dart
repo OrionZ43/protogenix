@@ -93,8 +93,8 @@ class LyricsService {
 
     debugPrint(
       '[LyricsService] Параллельных запросов: '
-          '${_providers.length} провайдера × ${queries.length} запросов '
-          '= ${allFutures.length}',
+      '${_providers.length} провайдера × ${queries.length} запросов '
+      '= ${allFutures.length}',
     );
 
     final allLists = await Future.wait(allFutures);
@@ -140,9 +140,9 @@ class LyricsService {
       final s = top10[i];
       debugPrint(
         '[LyricsService] #${i + 1} '
-            '"${s.metadata.artistName} — ${s.metadata.trackName}" '
-            '| ${s.metadata.type} | ${s.metadata.source} '
-            '| score=${s.scoreLabel}',
+        '"${s.metadata.artistName} — ${s.metadata.trackName}" '
+        '| ${s.metadata.type} | ${s.metadata.source} '
+        '| score=${s.scoreLabel}',
       );
     }
 
@@ -199,7 +199,7 @@ class LyricsService {
         score += 15.0;
         debugPrint(
           '[SCORE] "${meta.trackName}" +15.0 (длит. совпадает, '
-              'diff=${diffSec.toStringAsFixed(1)}s)',
+          'diff=${diffSec.toStringAsFixed(1)}s)',
         );
       } else if (diffSec < 10.0) {
         score += 5.0;
@@ -208,7 +208,7 @@ class LyricsService {
         score -= 10.0;
         debugPrint(
           '[SCORE] "${meta.trackName}" -10.0 '
-              '(длит. сильно отличается, diff=${diffSec.toStringAsFixed(0)}s)',
+          '(длит. сильно отличается, diff=${diffSec.toStringAsFixed(0)}s)',
         );
       }
     }
@@ -219,17 +219,17 @@ class LyricsService {
     final formatBonus = switch (meta.type) {
       LyricsType.syllable => 15.0,
       LyricsType.enhanced => 10.0,
-      LyricsType.synced   => 5.0,
-      LyricsType.plain    => 0.0,
+      LyricsType.synced => 5.0,
+      LyricsType.plain => 0.0,
     };
     score += formatBonus;
 
     debugPrint(
       '[SCORE] "${meta.artistName} — ${meta.trackName}" '
-          '| title=${(titleSim * 150).toStringAsFixed(1)} '
-          'artist=${(artistSim * 80).toStringAsFixed(1)} '
-          'format=$formatBonus '
-          '| TOTAL=${score.toStringAsFixed(1)} [${meta.type}] [${meta.source}]',
+      '| title=${(titleSim * 150).toStringAsFixed(1)} '
+      'artist=${(artistSim * 80).toStringAsFixed(1)} '
+      'format=$formatBonus '
+      '| TOTAL=${score.toStringAsFixed(1)} [${meta.type}] [${meta.source}]',
     );
 
     return score;
