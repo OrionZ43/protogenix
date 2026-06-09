@@ -25,7 +25,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.sizeOf(context).width;
-    final scale = (width / 1400).clamp(0.9, 1.15);
+    final scale = (width / 1400).clamp(0.9, 1.2);
 
     final player = ref.watch(playerProvider);
     final palette = ref.watch(paletteProvider);
@@ -35,7 +35,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
     if (track == null) return const SizedBox.shrink();
 
     return Container(
-      height: 90,
+      height: 110 * scale,
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.8),
@@ -204,18 +204,15 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   ),
                   SizedBox(height: 4 * scale),
                   // Waveform
-                  Flexible(
-                    child: SizedBox(
-                      height: 24 * scale,
-                      child: LiveWaveformProgressBar(
-                        progress: player.progress,
-                        position: player.position,
-                        total: player.total,
-                        accentColor: palette.primary,
-                        height: 12 * scale,
-                        barCount: 100,
-                        onSeek: (p) => notifier.seekToProgress(p),
-                      ),
+                  Expanded(
+                    child: LiveWaveformProgressBar(
+                      progress: player.progress,
+                      position: player.position,
+                      total: player.total,
+                      accentColor: palette.primary,
+                      height: 16 * scale,
+                      barCount: 100,
+                      onSeek: (p) => notifier.seekToProgress(p),
                     ),
                   ),
                 ],
