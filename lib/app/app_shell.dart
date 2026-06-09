@@ -35,8 +35,14 @@ import '../features/library/presentation/screens/playlists_screen.dart';
 import '../features/library/presentation/screens/favorites_screen.dart';
 import '../features/player/presentation/widgets/mini_player.dart';
 import '../features/player/presentation/screens/player_screen.dart';
+import 'package:flutter/services.dart';
+import '../core/widgets/z43_branding.dart';
 import '../features/player/presentation/screens/expanded_player_screen.dart';
 import '../features/player/presentation/providers/player_provider.dart';
+import '../features/player/presentation/providers/palette_provider.dart';
+import '../features/player/domain/track_model.dart';
+import '../features/player/domain/player_state.dart';
+import '../features/updater/update_banner.dart';
 
 // ── Провайдер текущей вкладки ─────────────────────────────────────────────────
 
@@ -91,10 +97,10 @@ class AppShell extends ConsumerWidget {
 
     // На десктопе оборачиваем в колонку: тайтлбар + контент
     if (_isDesktop) {
-      return Column(
+      return const Column(
         children: [
-          const WindowTitleBar(),
-          Expanded(child: shell),
+          WindowTitleBar(),
+          Expanded(child: _DesktopShell()),
         ],
       );
     }
@@ -162,9 +168,16 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF080810),
-      body: IndexedStack(
-        index: tabIndex,
-        children: _screens,
+      body: Column(
+        children: [
+          const UpdateBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: tabIndex,
+              children: _screens,
+            ),
+          ),
+        ],
       ),
 
       // MiniPlayer + BottomNavigationBar в одной колонке
@@ -309,9 +322,16 @@ class _ExpandedShell extends ConsumerWidget {
 
           // ── Контент справа ────────────────────────────────────────────────
           Expanded(
-            child: IndexedStack(
-              index: tabIndex,
-              children: _screens,
+            child: Column(
+              children: [
+                const UpdateBanner(),
+                Expanded(
+                  child: IndexedStack(
+                    index: tabIndex,
+                    children: _screens,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -486,4 +506,294 @@ class NextTrackIntent extends Intent {
 class PreviousTrackIntent extends Intent {
   const PreviousTrackIntent();
   static const key = Key('previous_track');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DESKTOP SHELL — широкий сайдбар + контентная зона с ограниченной шириной
+// ─────────────────────────────────────────────────────────────────────────────
+class _DesktopShell extends ConsumerWidget {
+  const _DesktopShell();
+
+  void _openPlayer(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, animation, __) => const ExpandedPlayerScreen(),
+        transitionsBuilder: (_, animation, __, child) => FadeTransition(
+          opacity:
+              CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic),
+          child: child,
+        ),
+        transitionDuration: const Duration(milliseconds: 250),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tabIndex = ref.watch(_tabIndexProvider);
+    final hasTrack =
+        ref.watch(playerProvider.select((s) => s.currentTrack != null));
+    final player = ref.watch(playerProvider);
+    final palette = ref.watch(paletteProvider);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF080810),
+      body: Row(
+        children: [
+          // ── Широкий сайдбар (220px) ────────────────────────────────────────
+          _DesktopSidebar(
+            tabIndex: tabIndex,
+            hasTrack: hasTrack,
+            player: player,
+            palette: palette,
+            onTabChange: (i) => ref.read(_tabIndexProvider.notifier).state = i,
+            onPlayerTap: () => _openPlayer(context),
+            onPlayPause: () => ref.read(playerProvider.notifier).playPause(),
+          ),
+
+          // Разделитель
+          Container(width: 1, color: Colors.white.withAlpha(12)),
+
+          // ── Контентная зона с ограниченной шириной ─────────────────────────
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: Column(
+                  children: [
+                    const UpdateBanner(),
+                    Expanded(
+                      child: IndexedStack(
+                        index: tabIndex,
+                        children: _screens,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopSidebar extends StatelessWidget {
+  const _DesktopSidebar({
+    required this.tabIndex,
+    required this.hasTrack,
+    required this.player,
+    required this.palette,
+    required this.onTabChange,
+    required this.onPlayerTap,
+    required this.onPlayPause,
+  });
+
+  final int tabIndex;
+  final bool hasTrack;
+  final ProtogenixPlayerState player;
+  final PaletteState palette;
+  final ValueChanged<int> onTabChange;
+  final VoidCallback onPlayerTap;
+  final VoidCallback onPlayPause;
+
+  @override
+  Widget build(BuildContext context) {
+    final track = player.currentTrack as TrackModel?;
+
+    return Container(
+      width: 220,
+      color: Colors.white.withAlpha(6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Логотип ────────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+            child: Text(
+              'PROTOGENIX',
+              style: TextStyle(
+                color: Colors.white.withAlpha(80),
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 3,
+              ),
+            ),
+          ),
+
+          // ── Навигация ──────────────────────────────────────────────────────
+          ...List.generate(_tabs.length, (i) {
+            final selected = tabIndex == i;
+            final tab = _tabs[i];
+            return _DesktopNavItem(
+              tab: tab,
+              selected: selected,
+              onTap: () => onTabChange(i),
+            );
+          }),
+
+          const Spacer(),
+
+          // ── Мини-плеер в сайдбаре ─────────────────────────────────────────
+          if (hasTrack && track != null)
+            GestureDetector(
+              onTap: onPlayerTap,
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: Colors.white.withAlpha(12),
+                  border: Border.all(color: Colors.white.withAlpha(20)),
+                ),
+                child: Row(
+                  children: [
+                    // Обложка
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image(
+                        image: track.coverImage,
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    // Название и исполнитель
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            track.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            track.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Кнопка play/pause
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        onPlayPause();
+                      },
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: palette.primary.withAlpha(200),
+                        ),
+                        child: Icon(
+                          player.isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // ── Z43 Branding ───────────────────────────────────────────────────
+          const Padding(
+            padding: EdgeInsets.fromLTRB(0, 0, 0, 16),
+            child: Z43BrandingBadge(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopNavItem extends StatefulWidget {
+  const _DesktopNavItem({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+  });
+  final _TabItem tab;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_DesktopNavItem> createState() => _DesktopNavItemState();
+}
+
+class _DesktopNavItemState extends State<_DesktopNavItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          widget.onTap();
+        },
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            color: widget.selected
+                ? Colors.white.withAlpha(18)
+                : _isHovered
+                    ? Colors.white.withAlpha(10)
+                    : Colors.transparent,
+            border: widget.selected
+                ? Border.all(color: Colors.white.withAlpha(25))
+                : null,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                widget.selected ? widget.tab.activeIcon : widget.tab.icon,
+                color: widget.selected ? Colors.white : Colors.white38,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                widget.tab.label,
+                style: TextStyle(
+                  color: widget.selected ? Colors.white : Colors.white38,
+                  fontSize: 13,
+                  fontWeight:
+                      widget.selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

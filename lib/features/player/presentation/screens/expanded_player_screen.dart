@@ -50,31 +50,42 @@ class ExpandedPlayerScreen extends ConsumerWidget {
 
               // ── Основной контент ──────────────────────────────────────────
               Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Левая колонка — плеер (42%), сердечко включено
-                    Expanded(
-                      flex: 42,
-                      child: MusicVisualizerControls(
-                        compact: true,
-                        showFavorite: true, // ← сердечко рядом с названием
-                        onAddTrack: () => showImporterSheet(context),
-                        onChangeLyrics: track != null
-                            ? () => showLyricsSearchSheet(context, ref, track)
-                            : null,
-                      ),
-                    ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // На широких экранах: фиксированная ширина для плеера,
+                    // чтобы обложка не плавала в огромном пустом пространстве
+                    final isWide = constraints.maxWidth > 800;
+                    final playerWidth =
+                        isWide ? 460.0 : constraints.maxWidth * 0.42;
 
-                    VerticalDivider(
-                      color: Colors.white.withAlpha(18),
-                      width: 1,
-                      thickness: 1,
-                    ),
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Левая колонка — плеер (фиксированная ширина на широких экранах)
+                        SizedBox(
+                          width: playerWidth,
+                          child: MusicVisualizerControls(
+                            compact: true,
+                            showFavorite: true,
+                            onAddTrack: () => showImporterSheet(context),
+                            onChangeLyrics: track != null
+                                ? () =>
+                                    showLyricsSearchSheet(context, ref, track)
+                                : null,
+                          ),
+                        ),
 
-                    // Правая колонка — текст песни (58%)
-                    const Expanded(flex: 58, child: BeautifulLyricsView()),
-                  ],
+                        VerticalDivider(
+                          color: Colors.white.withAlpha(18),
+                          width: 1,
+                          thickness: 1,
+                        ),
+
+                        // Правая колонка — текст песни (оставшееся пространство)
+                        const Expanded(child: BeautifulLyricsView()),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],

@@ -221,10 +221,11 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
 
   /// Плавная пауза (Fade Out 300 мс).
   Future<void> pause() async {
-    await _fadeVolume(from: 1.0, to: 0.0);
+    final userVolume = state.volume;
+    await _fadeVolume(from: userVolume, to: 0.0);
     await _handler.pause();
     // Восстанавливаем громкость (без звука — трек уже на паузе)
-    await _player.setVolume(1.0);
+    await _player.setVolume(userVolume);
   }
 
   Future<void> next() async {
