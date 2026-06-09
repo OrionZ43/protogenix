@@ -562,9 +562,6 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
       body: ProtogenixBackground(
         child: Column(
           children: [
-            if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
-              const WindowTitleBar(),
-
             Expanded(
               child: Row(
                 children: [
