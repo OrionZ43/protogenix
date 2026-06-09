@@ -94,7 +94,7 @@ class _FullLayout extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _CoverArt(track: track),
+          Flexible(child: _CoverArt(track: track)),
           const SizedBox(height: 28),
           _TrackInfo(
             track: track,
@@ -102,12 +102,14 @@ class _FullLayout extends StatelessWidget {
             showFavorite: showFavorite,
           ),
           const SizedBox(height: 20),
-          LiveWaveformProgressBar(
-            progress: player.progress,
-            accentColor: palette.primary,
-            onSeek: notifier.seekToProgress,
-            position: player.position,
-            total: player.total,
+          Flexible(
+            child: LiveWaveformProgressBar(
+              progress: player.progress,
+              accentColor: palette.primary,
+              onSeek: notifier.seekToProgress,
+              position: player.position,
+              total: player.total,
+            ),
           ),
           const SizedBox(height: 16),
           _Controls(player: player, notifier: notifier, palette: palette),
@@ -388,24 +390,27 @@ class _TrackInfo extends ConsumerWidget {
 
         // Название + артист — центрированы
         Expanded(
-          child: Column(
-            children: [
-              Text(
-                track.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: titleStyle,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                track.artist,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: artistStyle,
-              ),
-            ],
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              children: [
+                Text(
+                  track.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: titleStyle,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  track.artist,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: artistStyle,
+                ),
+              ],
+            ),
           ),
         ),
 

@@ -24,6 +24,9 @@ class DesktopBottomPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final width = MediaQuery.sizeOf(context).width;
+    final scale = (width / 1200).clamp(1.0, 1.6);
+
     final player = ref.watch(playerProvider);
     final palette = ref.watch(paletteProvider);
     final notifier = ref.read(playerProvider.notifier);
@@ -32,7 +35,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
     if (track == null) return const SizedBox.shrink();
 
     return Container(
-      height: 100,
+      height: 100 * scale,
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.8),
@@ -44,20 +47,20 @@ class DesktopBottomPlayer extends ConsumerWidget {
         children: [
           // ── Левая зона: Обложка и инфо (ширина ~300) ──────────────
           SizedBox(
-            width: 300,
+            width: 300 * scale,
             child: Row(
               children: [
-                const SizedBox(width: 24),
+                SizedBox(width: 24 * scale),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8 * scale),
                   child: Image(
                     image: track.coverImage,
-                    width: 64,
-                    height: 64,
+                    width: 64 * scale,
+                    height: 64 * scale,
                     fit: BoxFit.cover,
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: 16 * scale),
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -67,20 +70,20 @@ class DesktopBottomPlayer extends ConsumerWidget {
                         track.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
+                          fontSize: 14 * scale,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4 * scale),
                       Text(
                         track.artist,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white54,
-                          fontSize: 12,
+                          fontSize: 12 * scale,
                         ),
                       ),
                     ],
@@ -91,6 +94,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   builder: (context, ref, _) {
                     final isFav = ref.watch(isFavoriteProvider(track.id));
                     return IconButton(
+                      iconSize: 24 * scale,
                       icon: Icon(
                         isFav
                             ? Icons.favorite_rounded
@@ -104,7 +108,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
                     );
                   },
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: 16 * scale),
               ],
             ),
           ),
@@ -112,7 +116,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
           // ── Центральная зона: Контролы и Waveform ──────────────
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: 16 * scale),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -121,6 +125,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
+                        iconSize: 24 * scale,
                         icon: const Icon(Icons.shuffle_rounded),
                         color:
                             player.isShuffle ? palette.primary : Colors.white54,
@@ -131,8 +136,9 @@ class DesktopBottomPlayer extends ConsumerWidget {
                           notifier.toggleShuffle();
                         },
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: 16 * scale),
                       IconButton(
+                        iconSize: 24 * scale,
                         icon: const Icon(Icons.skip_previous_rounded),
                         color: Colors.white,
                         onPressed: () {
@@ -140,7 +146,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
                           notifier.previous();
                         },
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: 16 * scale),
                       MouseRegion(
                         cursor: SystemMouseCursors.click,
                         child: GestureDetector(
@@ -149,8 +155,8 @@ class DesktopBottomPlayer extends ConsumerWidget {
                             notifier.playPause();
                           },
                           child: Container(
-                            width: 48,
-                            height: 48,
+                            width: 48 * scale,
+                            height: 48 * scale,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: palette.primary,
@@ -160,13 +166,14 @@ class DesktopBottomPlayer extends ConsumerWidget {
                                   ? Icons.pause_rounded
                                   : Icons.play_arrow_rounded,
                               color: Colors.white,
-                              size: 28,
+                              size: 28 * scale,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: 16 * scale),
                       IconButton(
+                        iconSize: 24 * scale,
                         icon: const Icon(Icons.skip_next_rounded),
                         color: Colors.white,
                         onPressed: () {
@@ -174,8 +181,9 @@ class DesktopBottomPlayer extends ConsumerWidget {
                           notifier.next();
                         },
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: 16 * scale),
                       IconButton(
+                        iconSize: 24 * scale,
                         icon: Icon(
                           player.repeatMode == ps.RepeatMode.none
                               ? Icons.repeat_rounded
@@ -193,16 +201,16 @@ class DesktopBottomPlayer extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4 * scale),
                   // Waveform
                   SizedBox(
-                    height: 24,
+                    height: 24 * scale,
                     child: LiveWaveformProgressBar(
                       progress: player.progress,
                       position: player.position,
                       total: player.total,
                       accentColor: palette.primary,
-                      height: 12,
+                      height: 12 * scale,
                       barCount: 100,
                       onSeek: (p) => notifier.seekToProgress(p),
                     ),
@@ -214,13 +222,13 @@ class DesktopBottomPlayer extends ConsumerWidget {
 
           // ── Правая зона: Громкость, Lyrics, Expand (ширина ~300) ──────────────
           SizedBox(
-            width: 300,
+            width: 300 * scale,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 16 * scale),
                     child: _VolumeSlider(
                       volume: player.volume,
                       accentColor: palette.primary,
@@ -229,6 +237,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   ),
                 ),
                 IconButton(
+                  iconSize: 24 * scale,
                   icon: Icon(isRightPanelOpen
                       ? Icons.menu_open_rounded
                       : Icons.view_sidebar_rounded),
@@ -236,11 +245,12 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   onPressed: onToggleRightPanel,
                 ),
                 IconButton(
+                  iconSize: 24 * scale,
                   icon: const Icon(Icons.open_in_full_rounded),
                   color: Colors.white54,
                   onPressed: onExpand,
                 ),
-                const SizedBox(width: 24),
+                SizedBox(width: 24 * scale),
               ],
             ),
           ),

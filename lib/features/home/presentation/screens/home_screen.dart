@@ -5,27 +5,54 @@ import '../../../library/presentation/library_provider.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 
+import 'dart:math' as math;
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final width = MediaQuery.sizeOf(context).width;
+    final scale = (width / 1200).clamp(1.0, 1.6);
+
     final tracks = ref.watch(libraryProvider);
     final sortedTracks = List.of(tracks)
       ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
     final recentTracks = sortedTracks.take(12).toList();
 
-    // Greeting logic
+    // Greeting logic with Easter eggs
     final hour = DateTime.now().hour;
+    final random = math.Random();
     String greeting;
     if (hour >= 5 && hour < 12) {
-      greeting = 'Доброе утро';
+      final options = [
+        'Доброе утро',
+        'Просыпайся, самурай',
+        'Время для утреннего вайба',
+      ];
+      greeting = options[random.nextInt(options.length)];
     } else if (hour >= 12 && hour < 18) {
-      greeting = 'Добрый день';
+      final options = [
+        'Добрый день',
+        'Работаем под бит',
+        'Продолжаем движение',
+      ];
+      greeting = options[random.nextInt(options.length)];
     } else if (hour >= 18 && hour < 23) {
-      greeting = 'Добрый вечер';
+      final options = [
+        'Добрый вечер',
+        'Пора расслабиться',
+        'Вечерний чилл',
+      ];
+      greeting = options[random.nextInt(options.length)];
     } else {
-      greeting = 'Доброй ночи';
+      final options = [
+        'Доброй ночи',
+        'Не спишь?',
+        'Ночной ритм',
+        'Музыка в темноте',
+      ];
+      greeting = options[random.nextInt(options.length)];
     }
 
     return Scaffold(
@@ -34,37 +61,50 @@ class HomeScreen extends ConsumerWidget {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(32, 48, 32, 24),
+              padding: EdgeInsets.fromLTRB(32 * scale, 48 * scale, 32 * scale, 24 * scale),
               child: Text(
                 greeting,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
-                  fontSize: 32,
+                  fontSize: 32 * scale,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
                 ),
               ),
             ),
           ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.only(left: 32 * scale, right: 32 * scale, bottom: 16 * scale),
+              child: Text(
+                'Недавно добавленные',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20 * scale,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: EdgeInsets.symmetric(horizontal: 32 * scale),
             sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 280,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
+              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 280 * scale,
+                mainAxisSpacing: 16 * scale,
+                crossAxisSpacing: 16 * scale,
                 childAspectRatio: 2.8,
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final track = recentTracks[index];
-                  return _RecentTrackCard(track: track);
+                  return _RecentTrackCard(track: track, scale: scale);
                 },
                 childCount: recentTracks.length,
               ),
             ),
           ),
-          const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
+          SliverPadding(padding: EdgeInsets.only(bottom: 32 * scale)),
         ],
       ),
     );
@@ -72,9 +112,10 @@ class HomeScreen extends ConsumerWidget {
 }
 
 class _RecentTrackCard extends ConsumerStatefulWidget {
-  const _RecentTrackCard({required this.track});
+  const _RecentTrackCard({required this.track, required this.scale});
 
   final dynamic track; // LibraryTrack
+  final double scale;
 
   @override
   ConsumerState<_RecentTrackCard> createState() => _RecentTrackCardState();
@@ -110,7 +151,7 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
             children: [
               // Cover
               SizedBox(
-                width: 64,
+                width: 64 * widget.scale,
                 height: double.infinity,
                 child: Stack(
                   fit: StackFit.expand,
@@ -120,9 +161,10 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: Colors.white10,
-                        child: const Icon(
+                        child: Icon(
                           Icons.music_note_rounded,
                           color: Colors.white24,
+                          size: 24 * widget.scale,
                         ),
                       ),
                     ),
@@ -135,14 +177,14 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
                                 ? Icons.pause_rounded
                                 : Icons.play_arrow_rounded,
                             color: Colors.white,
-                            size: 32,
+                            size: 32 * widget.scale,
                           ),
                         ),
                       ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16 * widget.scale),
               // Info
               Expanded(
                 child: Column(
@@ -153,26 +195,26 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
                       widget.track.toTrackModel().title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 14,
+                        fontSize: 14 * widget.scale,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4 * widget.scale),
                     Text(
                       widget.track.toTrackModel().artist,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white54,
-                        fontSize: 12,
+                        fontSize: 12 * widget.scale,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16 * widget.scale),
             ],
           ),
         ),

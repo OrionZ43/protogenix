@@ -539,7 +539,8 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
               CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic),
           child: child,
         ),
-        transitionDuration: const Duration(milliseconds: 250),
+        transitionDuration: const Duration(milliseconds: 200),
+        reverseTransitionDuration: const Duration(milliseconds: 150),
       ),
     );
   }
@@ -593,57 +594,70 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
                   ),
 
                   // ── Выезжающая панель (Lyrics / Queue) ─────────────────────────────
-                  if (_isRightPanelOpen && hasTrack) ...[
-                    Container(
-                        width: 1, color: Colors.white.withValues(alpha: 0.1)),
-                    Container(
-                      width: 350,
-                      color: Colors.black.withValues(alpha: 0.3),
-                      child: Column(
+                  if (hasTrack)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                      width: _isRightPanelOpen ? 350 : 0,
+                      child: Row(
                         children: [
-                          // Toggle for Lyrics / Queue
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.1)),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _PanelTabButton(
-                                  icon: Icons.lyrics_outlined,
-                                  label: 'Текст',
-                                  isSelected: !_showQueue,
-                                  onTap: () =>
-                                      setState(() => _showQueue = false),
-                                ),
-                                _PanelTabButton(
-                                  icon: Icons.queue_music_rounded,
-                                  label: 'Очередь',
-                                  isSelected: _showQueue,
-                                  onTap: () =>
-                                      setState(() => _showQueue = true),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Panel Content
+                              width: 1,
+                              color: Colors.white.withValues(alpha: 0.1)),
                           Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: _showQueue
-                                  ? const QueuePanel()
-                                  : const BeautifulLyricsView(),
+                            child: Container(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              child: Column(
+                                children: [
+                                  // Toggle for Lyrics / Queue
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.1)),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        _PanelTabButton(
+                                          icon: Icons.lyrics_outlined,
+                                          label: 'Текст',
+                                          isSelected: !_showQueue,
+                                          onTap: () => setState(
+                                              () => _showQueue = false),
+                                        ),
+                                        _PanelTabButton(
+                                          icon: Icons.queue_music_rounded,
+                                          label: 'Очередь',
+                                          isSelected: _showQueue,
+                                          onTap: () =>
+                                              setState(() => _showQueue = true),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Panel Content
+                                  Expanded(
+                                    child: AnimatedSwitcher(
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      child: _showQueue
+                                          ? const QueuePanel()
+                                          : const BeautifulLyricsView(),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
                 ],
               ),
             ),
