@@ -30,8 +30,9 @@ Future<void> main() async {
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
     WindowOptions windowOptions = const WindowOptions(
-      size: Size(800, 600),
-      minimumSize: Size(800, 600),
+      size: Size(1000, 700),
+      minimumSize: Size(1000, 700),
+      maximumSize: Size(2560, 1440),
       center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
@@ -40,6 +41,8 @@ Future<void> main() async {
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
       await windowManager.focus();
+      await windowManager.setMinimumSize(const Size(1000, 700));
+      await windowManager.setMaximumSize(const Size(2560, 1440));
     });
   }
 
