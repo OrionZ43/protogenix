@@ -43,6 +43,10 @@ import '../features/player/presentation/providers/palette_provider.dart';
 import '../features/player/domain/track_model.dart';
 import '../features/player/domain/player_state.dart';
 import '../features/updater/update_banner.dart';
+import '../features/home/presentation/screens/home_screen.dart';
+import '../features/player/presentation/widgets/desktop_bottom_player.dart';
+import '../features/player/presentation/widgets/queue_panel.dart';
+import '../features/player/presentation/widgets/beautiful_lyrics_view.dart';
 
 // ── Провайдер текущей вкладки ─────────────────────────────────────────────────
 
@@ -51,6 +55,10 @@ final _tabIndexProvider = StateProvider<int>((ref) => 0);
 // ── Экраны вкладок ────────────────────────────────────────────────────────────
 
 const _tabs = [
+  _TabItem(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Главная'),
   _TabItem(
       icon: Icons.library_music_outlined,
       activeIcon: Icons.library_music_rounded,
@@ -70,6 +78,7 @@ const _tabs = [
 ];
 
 final _screens = <Widget>[
+  const HomeScreen(),
   const LibraryScreen(),
   const PlaylistsScreen(),
   const FavoritesScreen(),
@@ -511,8 +520,16 @@ class PreviousTrackIntent extends Intent {
 // ─────────────────────────────────────────────────────────────────────────────
 // DESKTOP SHELL — широкий сайдбар + контентная зона с ограниченной шириной
 // ─────────────────────────────────────────────────────────────────────────────
-class _DesktopShell extends ConsumerWidget {
+class _DesktopShell extends ConsumerStatefulWidget {
   const _DesktopShell();
+
+  @override
+  ConsumerState<_DesktopShell> createState() => _DesktopShellState();
+}
+
+class _DesktopShellState extends ConsumerState<_DesktopShell> {
+  bool _isRightPanelOpen = false;
+  bool _showQueue = false;
 
   void _openPlayer(BuildContext context) {
     Navigator.of(context).push(
@@ -528,49 +545,144 @@ class _DesktopShell extends ConsumerWidget {
     );
   }
 
+  void _toggleRightPanel() {
+    setState(() {
+      _isRightPanelOpen = !_isRightPanelOpen;
+    });
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final tabIndex = ref.watch(_tabIndexProvider);
     final hasTrack =
         ref.watch(playerProvider.select((s) => s.currentTrack != null));
-    final player = ref.watch(playerProvider);
-    final palette = ref.watch(paletteProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080810),
-      body: Row(
+      backgroundColor: Colors.transparent,
+      body: Column(
         children: [
-          // ── Широкий сайдбар (220px) ────────────────────────────────────────
-          _DesktopSidebar(
-            tabIndex: tabIndex,
-            hasTrack: hasTrack,
-            player: player,
-            palette: palette,
-            onTabChange: (i) => ref.read(_tabIndexProvider.notifier).state = i,
-            onPlayerTap: () => _openPlayer(context),
-            onPlayPause: () => ref.read(playerProvider.notifier).playPause(),
-          ),
+          if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+            const WindowTitleBar(),
 
-          // Разделитель
-          Container(width: 1, color: Colors.white.withAlpha(12)),
-
-          // ── Контентная зона с ограниченной шириной ─────────────────────────
           Expanded(
-            child: Center(
-              child: Column(
-                children: [
-                  const UpdateBanner(),
-                  Expanded(
-                    child: IndexedStack(
-                      index: tabIndex,
-                      children: _screens,
+            child: Row(
+              children: [
+                // ── Широкий сайдбар (240px) ────────────────────────────────────────
+                _DesktopSidebar(
+                  tabIndex: tabIndex,
+                  onTabChange: (i) => ref.read(_tabIndexProvider.notifier).state = i,
+                ),
+
+                Container(width: 1, color: Colors.white.withValues(alpha: 0.1)),
+
+                // ── Контентная зона ────────────────────────────────────────────────
+                Expanded(
+                  child: Column(
+                    children: [
+                      const UpdateBanner(),
+                      Expanded(
+                        child: IndexedStack(
+                          index: tabIndex,
+                          children: _screens,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Выезжающая панель (Lyrics / Queue) ─────────────────────────────
+                if (_isRightPanelOpen && hasTrack) ...[
+                  Container(width: 1, color: Colors.white.withValues(alpha: 0.1)),
+                  Container(
+                    width: 350,
+                    color: Colors.black.withValues(alpha: 0.3),
+                    child: Column(
+                      children: [
+                        // Toggle for Lyrics / Queue
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _PanelTabButton(
+                                label: 'Текст',
+                                isSelected: !_showQueue,
+                                onTap: () => setState(() => _showQueue = false),
+                              ),
+                              _PanelTabButton(
+                                label: 'Очередь',
+                                isSelected: _showQueue,
+                                onTap: () => setState(() => _showQueue = true),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Panel Content
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: _showQueue
+                                ? const QueuePanel()
+                                : const BeautifulLyricsView(),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
           ),
+
+          // ── Нижний плеер ──────────────────────────────────────────────────────────
+          if (hasTrack)
+            DesktopBottomPlayer(
+              onExpand: () => _openPlayer(context),
+              onToggleRightPanel: _toggleRightPanel,
+              isRightPanelOpen: _isRightPanelOpen,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _PanelTabButton extends StatelessWidget {
+  const _PanelTabButton({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white54,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
@@ -579,39 +691,27 @@ class _DesktopShell extends ConsumerWidget {
 class _DesktopSidebar extends StatelessWidget {
   const _DesktopSidebar({
     required this.tabIndex,
-    required this.hasTrack,
-    required this.player,
-    required this.palette,
     required this.onTabChange,
-    required this.onPlayerTap,
-    required this.onPlayPause,
   });
 
   final int tabIndex;
-  final bool hasTrack;
-  final ProtogenixPlayerState player;
-  final PaletteState palette;
   final ValueChanged<int> onTabChange;
-  final VoidCallback onPlayerTap;
-  final VoidCallback onPlayPause;
 
   @override
   Widget build(BuildContext context) {
-    final track = player.currentTrack as TrackModel?;
-
     return Container(
-      width: 220,
-      color: Colors.white.withAlpha(6),
+      width: 240,
+      color: Colors.black.withValues(alpha: 0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Логотип ────────────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
             child: Text(
               'PROTOGENIX',
               style: TextStyle(
-                color: Colors.white.withAlpha(80),
+                color: Colors.white.withValues(alpha: 0.8),
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 3,
@@ -629,91 +729,6 @@ class _DesktopSidebar extends StatelessWidget {
               onTap: () => onTabChange(i),
             );
           }),
-
-          const Spacer(),
-
-          // ── Мини-плеер в сайдбаре ─────────────────────────────────────────
-          if (hasTrack && track != null)
-            GestureDetector(
-              onTap: onPlayerTap,
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  color: Colors.white.withAlpha(12),
-                  border: Border.all(color: Colors.white.withAlpha(20)),
-                ),
-                child: Row(
-                  children: [
-                    // Обложка
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image(
-                        image: track.coverImage,
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-
-                    const SizedBox(width: 10),
-
-                    // Название и исполнитель
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            track.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            track.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white38,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Кнопка play/pause
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        onPlayPause();
-                      },
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: palette.primary.withAlpha(200),
-                        ),
-                        child: Icon(
-                          player.isPlaying
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
     );

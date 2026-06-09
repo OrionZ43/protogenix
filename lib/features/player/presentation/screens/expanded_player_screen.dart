@@ -52,26 +52,29 @@ class ExpandedPlayerScreen extends ConsumerWidget {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    // На широких экранах: фиксированная ширина для плеера,
-                    // чтобы обложка не плавала в огромном пустом пространстве
+                    // На широких экранах: масштабируем, чтобы обложка была крупной.
+                    // Выделяем до 50% ширины, но не более 600px для визуализатора.
                     final isWide = constraints.maxWidth > 800;
                     final playerWidth =
-                        isWide ? 460.0 : constraints.maxWidth * 0.42;
+                        isWide ? (constraints.maxWidth * 0.45).clamp(460.0, 600.0) : constraints.maxWidth * 0.42;
 
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Левая колонка — плеер (фиксированная ширина на широких экранах)
+                        // Левая колонка — плеер (крупная обложка, шрифты)
                         SizedBox(
                           width: playerWidth,
-                          child: MusicVisualizerControls(
-                            compact: true,
-                            showFavorite: true,
-                            onAddTrack: () => showImporterSheet(context),
-                            onChangeLyrics: track != null
-                                ? () =>
-                                    showLyricsSearchSheet(context, ref, track)
-                                : null,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+                            child: MusicVisualizerControls(
+                              compact: false, // Обязательно false, чтобы использовать большие шрифты
+                              showFavorite: true,
+                              onAddTrack: () => showImporterSheet(context),
+                              onChangeLyrics: track != null
+                                  ? () =>
+                                      showLyricsSearchSheet(context, ref, track)
+                                  : null,
+                            ),
                           ),
                         ),
 
@@ -81,8 +84,13 @@ class ExpandedPlayerScreen extends ConsumerWidget {
                           thickness: 1,
                         ),
 
-                        // Правая колонка — текст песни (оставшееся пространство)
-                        const Expanded(child: BeautifulLyricsView()),
+                        // Правая колонка — текст песни
+                        const Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 24.0, right: 32.0, bottom: 24.0),
+                            child: BeautifulLyricsView(),
+                          ),
+                        ),
                       ],
                     );
                   },
