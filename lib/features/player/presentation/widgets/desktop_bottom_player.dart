@@ -35,7 +35,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
     if (track == null) return const SizedBox.shrink();
 
     return Container(
-      height: 110 * scale,
+      height: 112,
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.8),
@@ -202,15 +202,16 @@ class DesktopBottomPlayer extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  SizedBox(height: 4 * scale),
+                  SizedBox(height: 8 * scale),
                   // Waveform
-                  Expanded(
+                  SizedBox(
+                    height: 44 * scale,
                     child: LiveWaveformProgressBar(
                       progress: player.progress,
                       position: player.position,
                       total: player.total,
                       accentColor: palette.primary,
-                      height: 16 * scale,
+                      height: 28 * scale,
                       barCount: 100,
                       onSeek: (p) => notifier.seekToProgress(p),
                     ),
@@ -226,9 +227,10 @@ class DesktopBottomPlayer extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Expanded(
+                SizedBox(
+                  width: 140 * scale,
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+                    padding: EdgeInsets.symmetric(horizontal: 8 * scale),
                     child: _VolumeSlider(
                       volume: player.volume,
                       accentColor: palette.primary,
