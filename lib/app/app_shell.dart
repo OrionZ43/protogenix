@@ -36,17 +36,16 @@ import '../features/library/presentation/screens/favorites_screen.dart';
 import '../features/player/presentation/widgets/mini_player.dart';
 import '../features/player/presentation/screens/player_screen.dart';
 import 'package:flutter/services.dart';
-import '../core/widgets/z43_branding.dart';
+
 import '../features/player/presentation/screens/expanded_player_screen.dart';
 import '../features/player/presentation/providers/player_provider.dart';
-import '../features/player/presentation/providers/palette_provider.dart';
-import '../features/player/domain/track_model.dart';
-import '../features/player/domain/player_state.dart';
+
 import '../features/updater/update_banner.dart';
 import '../features/home/presentation/screens/home_screen.dart';
 import '../features/player/presentation/widgets/desktop_bottom_player.dart';
 import '../features/player/presentation/widgets/queue_panel.dart';
 import '../features/player/presentation/widgets/beautiful_lyrics_view.dart';
+import '../features/player/presentation/widgets/protogenix_background.dart';
 
 // ── Провайдер текущей вкладки ─────────────────────────────────────────────────
 
@@ -558,95 +557,106 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
         ref.watch(playerProvider.select((s) => s.currentTrack != null));
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Column(
-        children: [
-          if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
-            const WindowTitleBar(),
+      backgroundColor: const Color(0xFF080810),
+      body: ProtogenixBackground(
+        child: Column(
+          children: [
+            if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+              const WindowTitleBar(),
 
-          Expanded(
-            child: Row(
-              children: [
-                // ── Широкий сайдбар (240px) ────────────────────────────────────────
-                _DesktopSidebar(
-                  tabIndex: tabIndex,
-                  onTabChange: (i) => ref.read(_tabIndexProvider.notifier).state = i,
-                ),
-
-                Container(width: 1, color: Colors.white.withValues(alpha: 0.1)),
-
-                // ── Контентная зона ────────────────────────────────────────────────
-                Expanded(
-                  child: Column(
-                    children: [
-                      const UpdateBanner(),
-                      Expanded(
-                        child: IndexedStack(
-                          index: tabIndex,
-                          children: _screens,
-                        ),
-                      ),
-                    ],
+            Expanded(
+              child: Row(
+                children: [
+                  // ── Широкий сайдбар (240px) ────────────────────────────────────────
+                  _DesktopSidebar(
+                    tabIndex: tabIndex,
+                    onTabChange: (i) =>
+                        ref.read(_tabIndexProvider.notifier).state = i,
                   ),
-                ),
 
-                // ── Выезжающая панель (Lyrics / Queue) ─────────────────────────────
-                if (_isRightPanelOpen && hasTrack) ...[
-                  Container(width: 1, color: Colors.white.withValues(alpha: 0.1)),
                   Container(
-                    width: 350,
-                    color: Colors.black.withValues(alpha: 0.3),
+                      width: 1, color: Colors.white.withValues(alpha: 0.1)),
+
+                  // ── Контентная зона ────────────────────────────────────────────────
+                  Expanded(
                     child: Column(
                       children: [
-                        // Toggle for Lyrics / Queue
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _PanelTabButton(
-                                label: 'Текст',
-                                isSelected: !_showQueue,
-                                onTap: () => setState(() => _showQueue = false),
-                              ),
-                              _PanelTabButton(
-                                label: 'Очередь',
-                                isSelected: _showQueue,
-                                onTap: () => setState(() => _showQueue = true),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Panel Content
+                        const UpdateBanner(),
                         Expanded(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: _showQueue
-                                ? const QueuePanel()
-                                : const BeautifulLyricsView(),
+                          child: IndexedStack(
+                            index: tabIndex,
+                            children: _screens,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ],
-            ),
-          ),
 
-          // ── Нижний плеер ──────────────────────────────────────────────────────────
-          if (hasTrack)
-            DesktopBottomPlayer(
-              onExpand: () => _openPlayer(context),
-              onToggleRightPanel: _toggleRightPanel,
-              isRightPanelOpen: _isRightPanelOpen,
+                  // ── Выезжающая панель (Lyrics / Queue) ─────────────────────────────
+                  if (_isRightPanelOpen && hasTrack) ...[
+                    Container(
+                        width: 1, color: Colors.white.withValues(alpha: 0.1)),
+                    Container(
+                      width: 350,
+                      color: Colors.black.withValues(alpha: 0.3),
+                      child: Column(
+                        children: [
+                          // Toggle for Lyrics / Queue
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.1)),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _PanelTabButton(
+                                  icon: Icons.lyrics_outlined,
+                                  label: 'Текст',
+                                  isSelected: !_showQueue,
+                                  onTap: () =>
+                                      setState(() => _showQueue = false),
+                                ),
+                                _PanelTabButton(
+                                  icon: Icons.queue_music_rounded,
+                                  label: 'Очередь',
+                                  isSelected: _showQueue,
+                                  onTap: () =>
+                                      setState(() => _showQueue = true),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Panel Content
+                          Expanded(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: _showQueue
+                                  ? const QueuePanel()
+                                  : const BeautifulLyricsView(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-        ],
+
+            // ── Нижний плеер ──────────────────────────────────────────────────────────
+            if (hasTrack)
+              DesktopBottomPlayer(
+                onExpand: () => _openPlayer(context),
+                onToggleRightPanel: _toggleRightPanel,
+                isRightPanelOpen: _isRightPanelOpen,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -654,33 +664,50 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
 
 class _PanelTabButton extends StatelessWidget {
   const _PanelTabButton({
+    required this.icon,
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
 
+  final IconData icon;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white54,
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? Colors.white : Colors.white54,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white54,
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ),
