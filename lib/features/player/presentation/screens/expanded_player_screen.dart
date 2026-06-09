@@ -203,34 +203,6 @@ class _TopBar extends StatelessWidget {
                       size: 18,
                     ),
                   ),
-                // Desktop window controls
-                if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.minimize,
-                            color: Colors.white54, size: 18),
-                        onPressed: () => windowManager.minimize(),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.crop_square,
-                            color: Colors.white54, size: 18),
-                        onPressed: () async {
-                          if (await windowManager.isMaximized()) {
-                            windowManager.unmaximize();
-                          } else {
-                            windowManager.maximize();
-                          }
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close,
-                            color: Colors.white54, size: 18),
-                        onPressed: () => windowManager.close(),
-                      ),
-                    ],
-                  ),
               ],
             ),
           ),
