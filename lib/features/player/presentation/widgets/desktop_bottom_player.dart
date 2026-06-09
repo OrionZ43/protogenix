@@ -35,7 +35,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
     if (track == null) return const SizedBox.shrink();
 
     return Container(
-      height: 112,
+      height: 120,
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.8),
@@ -205,7 +205,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   SizedBox(height: 8 * scale),
                   // Waveform
                   SizedBox(
-                    height: 44 * scale,
+                    height: 52 * scale,
                     child: LiveWaveformProgressBar(
                       progress: player.progress,
                       position: player.position,
