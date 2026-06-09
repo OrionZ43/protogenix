@@ -42,9 +42,9 @@ class DesktopBottomPlayer extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          // ── Левая зона: Обложка и инфо (ширина ~280) ──────────────
+          // ── Левая зона: Обложка и инфо (ширина ~300) ──────────────
           SizedBox(
-            width: 280,
+            width: 300,
             child: Row(
               children: [
                 const SizedBox(width: 24),
@@ -92,7 +92,9 @@ class DesktopBottomPlayer extends ConsumerWidget {
                     final isFav = ref.watch(isFavoriteProvider(track.id));
                     return IconButton(
                       icon: Icon(
-                        isFav ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                        isFav
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_outline_rounded,
                         color: isFav ? Colors.redAccent : Colors.white54,
                       ),
                       onPressed: () {
@@ -119,16 +121,19 @@ class DesktopBottomPlayer extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.shuffle_rounded),
-                        color: player.isShuffle ? palette.primary : Colors.white54,
+                        icon: const Icon(Icons.shuffle_rounded),
+                        color:
+                            player.isShuffle ? palette.primary : Colors.white54,
                         onPressed: () {
-                          player.isShuffle ? HapticPatterns.shuffleOff() : HapticPatterns.shuffleOn();
+                          player.isShuffle
+                              ? HapticPatterns.shuffleOff()
+                              : HapticPatterns.shuffleOn();
                           notifier.toggleShuffle();
                         },
                       ),
                       const SizedBox(width: 16),
                       IconButton(
-                        icon: Icon(Icons.skip_previous_rounded),
+                        icon: const Icon(Icons.skip_previous_rounded),
                         color: Colors.white,
                         onPressed: () {
                           HapticPatterns.previous();
@@ -151,7 +156,9 @@ class DesktopBottomPlayer extends ConsumerWidget {
                               color: palette.primary,
                             ),
                             child: Icon(
-                              player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                              player.isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
                               color: Colors.white,
                               size: 28,
                             ),
@@ -160,7 +167,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
                       ),
                       const SizedBox(width: 16),
                       IconButton(
-                        icon: Icon(Icons.skip_next_rounded),
+                        icon: const Icon(Icons.skip_next_rounded),
                         color: Colors.white,
                         onPressed: () {
                           HapticPatterns.next();
@@ -176,7 +183,9 @@ class DesktopBottomPlayer extends ConsumerWidget {
                                   ? Icons.repeat_rounded
                                   : Icons.repeat_one_rounded,
                         ),
-                        color: player.repeatMode != ps.RepeatMode.none ? palette.primary : Colors.white54,
+                        color: player.repeatMode != ps.RepeatMode.none
+                            ? palette.primary
+                            : Colors.white54,
                         onPressed: () {
                           HapticPatterns.repeat();
                           notifier.toggleRepeat();
@@ -203,9 +212,9 @@ class DesktopBottomPlayer extends ConsumerWidget {
             ),
           ),
 
-          // ── Правая зона: Громкость, Lyrics, Expand (ширина ~280) ──────────────
+          // ── Правая зона: Громкость, Lyrics, Expand (ширина ~300) ──────────────
           SizedBox(
-            width: 280,
+            width: 300,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -220,12 +229,14 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.lyrics_rounded),
+                  icon: Icon(isRightPanelOpen
+                      ? Icons.menu_open_rounded
+                      : Icons.view_sidebar_rounded),
                   color: isRightPanelOpen ? palette.primary : Colors.white54,
                   onPressed: onToggleRightPanel,
                 ),
                 IconButton(
-                  icon: Icon(Icons.open_in_full_rounded),
+                  icon: const Icon(Icons.open_in_full_rounded),
                   color: Colors.white54,
                   onPressed: onExpand,
                 ),

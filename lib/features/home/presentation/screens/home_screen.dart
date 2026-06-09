@@ -86,7 +86,8 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
   @override
   Widget build(BuildContext context) {
     final player = ref.watch(playerProvider);
-    final isPlaying = player.isPlaying && player.currentTrack?.id == widget.track.id;
+    final isPlaying =
+        player.isPlaying && player.currentTrack?.id == widget.track.id;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -97,7 +98,8 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
           final notifier = ref.read(playerProvider.notifier);
           // If the clicked track is already in the queue, we can just skip to it
           // Wait, simple loadPlaylist is better for play track now.
-          await notifier.loadPlaylist([widget.track.toTrackModel()], initialIndex: 0);
+          await notifier
+              .loadPlaylist([widget.track.toTrackModel()], initialIndex: 0);
           await notifier.play();
         },
         child: GlassCard(
@@ -114,7 +116,7 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
                   fit: StackFit.expand,
                   children: [
                     Image(
-                      image: widget.track.coverImage,
+                      image: widget.track.toTrackModel().coverImage,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: Colors.white10,
@@ -129,7 +131,9 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
                         color: Colors.black.withValues(alpha: 0.4),
                         child: Center(
                           child: Icon(
-                            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
                             color: Colors.white,
                             size: 32,
                           ),
@@ -146,7 +150,7 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      widget.track.title,
+                      widget.track.toTrackModel().title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -157,7 +161,7 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      widget.track.artist,
+                      widget.track.toTrackModel().artist,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
