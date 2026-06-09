@@ -204,17 +204,14 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   ),
                   SizedBox(height: 8 * scale),
                   // Waveform
-                  SizedBox(
-                    height: 52 * scale,
-                    child: LiveWaveformProgressBar(
-                      progress: player.progress,
-                      position: player.position,
-                      total: player.total,
-                      accentColor: palette.primary,
-                      height: 28 * scale,
-                      barCount: 100,
-                      onSeek: (p) => notifier.seekToProgress(p),
-                    ),
+                  LiveWaveformProgressBar(
+                    progress: player.progress,
+                    position: player.position,
+                    total: player.total,
+                    accentColor: palette.primary,
+                    height: 28 * scale,
+                    barCount: 100,
+                    onSeek: (p) => notifier.seekToProgress(p),
                   ),
                 ],
               ),
