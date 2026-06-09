@@ -7,53 +7,75 @@ import '../../../player/presentation/widgets/glass_card.dart';
 
 import 'dart:math' as math;
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final width = MediaQuery.sizeOf(context).width;
-    final scale = (width / 1200).clamp(1.0, 1.6);
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
 
-    final tracks = ref.watch(libraryProvider);
-    final sortedTracks = List.of(tracks)
-      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
-    final recentTracks = sortedTracks.take(12).toList();
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  late String _greeting;
 
-    // Greeting logic with Easter eggs
+  @override
+  void initState() {
+    super.initState();
+    _initGreeting();
+  }
+
+  void _initGreeting() {
     final hour = DateTime.now().hour;
     final random = math.Random();
-    String greeting;
+
     if (hour >= 5 && hour < 12) {
       final options = [
         'Доброе утро',
         'Просыпайся, самурай',
         'Время для утреннего вайба',
+        'Начни день с ритма',
+        'Утро начинается не с кофе',
       ];
-      greeting = options[random.nextInt(options.length)];
+      _greeting = options[random.nextInt(options.length)];
     } else if (hour >= 12 && hour < 18) {
       final options = [
         'Добрый день',
         'Работаем под бит',
         'Продолжаем движение',
+        'Музыкальный перерыв',
+        'Включай громче',
       ];
-      greeting = options[random.nextInt(options.length)];
+      _greeting = options[random.nextInt(options.length)];
     } else if (hour >= 18 && hour < 23) {
       final options = [
         'Добрый вечер',
         'Пора расслабиться',
         'Вечерний чилл',
+        'Закат под хорошую музыку',
+        'Оставь суету позади',
       ];
-      greeting = options[random.nextInt(options.length)];
+      _greeting = options[random.nextInt(options.length)];
     } else {
       final options = [
         'Доброй ночи',
         'Не спишь?',
         'Ночной ритм',
         'Музыка в темноте',
+        'Протоколы ночи активированы',
+        'Симуляция запущена',
       ];
-      greeting = options[random.nextInt(options.length)];
+      _greeting = options[random.nextInt(options.length)];
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final scale = (width / 1400).clamp(0.9, 1.15);
+
+    final tracks = ref.watch(libraryProvider);
+    final sortedTracks = List.of(tracks)
+      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+    final recentTracks = sortedTracks.take(12).toList();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -61,9 +83,10 @@ class HomeScreen extends ConsumerWidget {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(32 * scale, 48 * scale, 32 * scale, 24 * scale),
+              padding: EdgeInsets.fromLTRB(
+                  32 * scale, 48 * scale, 32 * scale, 24 * scale),
               child: Text(
-                greeting,
+                _greeting,
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 32 * scale,
@@ -75,7 +98,8 @@ class HomeScreen extends ConsumerWidget {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.only(left: 32 * scale, right: 32 * scale, bottom: 16 * scale),
+              padding: EdgeInsets.only(
+                  left: 32 * scale, right: 32 * scale, bottom: 16 * scale),
               child: Text(
                 'Недавно добавленные',
                 style: TextStyle(
