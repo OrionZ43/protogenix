@@ -55,8 +55,9 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
           ),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch, // Растягиваем на всю высоту
-          children:[
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch, // Растягиваем на всю высоту
+          children: [
             // 1. macOS Кнопки (отдельно от DragToMoveArea = моментальный клик)
             if (_isMacOS) ...[
               const SizedBox(width: 12),
@@ -98,13 +99,13 @@ class _Logo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children:[
+      children: [
         Container(
           width: 18,
           height: 18,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(5),
-            boxShadow:[
+            boxShadow: [
               BoxShadow(
                 color: const Color(0xFFCE93D8).withValues(alpha: 0.3),
                 blurRadius: 6,
@@ -153,12 +154,16 @@ class _WindowsControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children:[
+      children: [
         _WinBtn(icon: Icons.minimize_rounded, onTap: windowManager.minimize),
         _WinBtn(
-          icon: isMaximized ? Icons.filter_none_rounded : Icons.crop_square_rounded,
+          icon: isMaximized
+              ? Icons.filter_none_rounded
+              : Icons.crop_square_rounded,
           iconSize: isMaximized ? 12 : 14,
-          onTap: () => isMaximized ? windowManager.unmaximize() : windowManager.maximize(),
+          onTap: () => isMaximized
+              ? windowManager.unmaximize()
+              : windowManager.maximize(),
         ),
         _WinBtn(
           icon: Icons.close_rounded,
@@ -171,7 +176,11 @@ class _WindowsControls extends StatelessWidget {
 }
 
 class _WinBtn extends StatefulWidget {
-  const _WinBtn({required this.icon, required this.onTap, this.isClose = false, this.iconSize = 16});
+  const _WinBtn(
+      {required this.icon,
+      required this.onTap,
+      this.isClose = false,
+      this.iconSize = 16});
   final IconData icon;
   final VoidCallback onTap;
   final bool isClose;
@@ -197,7 +206,9 @@ class _WinBtnState extends State<_WinBtn> {
           duration: const Duration(milliseconds: 100),
           width: 40,
           color: _hover
-              ? (widget.isClose ? const Color(0xFFE81123) : Colors.white.withValues(alpha: 0.08))
+              ? (widget.isClose
+                  ? const Color(0xFFE81123)
+                  : Colors.white.withValues(alpha: 0.08))
               : Colors.transparent,
           child: Icon(
             widget.icon,
@@ -220,15 +231,25 @@ class _MacOsControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children:[
-        _MacBtn(color: const Color(0xFFFF5F57), icon: Icons.close_rounded, onTap: windowManager.close),
+      children: [
+        _MacBtn(
+            color: const Color(0xFFFF5F57),
+            icon: Icons.close_rounded,
+            onTap: windowManager.close),
         const SizedBox(width: 8),
-        _MacBtn(color: const Color(0xFFFFBD2E), icon: Icons.minimize_rounded, onTap: windowManager.minimize),
+        _MacBtn(
+            color: const Color(0xFFFFBD2E),
+            icon: Icons.minimize_rounded,
+            onTap: windowManager.minimize),
         const SizedBox(width: 8),
         _MacBtn(
           color: const Color(0xFF28CA42),
-          icon: isMaximized ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
-          onTap: () => isMaximized ? windowManager.unmaximize() : windowManager.maximize(),
+          icon: isMaximized
+              ? Icons.fullscreen_exit_rounded
+              : Icons.fullscreen_rounded,
+          onTap: () => isMaximized
+              ? windowManager.unmaximize()
+              : windowManager.maximize(),
         ),
       ],
     );
@@ -264,9 +285,16 @@ class _MacBtnState extends State<_MacBtn> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: _hover ? widget.color : widget.color.withValues(alpha: 0.8),
-            boxShadow: _hover ? [BoxShadow(color: widget.color.withValues(alpha: 0.5), blurRadius: 4)] : null,
+            boxShadow: _hover
+                ? [
+                    BoxShadow(
+                        color: widget.color.withValues(alpha: 0.5),
+                        blurRadius: 4)
+                  ]
+                : null,
           ),
-          child: _hover ? Icon(widget.icon, size: 8, color: Colors.black45) : null,
+          child:
+              _hover ? Icon(widget.icon, size: 8, color: Colors.black45) : null,
         ),
       ),
     );

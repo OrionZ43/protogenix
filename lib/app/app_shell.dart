@@ -557,19 +557,16 @@ class _DesktopShell extends ConsumerWidget {
           // ── Контентная зона с ограниченной шириной ─────────────────────────
           Expanded(
             child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1100),
-                child: Column(
-                  children: [
-                    const UpdateBanner(),
-                    Expanded(
-                      child: IndexedStack(
-                        index: tabIndex,
-                        children: _screens,
-                      ),
+              child: Column(
+                children: [
+                  const UpdateBanner(),
+                  Expanded(
+                    child: IndexedStack(
+                      index: tabIndex,
+                      children: _screens,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -717,12 +714,6 @@ class _DesktopSidebar extends StatelessWidget {
                 ),
               ),
             ),
-
-          // ── Z43 Branding ───────────────────────────────────────────────────
-          const Padding(
-            padding: EdgeInsets.fromLTRB(0, 0, 0, 16),
-            child: Z43BrandingBadge(),
-          ),
         ],
       ),
     );

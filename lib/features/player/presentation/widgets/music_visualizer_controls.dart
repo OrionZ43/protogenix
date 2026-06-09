@@ -270,7 +270,7 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
                 const SizedBox(width: 6),
                 Text(widget.label,
                     style:
-                    const TextStyle(color: Colors.white60, fontSize: 12)),
+                        const TextStyle(color: Colors.white60, fontSize: 12)),
               ],
             ),
           ),
@@ -343,7 +343,7 @@ class _TrackInfo extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isFav =
-    showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
+        showFavorite ? ref.watch(isFavoriteProvider(track.id)) : false;
 
     final titleStyle = TextStyle(
       color: Colors.white,
@@ -556,8 +556,8 @@ class _VolumeSlider extends StatelessWidget {
     final IconData volIcon = volume == 0
         ? Icons.volume_off_rounded
         : volume < 0.4
-        ? Icons.volume_down_rounded
-        : Icons.volume_up_rounded;
+            ? Icons.volume_down_rounded
+            : Icons.volume_up_rounded;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -569,10 +569,8 @@ class _VolumeSlider extends StatelessWidget {
             child: SliderTheme(
               data: SliderThemeData(
                 trackHeight: 2.5,
-                thumbShape:
-                const RoundSliderThumbShape(enabledThumbRadius: 5),
-                overlayShape:
-                const RoundSliderOverlayShape(overlayRadius: 12),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
                 activeTrackColor: accentColor.withAlpha(200),
                 inactiveTrackColor: Colors.white.withAlpha(20),
                 thumbColor: Colors.white,
