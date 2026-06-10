@@ -117,18 +117,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: 20 * scale),
                 sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 280 * scale,
-                mainAxisSpacing: 16 * scale,
-                crossAxisSpacing: 16 * scale,
-                childAspectRatio: 2.8,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final track = recentTracks[index];
-                  return _RecentTrackCard(track: track, scale: scale);
-                },
-                childCount: recentTracks.length,
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 280 * scale,
+                    mainAxisSpacing: 16 * scale,
+                    crossAxisSpacing: 16 * scale,
+                    childAspectRatio: 2.8,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final track = recentTracks[index];
+                      return _RecentTrackCard(track: track, scale: scale);
+                    },
+                    childCount: recentTracks.length,
+                  ),
                 ),
               ),
               SliverPadding(padding: EdgeInsets.only(bottom: 32 * scale)),
