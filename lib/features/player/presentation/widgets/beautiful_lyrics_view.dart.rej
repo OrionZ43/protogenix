@@ -1,0 +1,98 @@
+--- beautiful_lyrics_view.dart
++++ beautiful_lyrics_view.dart
+@@ -109,7 +109,17 @@
+         ),
+         child: const SizedBox.expand(),
+       ),
+-      ScrollablePositionedList.builder(
++      ShaderMask(
++        shaderCallback: (Rect bounds) {
++          return LinearGradient(
++            begin: Alignment.topCenter,
++            end: Alignment.bottomCenter,
++            colors: [Colors.black, Colors.transparent, Colors.transparent, Colors.black],
++            stops: const [0.0, 0.1, 0.9, 1.0],
++          ).createShader(bounds);
++        },
++        blendMode: BlendMode.dstOut,
++        child: ScrollablePositionedList.builder(
+           itemScrollController: _itemScrollController,
+           itemPositionsListener: _itemPositionsListener,
+           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
+@@ -165,11 +175,10 @@
+               );
+             }
+           },
+-      ),
+-      const _Fade(top: true),
+-      const _Fade(top: false),
++        ),
++      ),
+     ]);
+   }
+ }
+
+ // ═══════════════════════════════════════════════════════════════════════════
+@@ -348,7 +357,17 @@
+           ),
+           child: const SizedBox.expand(),
+         ),
+-        ListView.builder(
++        ShaderMask(
++          shaderCallback: (Rect bounds) {
++            return LinearGradient(
++              begin: Alignment.topCenter,
++              end: Alignment.bottomCenter,
++              colors: [Colors.black, Colors.transparent, Colors.transparent, Colors.black],
++              stops: const [0.0, 0.1, 0.9, 1.0],
++            ).createShader(bounds);
++          },
++          blendMode: BlendMode.dstOut,
++          child: ListView.builder(
+             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 60),
+             itemCount: lines.length,
+             itemBuilder: (context, i) => Padding(
+@@ -363,9 +382,8 @@
+                 ),
+               ),
+             ),
+-        ),
+-        const _Fade(top: true),
+-        const _Fade(top: false),
++          ),
++        ),
+       ],
+     );
+   }
+@@ -467,31 +485,3 @@
+   bool shouldRepaint(_AmbientPainter o) =>
+       o.pulse != pulse || o.c1 != c1 || o.c2 != c2;
+ }
+-
+-// ═══════════════════════════════════════════════════════════════════════════
+-// FADE OVERLAY
+-// ═══════════════════════════════════════════════════════════════════════════
+-
+-class _Fade extends StatelessWidget {
+-  const _Fade({required this.top});
+-  final bool top;
+-
+-  @override
+-  Widget build(BuildContext context) => Positioned(
+-        top: top ? 0 : null,
+-        bottom: top ? null : 0,
+-        left: 0,
+-        right: 0,
+-        height: 110,
+-        child: IgnorePointer(
+-          child: DecoratedBox(
+-            decoration: BoxDecoration(
+-              gradient: LinearGradient(
+-                begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+-                end: top ? Alignment.bottomCenter : Alignment.topCenter,
+-                colors: [
+-                  Colors.black,
+-                  Colors.black.withAlpha(190),
+-                  Colors.transparent,
+-                ],
+-                stops: const [0.0, 0.55, 1.0],

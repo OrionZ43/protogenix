@@ -341,7 +341,7 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
       crossAxisCount: 2,
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 1.3,
+      childAspectRatio: 1.1,
       padding: EdgeInsets.zero,
       children: [
         _buildServiceCard('YouTube', Icons.play_arrow_rounded, Colors.redAccent,

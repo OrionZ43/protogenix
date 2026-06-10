@@ -208,53 +208,44 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
               }
               return false;
             },
-            child: ShaderMask(
-              shaderCallback: (Rect bounds) {
-                return const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.black, Colors.transparent, Colors.transparent, Colors.black],
-                  stops: [0.0, 0.1, 0.9, 1.0],
-                ).createShader(bounds);
-              },
-              blendMode: BlendMode.dstOut,
-              child: ScrollablePositionedList.builder(
-                itemScrollController: _scroll,
-                itemPositionsListener: _positions,
-                padding: EdgeInsets.symmetric(
-                  vertical: MediaQuery.of(context).size.height * 0.42,
-                  horizontal: 24,
-                ),
-                itemCount: karaoke.lines.length,
-                itemBuilder: (context, index) {
-                  final isCurrent = index == activeIndex;
-                  final distance = (index - activeIndex).abs();
-
-                  final blurAmount = _userScrolling
-                      ? 0.0
-                      : isCurrent
-                          ? 0.0
-                          : (distance / _kDistanceToMaxBlur).clamp(0.0, 1.0) *
-                              _kBlurScale *
-                              8.0;
-
-                  return RepaintBoundary(
-                    child: _LineItem(
-                      key: ValueKey('line_$index'),
-                      line: karaoke.lines[index],
-                      isCurrent: isCurrent,
-                      distance: distance,
-                      blurAmount: blurAmount,
-                      palette: palette,
-                      userScrolling: _userScrolling,
-                      positionMs: _positionMs,
-                      hasWordSync: hasWordSync,
-                    ),
-                  );
-                },
+            child: ScrollablePositionedList.builder(
+              itemScrollController: _scroll,
+              itemPositionsListener: _positions,
+              padding: EdgeInsets.symmetric(
+                vertical: MediaQuery.of(context).size.height * 0.42,
+                horizontal: 24,
               ),
+              itemCount: karaoke.lines.length,
+              itemBuilder: (context, index) {
+                final isCurrent = index == activeIndex;
+                final distance = (index - activeIndex).abs();
+
+                final blurAmount = _userScrolling
+                    ? 0.0
+                    : isCurrent
+                        ? 0.0
+                        : (distance / _kDistanceToMaxBlur).clamp(0.0, 1.0) *
+                            _kBlurScale *
+                            8.0;
+
+                return RepaintBoundary(
+                  child: _LineItem(
+                    key: ValueKey('line_$index'),
+                    line: karaoke.lines[index],
+                    isCurrent: isCurrent,
+                    distance: distance,
+                    blurAmount: blurAmount,
+                    palette: palette,
+                    userScrolling: _userScrolling,
+                    positionMs: _positionMs,
+                    hasWordSync: hasWordSync,
+                  ),
+                );
+              },
             ),
           ),
+          const _Fade(top: true),
+          const _Fade(top: false),
           Positioned(
             top: 18,
             left: 24,
@@ -1067,34 +1058,25 @@ class _PlainLyricsView extends StatelessWidget {
           ),
           child: const SizedBox.expand(),
         ),
-        ShaderMask(
-          shaderCallback: (Rect bounds) {
-            return const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.black, Colors.transparent, Colors.transparent, Colors.black],
-              stops: [0.0, 0.1, 0.9, 1.0],
-            ).createShader(bounds);
-          },
-          blendMode: BlendMode.dstOut,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 60),
-            itemCount: lines.length,
-            itemBuilder: (context, i) => Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: Text(
-                lines[i].plainText,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withAlpha(180),
-                  height: 1.6,
-                ),
+        ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 60),
+          itemCount: lines.length,
+          itemBuilder: (context, i) => Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: Text(
+              lines[i].plainText,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withAlpha(180),
+                height: 1.6,
               ),
             ),
           ),
         ),
+        const _Fade(top: true),
+        const _Fade(top: false),
       ],
     );
   }
@@ -1232,3 +1214,36 @@ class _AmbientPainter extends CustomPainter {
       o.pulse != pulse || o.c1 != c1 || o.c2 != c2;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// FADE OVERLAY
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _Fade extends StatelessWidget {
+  const _Fade({required this.top});
+  final bool top;
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+        top: top ? 0 : null,
+        bottom: top ? null : 0,
+        left: 0,
+        right: 0,
+        height: 110,
+        child: IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+                end: top ? Alignment.bottomCenter : Alignment.topCenter,
+                colors: [
+                  Colors.black,
+                  Colors.black.withAlpha(190),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.55, 1.0],
+              ),
+            ),
+          ),
+        ),
+      );
+}
