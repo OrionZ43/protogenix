@@ -30,10 +30,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/utils/fold_layout.dart';
 import '../core/widgets/window_title_bar.dart';
-import '../features/library/presentation/screens/info_screen.dart';
 import '../features/library/presentation/screens/library_screen.dart';
-import '../features/library/presentation/screens/playlists_screen.dart';
-import '../features/library/presentation/screens/favorites_screen.dart';
+import '../features/search/presentation/screens/search_screen.dart';
 import '../features/player/presentation/widgets/mini_player.dart';
 import '../features/player/presentation/screens/player_screen.dart';
 import 'package:flutter/services.dart';
@@ -60,29 +58,19 @@ const _tabs = [
       activeIcon: Icons.home_rounded,
       label: 'Главная'),
   _TabItem(
+      icon: Icons.search_outlined,
+      activeIcon: Icons.search_rounded,
+      label: 'Поиск'),
+  _TabItem(
       icon: Icons.library_music_outlined,
       activeIcon: Icons.library_music_rounded,
-      label: 'Треки'),
-  _TabItem(
-      icon: Icons.queue_music_outlined,
-      activeIcon: Icons.queue_music_rounded,
-      label: 'Плейлисты'),
-  _TabItem(
-      icon: Icons.favorite_outline_rounded,
-      activeIcon: Icons.favorite_rounded,
-      label: 'Избранное'),
-  _TabItem(
-      icon: Icons.info_outline_rounded,
-      activeIcon: Icons.info_rounded,
-      label: 'Инфо'),
+      label: 'Медиатека'),
 ];
 
 final _screens = <Widget>[
   const HomeScreen(),
+  const SearchScreen(),
   const LibraryScreen(),
-  const PlaylistsScreen(),
-  const FavoritesScreen(),
-  const InfoScreen(),
 ];
 
 // ── Хелпер: десктопная платформа? ────────────────────────────────────────────

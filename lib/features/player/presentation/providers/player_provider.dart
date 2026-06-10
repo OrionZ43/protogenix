@@ -174,7 +174,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
             ))
         .toList();
 
-    final audioSources = tracksList.map((t) => t.toAudioSource()).toList();
+    final audioSources = await Future.wait(tracksList.map((t) => t.toAudioSource()));
 
     try {
       await _handler.loadPlaylist(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class TrackModel {
   final String id;
@@ -22,13 +24,32 @@ class TrackModel {
     this.lrcPath,
   });
 
-  AudioSource toAudioSource() {
-    if (filePath != null) {
-      return AudioSource.file(filePath!);
+  Future<AudioSource> toAudioSource() async {
+    final path = filePath;
+
+    if (path != null && (path.startsWith('http://') || path.startsWith('https://'))) {
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final cacheDir = Directory('${appDocDir.path}/audio_cache');
+      if (!await cacheDir.exists()) {
+        await cacheDir.create(recursive: true);
+      }
+
+      final cacheFile = File('${cacheDir.path}/$id.m4a');
+
+      return LockCachingAudioSource(
+        Uri.parse(path),
+        cacheFile: cacheFile,
+      );
     }
+
+    if (path != null && await File(path).exists()) {
+      return AudioSource.file(path);
+    }
+
     return AudioSource.asset('assets/mock/silence.mp3');
   }
 }
+
 
 // Мок только для UI-разработки — больше не используется в продакшене
 const mockTrack = TrackModel(
