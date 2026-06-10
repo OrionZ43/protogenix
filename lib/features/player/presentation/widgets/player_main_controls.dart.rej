@@ -1,0 +1,11 @@
+--- player_main_controls.dart
++++ player_main_controls.dart
+@@ -238,7 +238,7 @@
+           ),
+           _CapsuleBtn(
+             icon: Icons.bedtime_rounded,
+-            label: timerActive && sleepTimerRemaining != null
++            label: timerActive
+                 ? _formatDuration(sleepTimerRemaining ?? Duration.zero)
+                 : 'Таймер',
+             isActive: timerActive,

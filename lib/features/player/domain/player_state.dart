@@ -26,6 +26,7 @@ class ProtogenixPlayerState {
 
   final bool sleepTimerActive;
   final bool stopAfterTrack;
+  final Duration? sleepTimerRemaining;
 
   const ProtogenixPlayerState({
     this.currentTrack,
@@ -45,6 +46,7 @@ class ProtogenixPlayerState {
     this.eqBandGains = const [],
     this.sleepTimerActive = false,
     this.stopAfterTrack = false,
+    this.sleepTimerRemaining,
   });
 
   double get progress {
@@ -74,6 +76,7 @@ class ProtogenixPlayerState {
     List<double>? eqBandGains,
     bool? sleepTimerActive,
     bool? stopAfterTrack,
+    Duration? sleepTimerRemaining,
   }) {
     return ProtogenixPlayerState(
       currentTrack: currentTrack ?? this.currentTrack,
@@ -93,6 +96,7 @@ class ProtogenixPlayerState {
       eqBandGains: eqBandGains ?? this.eqBandGains,
       sleepTimerActive: sleepTimerActive ?? this.sleepTimerActive,
       stopAfterTrack: stopAfterTrack ?? this.stopAfterTrack,
+      sleepTimerRemaining: sleepTimerRemaining ?? this.sleepTimerRemaining,
     );
   }
 }

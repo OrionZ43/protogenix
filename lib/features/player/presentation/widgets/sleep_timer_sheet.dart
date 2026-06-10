@@ -16,6 +16,17 @@ void showSleepTimerSheet(BuildContext context, WidgetRef ref) {
 class _SleepTimerSheet extends ConsumerWidget {
   const _SleepTimerSheet();
 
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    if (hours > 0) {
+      return '${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}';
+    }
+    return '${twoDigits(minutes)}:${twoDigits(seconds)}';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(playerProvider);
@@ -27,6 +38,7 @@ class _SleepTimerSheet extends ConsumerWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
           decoration: BoxDecoration(
             color: Colors.black.withAlpha(200),
@@ -60,14 +72,36 @@ class _SleepTimerSheet extends ConsumerWidget {
                 Text(
                   stopAfterTrack
                       ? 'Остановка после этого трека'
-                      : 'Таймер активен',
-                  style: const TextStyle(
+                      : state.sleepTimerRemaining != null
+                          ? _formatDuration(state.sleepTimerRemaining!)
+                          : 'Таймер активен',
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: state.sleepTimerRemaining != null && !stopAfterTrack ? 32 : 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 32),
+              ],
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
+                children: [5, 10, 15, 20, 30, 45, 60, 90]
+                    .map((minutes) => _PresetCapsule(
+                          label: '$minutes мин',
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            ref
+                                .read(playerProvider.notifier)
+                                .startSleepTimer(Duration(minutes: minutes));
+                            Navigator.of(context).pop();
+                          },
+                        ))
+                    .toList(),
+              ),
+              const SizedBox(height: 24),
+              if (isActive)
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
@@ -91,26 +125,8 @@ class _SleepTimerSheet extends ConsumerWidget {
                       ),
                     ),
                   ),
-                ),
-              ] else ...[
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  alignment: WrapAlignment.center,
-                  children: [5, 10, 15, 20, 30, 45, 60, 90]
-                      .map((minutes) => _PresetCapsule(
-                            label: '$minutes мин',
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              ref
-                                  .read(playerProvider.notifier)
-                                  .startSleepTimer(Duration(minutes: minutes));
-                              Navigator.of(context).pop();
-                            },
-                          ))
-                      .toList(),
-                ),
-                const SizedBox(height: 24),
+                )
+              else
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
@@ -135,7 +151,6 @@ class _SleepTimerSheet extends ConsumerWidget {
                     ),
                   ),
                 ),
-              ],
             ],
           ),
         ),
