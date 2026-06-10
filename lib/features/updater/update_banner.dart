@@ -10,6 +10,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../player/presentation/providers/palette_provider.dart';
 import 'update_provider.dart';
+import 'updater_service.dart';
+import 'auto_updater.dart';
 
 class UpdateBanner extends ConsumerStatefulWidget {
   const UpdateBanner({super.key});
@@ -23,6 +25,7 @@ class _UpdateBannerState extends ConsumerState<UpdateBanner>
   bool _expanded = false;
   late AnimationController _controller;
   late Animation<double> _expandAnim;
+  DownloadProgress _dl = const DownloadProgress(state: DownloadState.idle);
 
   @override
   void initState() {
@@ -53,6 +56,85 @@ class _UpdateBannerState extends ConsumerState<UpdateBanner>
   Future<void> _openRelease(String url) async {
     final uri = Uri.parse(url);
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  void _startDownload(UpdateInfo info) {
+    AutoUpdater.downloadAndInstall(info, (progress) {
+      if (mounted) setState(() => _dl = progress);
+    });
+  }
+
+  Widget _buildUpdateButton(UpdateInfo update) {
+    final accent = ref.watch(paletteProvider).primary;
+
+    // Фолбэк: нет ссылки для прямого скачивания — открываем браузер
+    if (update.downloadUrl == null) {
+      return GestureDetector(
+        onTap: () => _openRelease(update.releaseUrl),
+        child: _pillButton('Обновить', accent),
+      );
+    }
+
+    switch (_dl.state) {
+      case DownloadState.idle:
+        return GestureDetector(
+          onTap: () => _startDownload(update),
+          child: _pillButton('Скачать', accent),
+        );
+
+      case DownloadState.downloading:
+        return SizedBox(
+          width: 90,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: _dl.progress,
+                  backgroundColor: Colors.white12,
+                  color: accent,
+                  minHeight: 4,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${(_dl.progress * 100).toStringAsFixed(0)}%',
+                style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        );
+
+      case DownloadState.installing:
+        return _pillButton('Установка...', accent, enabled: false);
+
+      case DownloadState.done:
+        return _pillButton('Готово ✓', accent, enabled: false);
+
+      case DownloadState.error:
+        return GestureDetector(
+          onTap: () {
+            setState(() => _dl = const DownloadProgress(state: DownloadState.idle));
+          },
+          child: _pillButton('Повторить', Colors.redAccent),
+        );
+    }
+  }
+
+  Widget _pillButton(String label, Color color, {bool enabled = true}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: enabled ? color.withAlpha(220) : color.withAlpha(80),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+      ),
+    );
   }
 
   @override
@@ -145,26 +227,17 @@ class _UpdateBannerState extends ConsumerState<UpdateBanner>
                     const SizedBox(width: 8),
 
                     // Кнопка «Обновить»
-                    GestureDetector(
-                      onTap: () => _openRelease(update.releaseUrl),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          color: accent.withAlpha(220),
-                        ),
-                        child: const Text(
-                          'Обновить',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        _buildUpdateButton(update),
+                        if (_dl.state == DownloadState.error && _dl.errorMsg != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(_dl.errorMsg!, style: const TextStyle(color: Colors.redAccent, fontSize: 10)),
                           ),
-                        ),
-                      ),
+                      ],
                     ),
 
                     const SizedBox(width: 8),
