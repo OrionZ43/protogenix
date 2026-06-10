@@ -24,6 +24,7 @@
 //          модальный плеер принудительно закрывается.
 
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -359,17 +360,20 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D0D1A),
-        border: Border(top: BorderSide(color: Colors.white.withAlpha(18))),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 56,
-          child: Row(
-            children: List.generate(_tabs.length, (i) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(160),
+            border: Border(top: BorderSide(color: Colors.white.withAlpha(18))),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 56,
+              child: Row(
+                children: List.generate(_tabs.length, (i) {
               final selected = currentIndex == i;
               final tab = _tabs[i];
               return Expanded(
@@ -396,12 +400,14 @@ class _BottomBar extends StatelessWidget {
                             color: selected ? Colors.white : Colors.white38,
                           ),
                         ),
-                      ],
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              );
-            }),
+                  );
+                }),
+              ),
+            ),
           ),
         ),
       ),

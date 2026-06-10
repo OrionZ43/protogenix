@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../library/presentation/library_provider.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
+import '../../../player/presentation/widgets/protogenix_background.dart';
 
 import 'dart:math' as math;
 
@@ -79,40 +80,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                  32 * scale, 48 * scale, 32 * scale, 24 * scale),
-              child: Text(
-                _greeting,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32 * scale,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+      body: ProtogenixBackground(
+        child: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                      20 * scale, 16 * scale, 20 * scale, 8 * scale),
+                  child: Text(
+                    _greeting,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32 * scale,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.only(
-                  left: 32 * scale, right: 32 * scale, bottom: 16 * scale),
-              child: Text(
-                'Недавно добавленные',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20 * scale,
-                  fontWeight: FontWeight.w700,
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                      left: 20 * scale, right: 20 * scale, bottom: 16 * scale),
+                  child: Text(
+                    'Недавно добавленные',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: 32 * scale),
-            sliver: SliverGrid(
+              SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: 20 * scale),
+                sliver: SliverGrid(
               gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                 maxCrossAxisExtent: 280 * scale,
                 mainAxisSpacing: 16 * scale,
@@ -125,11 +129,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   return _RecentTrackCard(track: track, scale: scale);
                 },
                 childCount: recentTracks.length,
+                ),
               ),
-            ),
+              SliverPadding(padding: EdgeInsets.only(bottom: 32 * scale)),
+            ],
           ),
-          SliverPadding(padding: EdgeInsets.only(bottom: 32 * scale)),
-        ],
+        ),
       ),
     );
   }
