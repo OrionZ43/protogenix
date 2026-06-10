@@ -4,6 +4,7 @@
 // Сравнивает текущую версию приложения с последним релизом на GitHub.
 
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -14,12 +15,16 @@ class UpdateInfo {
     required this.releaseNotes,
     required this.releaseUrl,
     required this.publishedAt,
+    this.downloadUrl,
+    this.downloadSize,
   });
 
   final String version; // "v1.0.1"
   final String releaseNotes; // markdown из поля body
   final String releaseUrl; // ссылка на страницу релиза
   final DateTime publishedAt;
+  final String? downloadUrl;
+  final int? downloadSize;
 }
 
 class UpdaterService {
@@ -63,6 +68,33 @@ class UpdaterService {
         '[Updater] Найдена новая версия: $latestVersion (текущая: $currentVersion)',
       );
 
+      // Определяем нужный asset для текущей платформы
+      String? downloadUrl;
+      int? downloadSize;
+
+      // Соглашение об именах assets в GitHub Release:
+      //   protogenix-android.apk
+      //   protogenix-windows.zip
+      //   protogenix-linux.tar.gz
+      // Содержимое ZIP и tar.gz: файлы приложения в корне архива (без вложенной папки).
+      final assets = data['assets'] as List<dynamic>? ?? [];
+      for (final asset in assets) {
+        final name = (asset['name'] as String? ?? '').toLowerCase();
+        final browserUrl = asset['browser_download_url'] as String? ?? '';
+        final size = asset['size'] as int? ?? 0;
+
+        bool matches = false;
+        if (Platform.isAndroid && name.endsWith('.apk')) matches = true;
+        if (Platform.isWindows && name.contains('windows') && name.endsWith('.zip')) matches = true;
+        if (Platform.isLinux && name.contains('linux') && name.endsWith('.tar.gz')) matches = true;
+
+        if (matches && browserUrl.isNotEmpty) {
+          downloadUrl = browserUrl;
+          downloadSize = size;
+          break;
+        }
+      }
+
       return UpdateInfo(
         version: tagName,
         releaseNotes: releaseNotes,
@@ -70,6 +102,8 @@ class UpdaterService {
         publishedAt: publishedAtStr.isNotEmpty
             ? DateTime.tryParse(publishedAtStr) ?? DateTime.now()
             : DateTime.now(),
+        downloadUrl: downloadUrl,
+        downloadSize: downloadSize,
       );
     } catch (e) {
       // Тихая ошибка — не прерываем запуск приложения
