@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'dart:ui';
 import '../../../library/presentation/library_provider.dart';
+import '../../../library/presentation/screens/info_screen.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
@@ -89,14 +91,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
                       20 * scale, 16 * scale, 20 * scale, 8 * scale),
-                  child: Text(
-                    _greeting,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 32 * scale,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _greeting,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 32 * scale,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      const _InfoButton(),
+                    ],
                   ),
                 ),
               ),
@@ -149,6 +159,35 @@ class _RecentTrackCard extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<_RecentTrackCard> createState() => _RecentTrackCardState();
+}
+
+class _InfoButton extends StatelessWidget {
+  const _InfoButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: IconButton(
+          icon: const Icon(Icons.info_outline_rounded),
+          color: Colors.white.withAlpha(217), // ~0.85
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withAlpha(26), // ~0.1
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.white.withAlpha(38)), // ~0.15
+            ),
+          ),
+          tooltip: 'О приложении',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const InfoScreen()),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
