@@ -519,6 +519,8 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
   bool _isRightPanelOpen = false;
   bool _showQueue = false;
   bool _isPlayerExpanded = false;
+  double _rightPanelWidth = 400.0;
+  bool _isDragging = false;
 
   void _openPlayer(BuildContext context) {
     setState(() => _isPlayerExpanded = true);
@@ -578,21 +580,42 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
                   ),
 
                   // ── Выезжающая панель (Lyrics / Queue) ─────────────────────────────
-                  if (hasTrack)
+                  if (hasTrack) ...[
+                    if (_isRightPanelOpen)
+                      MouseRegion(
+                        cursor: SystemMouseCursors.resizeLeftRight,
+                        child: GestureDetector(
+                          onPanStart: (_) => setState(() => _isDragging = true),
+                          onPanEnd: (_) => setState(() => _isDragging = false),
+                          onPanCancel: () => setState(() => _isDragging = false),
+                          onPanUpdate: (details) {
+                            setState(() {
+                              _rightPanelWidth -= details.delta.dx;
+                              _rightPanelWidth = _rightPanelWidth.clamp(300.0, 800.0);
+                            });
+                          },
+                          child: Container(
+                            width: 6,
+                            color: Colors.transparent,
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 1,
+                              color: Colors.white.withValues(alpha: 0.2),
+                            ),
+                          ),
+                        ),
+                      ),
                     AnimatedContainer(
-                      duration: const Duration(milliseconds: 350),
+                      duration: _isDragging ? Duration.zero : const Duration(milliseconds: 350), // 0 duration only while dragging for smooth resize
                       curve: Curves.easeOutCubic,
-                      width: _isRightPanelOpen ? 350 : 0,
+                      width: _isRightPanelOpen ? _rightPanelWidth : 0,
                       child: ClipRect(
                         child: OverflowBox(
-                          minWidth: 350,
-                          maxWidth: 350,
+                          minWidth: _rightPanelWidth,
+                          maxWidth: _rightPanelWidth,
                           alignment: Alignment.centerLeft,
                           child: Row(
                             children: [
-                              Container(
-                                  width: 1,
-                                  color: Colors.white.withValues(alpha: 0.1)),
                               Expanded(
                                 child: Container(
                                   color: Colors.black.withValues(alpha: 0.3),
@@ -649,6 +672,7 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
             ),

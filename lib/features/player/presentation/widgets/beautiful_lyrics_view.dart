@@ -156,13 +156,19 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
 
   @override
   Widget build(BuildContext context) {
-    final karaoke = ref.watch(karaokeProvider);
-    final palette = ref.watch(paletteProvider);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final karaoke = ref.watch(karaokeProvider);
+        final palette = ref.watch(paletteProvider);
 
-    final scale = (MediaQuery.sizeOf(context).width / 1200).clamp(0.8, 2.0);
-    final baseFontSize = 32.0 * scale;
+        // Calculate scale based on actual available width instead of global screen width.
+        // If it's in a sidebar (e.g. 400px), it will scale down properly.
+        final referenceWidth = constraints.maxWidth > 0 ? constraints.maxWidth : MediaQuery.sizeOf(context).width;
+        // Using 600 as the reference width since lyrics usually take ~half the screen on desktop.
+        final scale = (referenceWidth / 600).clamp(0.5, 2.0);
+        final baseFontSize = 32.0 * scale;
 
-    ref.listen(karaokeProvider.select((s) => s.currentIndex), (prev, next) {
+        ref.listen(karaokeProvider.select((s) => s.currentIndex), (prev, next) {
       if (prev != next && next >= 0) {
         if (!_userScrolling) _scrollTo(next);
         HapticPatterns.lyricsLine();
@@ -311,6 +317,8 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 }
