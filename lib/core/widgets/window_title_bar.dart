@@ -1,19 +1,24 @@
 // lib/core/widgets/window_title_bar.dart
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
+import '../../features/player/presentation/providers/palette_provider.dart';
 
-class WindowTitleBar extends StatefulWidget implements PreferredSizeWidget {
+class WindowTitleBar extends ConsumerStatefulWidget
+    implements PreferredSizeWidget {
   const WindowTitleBar({super.key});
 
   @override
   Size get preferredSize => const Size.fromHeight(32);
 
   @override
-  State<WindowTitleBar> createState() => _WindowTitleBarState();
+  ConsumerState<WindowTitleBar> createState() => _WindowTitleBarState();
 }
 
-class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
+class _WindowTitleBarState extends ConsumerState<WindowTitleBar>
+    with WindowListener {
   bool _isMaximized = false;
   bool get _isMacOS => Platform.isMacOS;
 
@@ -43,47 +48,60 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      // Задаём фоновый цвет приложения (решает проблему подчёркиваний)
-      color: const Color(0xFF080810),
-      child: Container(
-        height: 32,
-        decoration: BoxDecoration(
-          // Лёгкая линия отделит тайтлбар от основного контента
-          border: Border(
-            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch, // Растягиваем на всю высоту
-          children: [
-            // 1. macOS Кнопки (отдельно от DragToMoveArea = моментальный клик)
-            if (_isMacOS) ...[
-              const SizedBox(width: 12),
-              Align(
-                alignment: Alignment.center,
-                child: _MacOsControls(isMaximized: _isMaximized),
-              ),
-              const SizedBox(width: 16),
-            ],
+    final palette = ref.watch(paletteProvider);
 
-            // 2. Зона перетаскивания окна
-            Expanded(
-              child: DragToMoveArea(
-                child: Container(
-                  // Прозрачный цвет нужен, чтобы Flutter "видел" эту зону для мыши
-                  color: Colors.transparent,
-                  alignment: Alignment.centerLeft,
-                  padding: EdgeInsets.only(left: _isMacOS ? 0 : 16),
-                  child: const _Logo(),
-                ),
+    return Material(
+      color: Colors.transparent,
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  palette.primary.withAlpha(40),
+                  Colors.black.withAlpha(160),
+                ],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
               ),
             ),
+            child: Row(
+              crossAxisAlignment:
+                  CrossAxisAlignment.stretch, // Растягиваем на всю высоту
+              children: [
+                // 1. macOS Кнопки (отдельно от DragToMoveArea = моментальный клик)
+                if (_isMacOS) ...[
+                  const SizedBox(width: 12),
+                  Align(
+                    alignment: Alignment.center,
+                    child: _MacOsControls(isMaximized: _isMaximized),
+                  ),
+                  const SizedBox(width: 16),
+                ],
 
-            // 3. Windows/Linux Кнопки (отдельно от DragToMoveArea = моментальный клик)
-            if (!_isMacOS) _WindowsControls(isMaximized: _isMaximized),
-          ],
+                // 2. Зона перетаскивания окна
+                Expanded(
+                  child: DragToMoveArea(
+                    child: Container(
+                      // Прозрачный цвет нужен, чтобы Flutter "видел" эту зону для мыши
+                      color: Colors.transparent,
+                      alignment: Alignment.centerLeft,
+                      padding: EdgeInsets.only(left: _isMacOS ? 0 : 16),
+                      child: const _Logo(),
+                    ),
+                  ),
+                ),
+
+                // 3. Windows/Linux Кнопки (отдельно от DragToMoveArea = моментальный клик)
+                if (!_isMacOS) _WindowsControls(isMaximized: _isMaximized),
+              ],
+            ),
+          ),
         ),
       ),
     );
