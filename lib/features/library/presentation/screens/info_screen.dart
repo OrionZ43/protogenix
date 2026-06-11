@@ -4,6 +4,8 @@ import '../../../../core/widgets/z43_branding.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
 
+import 'dart:ui';
+
 class InfoScreen extends StatelessWidget {
   const InfoScreen({super.key});
 
@@ -13,8 +15,10 @@ class InfoScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       body: ProtogenixBackground(
         child: SafeArea(
-          child: Center(
-            child: GlassCard(
+          child: Stack(
+            children: [
+              Center(
+                child: GlassCard(
               padding: const EdgeInsets.all(40),
               borderRadius: 32.0,
               child: Column(
@@ -75,7 +79,41 @@ class InfoScreen extends StatelessWidget {
                 ],
               ),
             ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.1, curve: Curves.easeOutCubic),
+              ),
+              const Positioned(
+                top: 16,
+                left: 16,
+                child: _CloseButton(),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CloseButton extends StatelessWidget {
+  const _CloseButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          color: Colors.white.withAlpha(217),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withAlpha(26),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.white.withAlpha(38)),
+            ),
+          ),
+          tooltip: 'Назад',
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
     );

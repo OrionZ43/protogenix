@@ -17,16 +17,18 @@ class PlayerMainControls extends ConsumerWidget {
     super.key,
     required this.track,
     this.compact = true,
+    this.onClose,
   });
 
   final TrackModel? track;
   final bool compact;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
-        _TopBar(track: track),
+        _TopBar(track: track, compact: compact, onClose: onClose),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32.0),
@@ -40,18 +42,21 @@ class PlayerMainControls extends ConsumerWidget {
             ),
           ),
         ),
-        _BottomRow(track: track),
+        _BottomRow(track: track, compact: compact),
       ],
     );
   }
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.track});
+  const _TopBar({required this.track, required this.compact, this.onClose});
   final TrackModel? track;
+  final bool compact;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
+    final canClose = onClose != null || Navigator.canPop(context);
     return SafeArea(
       bottom: false,
       child: SizedBox(
@@ -61,13 +66,17 @@ class _TopBar extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             // Слева: Кнопка закрытия
-            if (Navigator.canPop(context))
+            if (canClose)
               Positioned(
                 left: 16,
                 child: GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    Navigator.of(context).pop();
+                    if (onClose != null) {
+                      onClose!();
+                    } else {
+                      Navigator.of(context).pop();
+                    }
                   },
                   child: Container(
                     width: 36,
@@ -97,25 +106,26 @@ class _TopBar extends StatelessWidget {
             ),
 
             // Справа: Лирика
-            Positioned(
-              right: 16,
-              child: Row(
-                children: [
-                  if (track != null)
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _showLyricsSheet(context, track!);
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Icon(Icons.lyrics_outlined,
-                            color: Colors.white54, size: 22),
+            if (compact)
+              Positioned(
+                right: 16,
+                child: Row(
+                  children: [
+                    if (track != null)
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          _showLyricsSheet(context, track!);
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Icon(Icons.lyrics_outlined,
+                              color: Colors.white54, size: 22),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -196,8 +206,9 @@ class _TopBar extends StatelessWidget {
 }
 
 class _BottomRow extends ConsumerWidget {
-  const _BottomRow({required this.track});
+  const _BottomRow({required this.track, required this.compact});
   final TrackModel? track;
+  final bool compact;
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -214,7 +225,7 @@ class _BottomRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = ref.watch(paletteProvider);
     final timerActive = ref.watch(playerProvider.select((s) => s.sleepTimerActive));
-
+    final stopAfterTrack = ref.watch(playerProvider.select((s) => s.stopAfterTrack));
     final sleepTimerRemaining = ref.watch(playerProvider.select((s) => s.sleepTimerRemaining));
 
     return Padding(
@@ -237,9 +248,13 @@ class _BottomRow extends ConsumerWidget {
           ),
           _CapsuleBtn(
             icon: Icons.bedtime_rounded,
-            label: timerActive
-                ? _formatDuration(sleepTimerRemaining ?? Duration.zero)
-                : 'Таймер',
+            label: !timerActive
+                ? 'Таймер'
+                : stopAfterTrack
+                    ? 'До конца трека'
+                    : (sleepTimerRemaining != null
+                        ? _formatDuration(sleepTimerRemaining)
+                        : 'Таймер активен'),
             isActive: timerActive,
             accentColor: palette.primary,
             onTap: () {
@@ -248,19 +263,21 @@ class _BottomRow extends ConsumerWidget {
             },
           ),
           Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: _CapsuleBtn(
-                icon: Icons.lyrics_outlined,
-                label: 'Текст',
-                onTap: track != null
-                    ? () {
-                        HapticFeedback.lightImpact();
-                        _showLyricsSheet(context, ref, track!);
-                      }
-                    : null,
-              ),
-            ),
+            child: compact
+                ? Align(
+                    alignment: Alignment.centerRight,
+                    child: _CapsuleBtn(
+                      icon: Icons.lyrics_outlined,
+                      label: 'Текст',
+                      onTap: track != null
+                          ? () {
+                              HapticFeedback.lightImpact();
+                              _showLyricsSheet(context, ref, track!);
+                            }
+                          : null,
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
         ],
       ),

@@ -390,27 +390,25 @@ class _TrackInfo extends ConsumerWidget {
 
         // Название + артист — центрированы
         Expanded(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Column(
-              children: [
-                Text(
-                  track.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: titleStyle,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  track.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: artistStyle,
-                ),
-              ],
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                track.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: titleStyle,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                track.artist,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: artistStyle,
+              ),
+            ],
           ),
         ),
 

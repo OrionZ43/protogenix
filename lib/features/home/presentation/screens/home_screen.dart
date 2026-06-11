@@ -8,6 +8,7 @@ import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
 
+import 'dart:io';
 import 'dart:math' as math;
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -105,7 +106,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                       ),
-                      const _InfoButton(),
+                      if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS)
+                        const _InfoButton(),
                     ],
                   ),
                 ),
@@ -117,7 +119,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Text(
                     'Недавно добавленные',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Colors.white.withAlpha(140),
                       fontSize: 20 * scale,
                       fontWeight: FontWeight.w500,
                     ),

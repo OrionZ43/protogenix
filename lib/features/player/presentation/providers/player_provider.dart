@@ -71,12 +71,20 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
       if (_stopAfterTrackIndex != null && index != _stopAfterTrackIndex) {
         _stopAfterTrackIndex = null;
         if (mounted) {
-          state =
-              state.copyWith(stopAfterTrack: false, sleepTimerActive: false);
+          state = state
+              .copyWith(
+                stopAfterTrack: false,
+                sleepTimerActive: false,
+                isPlaying: false,
+              )
+              .clearSleepTimerRemaining();
         }
         await _handler.pause();
         // Перематываем начало нового трека, чтобы он был готов к resume play
         await _handler.seek(Duration.zero);
+        if (mounted && state.isPlaying) {
+          state = state.copyWith(isPlaying: false);
+        }
       }
     });
 
@@ -336,13 +344,9 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
         timer.cancel();
         await pause(); // Fade Out 300 мс + pause
         if (mounted) {
-          state = state.copyWith(
-            sleepTimerActive: false,
-            stopAfterTrack: false,
-            // We need to nullify sleepTimerRemaining, but copyWith doesn't support nulling unless modified.
-            // In Riverpod StateNotifier, we'll create a new state instance or just leave it at 0.
-            // To nullify it, we'll use a hack or just set it to Duration.zero and rely on sleepTimerActive.
-          );
+          state = state
+              .copyWith(sleepTimerActive: false, stopAfterTrack: false)
+              .clearSleepTimerRemaining();
         }
       }
     });
@@ -355,10 +359,9 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     _stopAfterTrackIndex = state.currentIndex;
 
     if (mounted) {
-      state = state.copyWith(
-        sleepTimerActive: true,
-        stopAfterTrack: true,
-      );
+      state = state
+          .copyWith(sleepTimerActive: true, stopAfterTrack: true)
+          .clearSleepTimerRemaining();
     }
   }
 
@@ -368,10 +371,9 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     _sleepTimer = null;
     _stopAfterTrackIndex = null;
     if (mounted) {
-      state = state.copyWith(
-        sleepTimerActive: false,
-        stopAfterTrack: false,
-      );
+      state = state
+          .copyWith(sleepTimerActive: false, stopAfterTrack: false)
+          .clearSleepTimerRemaining();
     }
   }
 

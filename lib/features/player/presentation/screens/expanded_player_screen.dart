@@ -14,7 +14,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:window_manager/window_manager.dart';
 
 import '../providers/palette_provider.dart';
 import '../providers/karaoke_provider.dart';
@@ -25,7 +24,11 @@ import '../widgets/beautiful_lyrics_view.dart';
 import '../widgets/player_main_controls.dart';
 
 class ExpandedPlayerScreen extends ConsumerWidget {
-  const ExpandedPlayerScreen({super.key});
+  const ExpandedPlayerScreen({super.key, this.onClose});
+
+  /// Если задан — кнопка "вниз"/"назад" вызывает этот callback вместо Navigator.pop.
+  /// Используется на десктопе, где экран не является отдельным route.
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,12 +44,6 @@ class ExpandedPlayerScreen extends ConsumerWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // ── Топ-бар с кнопкой "назад" ─────────────────────────────────
-              if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
-                const DragToMoveArea(child: SizedBox(height: 16)) // Small padding for drag area, PlayerMainControls has its own TopBar
-              else
-                const SizedBox.shrink(),
-
               // ── Основной контент ──────────────────────────────────────────
               Expanded(
                 child: LayoutBuilder(
@@ -62,12 +59,14 @@ class ExpandedPlayerScreen extends ConsumerWidget {
                       children: [
                         // Левая колонка — плеер (PlayerMainControls)
                         Expanded(
+                          flex: isWideDesktop ? 5 : 1,
                           child: Padding(
                             padding: EdgeInsets.symmetric(
                                 vertical: isWideDesktop ? 24.0 : 0.0),
                             child: PlayerMainControls(
                               track: track,
                               compact: false, // Обязательно false, чтобы использовать большие шрифты
+                              onClose: onClose,
                             ),
                           ),
                         ),
@@ -80,12 +79,26 @@ class ExpandedPlayerScreen extends ConsumerWidget {
 
                         // Правая колонка — текст песни
                         Expanded(
+                          flex: isWideDesktop ? 4 : 1,
                           child: Padding(
                             padding: EdgeInsets.only(
+                                left: isWideDesktop ? 24.0 : 16.0,
                                 top: isWideDesktop ? 48.0 : 24.0,
                                 right: isWideDesktop ? 48.0 : 32.0,
                                 bottom: isWideDesktop ? 48.0 : 24.0),
-                            child: const BeautifulLyricsView(),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withAlpha(100),
+                                    blurRadius: 40,
+                                    spreadRadius: -10,
+                                    offset: const Offset(-20, 0),
+                                  ),
+                                ],
+                              ),
+                              child: const BeautifulLyricsView(),
+                            ),
                           ),
                         ),
                       ],
