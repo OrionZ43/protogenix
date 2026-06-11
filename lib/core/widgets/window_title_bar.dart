@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import '../../features/player/presentation/providers/palette_provider.dart';
+import 'neon_logo.dart';
 
 class WindowTitleBar extends ConsumerStatefulWidget
     implements PreferredSizeWidget {
@@ -110,40 +111,12 @@ class _Logo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return const Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 18,
-          height: 18,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(5),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFCE93D8).withValues(alpha: 0.3),
-                blurRadius: 6,
-              ),
-            ],
-            gradient: const LinearGradient(
-              colors: [Color(0xFFCE93D8), Color(0xFF80DEEA)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: const Center(
-            child: Text(
-              'P',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                height: 1,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        const Text(
+        NeonLogo(size: 18),
+        SizedBox(width: 8),
+        Text(
           'Protogenix',
           style: TextStyle(
             color: Colors.white70,

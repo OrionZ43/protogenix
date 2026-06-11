@@ -37,6 +37,7 @@ dependencies:
   scrollable_positioned_list: ^0.3.8
   string_similarity: ^2.0.0
   open_file: ^3.5.7
+  flutter_svg: ^2.3.0
 
   # HTTP (нужен importer_service)
   http: ^1.2.1
