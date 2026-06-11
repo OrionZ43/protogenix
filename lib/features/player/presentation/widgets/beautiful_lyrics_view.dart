@@ -156,24 +156,22 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final karaoke = ref.watch(karaokeProvider);
-        final palette = ref.watch(paletteProvider);
+    // 1. СНАЧАЛА ВСЕ ПРОВАЙДЕРЫ И СЛУШАТЕЛИ
+    final karaoke = ref.watch(karaokeProvider);
+    final palette = ref.watch(paletteProvider);
 
-        // Calculate scale based on actual available width instead of global screen width.
-        // If it's in a sidebar (e.g. 400px), it will scale down properly.
-        final referenceWidth = constraints.maxWidth > 0 ? constraints.maxWidth : MediaQuery.sizeOf(context).width;
-        // Using 600 as the reference width since lyrics usually take ~half the screen on desktop.
-        final scale = (referenceWidth / 600).clamp(0.5, 2.0);
-        final baseFontSize = 32.0 * scale;
-
-        ref.listen(karaokeProvider.select((s) => s.currentIndex), (prev, next) {
+    ref.listen(karaokeProvider.select((s) => s.currentIndex), (prev, next) {
       if (prev != next && next >= 0) {
         if (!_userScrolling) _scrollTo(next);
         HapticPatterns.lyricsLine();
       }
     });
+
+    // 2. ЗАТЕМ ЛОКАЛЬНАЯ ЛОГИКА И МАСШТАБ
+    final referenceWidth = MediaQuery.sizeOf(context).width;
+    final scale = (referenceWidth / 1200).clamp(0.85, 1.3);
+    final baseFontSize = 32.0 * scale;
+    // bgFontSize is automatically passed via baseFontSize logic in child widgets
 
     if (!karaoke.isLoaded) {
       return Center(
@@ -317,8 +315,6 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
           ),
         ],
       ),
-    );
-      },
     );
   }
 }
