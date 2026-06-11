@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
 import 'features/player/data/audio_handler.dart';
+import 'core/utils/telemetry_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +54,8 @@ Future<void> main() async {
 
   // Инициализируем фоновое воспроизведение ПЕРЕД runApp
   await initAudioService();
+
+  TelemetryService.sendAppLaunchPing();
 
   runApp(
     const ProviderScope(
