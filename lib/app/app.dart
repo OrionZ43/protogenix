@@ -14,18 +14,20 @@ class ProtogenixApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
-    return Column(
-      children: [
-        if (isDesktop) const WindowTitleBar(),
-        Expanded(
-          child: MaterialApp(
-            title: 'Protogenix',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.dark(),
-            home: const AppShell(),
-          ),
-        ),
-      ],
+    return MaterialApp(
+      title: 'Protogenix',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.dark(),
+      builder: (context, child) {
+        if (!isDesktop) return child!;
+        return Column(
+          children: [
+            const WindowTitleBar(),
+            Expanded(child: child!),
+          ],
+        );
+      },
+      home: const AppShell(),
     );
   }
 }
