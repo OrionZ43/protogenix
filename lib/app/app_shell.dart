@@ -29,7 +29,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/utils/fold_layout.dart';
-import '../core/widgets/window_title_bar.dart';
 import '../features/library/presentation/screens/library_screen.dart';
 import '../features/search/presentation/screens/search_screen.dart';
 import '../features/player/presentation/widgets/mini_player.dart';
@@ -45,6 +44,7 @@ import '../features/player/presentation/widgets/desktop_bottom_player.dart';
 import '../features/player/presentation/widgets/queue_panel.dart';
 import '../features/player/presentation/widgets/beautiful_lyrics_view.dart';
 import '../features/player/presentation/widgets/protogenix_background.dart';
+import '../features/library/presentation/screens/info_screen.dart';
 
 // ── Провайдер текущей вкладки ─────────────────────────────────────────────────
 
@@ -92,14 +92,9 @@ class AppShell extends ConsumerWidget {
       expandedBuilder: (ctx, _) => const _ExpandedShell(),
     );
 
-    // На десктопе оборачиваем в колонку: тайтлбар + контент
+    // На десктопе возвращаем только _DesktopShell (WindowTitleBar вынесен в app.dart)
     if (_isDesktop) {
-      return const Column(
-        children: [
-          WindowTitleBar(),
-          Expanded(child: _DesktopShell()),
-        ],
-      );
+      return const _DesktopShell();
     }
 
     return shell;
@@ -523,20 +518,14 @@ class _DesktopShell extends ConsumerStatefulWidget {
 class _DesktopShellState extends ConsumerState<_DesktopShell> {
   bool _isRightPanelOpen = false;
   bool _showQueue = false;
+  bool _isPlayerExpanded = false;
 
   void _openPlayer(BuildContext context) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (_, animation, __) => const ExpandedPlayerScreen(),
-        transitionsBuilder: (_, animation, __, child) => FadeTransition(
-          opacity:
-              CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic),
-          child: child,
-        ),
-        transitionDuration: const Duration(milliseconds: 200),
-        reverseTransitionDuration: Duration.zero,
-      ),
-    );
+    setState(() => _isPlayerExpanded = true);
+  }
+
+  void _closePlayer() {
+    setState(() => _isPlayerExpanded = false);
   }
 
   void _toggleRightPanel() {
@@ -550,6 +539,10 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
     final tabIndex = ref.watch(_tabIndexProvider);
     final hasTrack =
         ref.watch(playerProvider.select((s) => s.currentTrack != null));
+
+    if (_isPlayerExpanded && hasTrack) {
+      return ExpandedPlayerScreen(onClose: _closePlayer);
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF080810),
@@ -768,6 +761,23 @@ class _DesktopSidebar extends StatelessWidget {
               onTap: () => onTabChange(i),
             );
           }),
+
+          const Spacer(), // Прижимает "Инфо" книзу
+
+          // Пункт "Инфо"
+          _DesktopNavItem(
+            tab: const _TabItem(
+              icon: Icons.info_outline_rounded,
+              activeIcon: Icons.info_rounded,
+              label: 'Инфо',
+            ),
+            selected: false,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const InfoScreen()),
+            ),
+          ),
+
+          const SizedBox(height: 16),
         ],
       ),
     );

@@ -22,7 +22,7 @@ class LibraryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DefaultTabController(
+    return const DefaultTabController(
       length: 3,
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -32,10 +32,10 @@ class LibraryScreen extends ConsumerWidget {
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Медиатека',
                           style: TextStyle(
@@ -46,28 +46,11 @@ class LibraryScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      Builder(
-                        builder: (ctx) {
-                          final controller = DefaultTabController.of(ctx);
-                          return AnimatedBuilder(
-                            animation: controller,
-                            builder: (context, _) {
-                              return controller.index == 1
-                                  ? IconButton(
-                                      icon: const Icon(Icons.add_rounded),
-                                      color: Colors.white,
-                                      onPressed: () => _createPlaylistDialog(context, ref),
-                                    )
-                                  : const SizedBox.shrink();
-                            },
-                          );
-                        },
-                      ),
                     ],
                   ),
                 ),
-                const _GlassTabBar(),
-                const Expanded(
+                _GlassTabBar(),
+                Expanded(
                   child: TabBarView(
                     children: [
                       _TracksTab(),
@@ -139,6 +122,38 @@ class _PlaylistsTab extends ConsumerWidget {
 
     return CustomScrollView(
       slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Row(
+              children: [
+                const Text(
+                  'Плейлисты',
+                  style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                ),
+                const Spacer(),
+                Text(
+                  '${playlists.length}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 16),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => _createPlaylistDialog(context, ref),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withAlpha(15),
+                      border: Border.all(color: Colors.white.withAlpha(30)),
+                    ),
+                    child: const Icon(Icons.add_rounded, color: Colors.white70, size: 20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
         if (playlists.isEmpty)
           SliverFillRemaining(
             child: _EmptyPlaylists(

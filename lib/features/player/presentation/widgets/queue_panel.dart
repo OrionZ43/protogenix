@@ -20,7 +20,7 @@ class QueuePanel extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
           child: Text(
-            'UP NEXT',
+            'ДАЛЕЕ',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: Colors.white54,
                   letterSpacing: 4,
@@ -40,6 +40,7 @@ class QueuePanel extends ConsumerWidget {
                 isCurrent: isCurrent,
                 index: index,
                 palette: palette,
+                isPlaying: player.isPlaying,
                 onTap: () {
                   ref.read(playerProvider.notifier).loadPlaylist(
                         queue,
@@ -64,6 +65,7 @@ class _QueueItem extends StatelessWidget {
     required this.isCurrent,
     required this.index,
     required this.palette,
+    required this.isPlaying,
     required this.onTap,
   });
 
@@ -71,6 +73,7 @@ class _QueueItem extends StatelessWidget {
   final bool isCurrent;
   final int index;
   final PaletteState palette;
+  final bool isPlaying;
   final VoidCallback onTap;
 
   @override
@@ -139,7 +142,7 @@ class _QueueItem extends StatelessWidget {
 
                 // Индикатор текущего трека
                 if (isCurrent)
-                  _PlayingIndicator(color: palette.primary)
+                  _PlayingIndicator(color: palette.primary, isPlaying: isPlaying)
                 else
                   Text(
                     _formatDuration(track.duration),
@@ -165,8 +168,9 @@ class _QueueItem extends StatelessWidget {
 
 /// Анимированные полоски "сейчас играет"
 class _PlayingIndicator extends StatefulWidget {
-  const _PlayingIndicator({required this.color});
+  const _PlayingIndicator({required this.color, required this.isPlaying});
   final Color color;
+  final bool isPlaying;
 
   @override
   State<_PlayingIndicator> createState() => _PlayingIndicatorState();
@@ -183,8 +187,29 @@ class _PlayingIndicatorState extends State<_PlayingIndicator>
       return AnimationController(
         vsync: this,
         duration: Duration(milliseconds: 400 + i * 120),
-      )..repeat(reverse: true);
+      );
     });
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PlayingIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isPlaying != widget.isPlaying) {
+      _syncAnimation();
+    }
+  }
+
+  void _syncAnimation() {
+    for (final c in _controllers) {
+      if (widget.isPlaying) {
+        if (!c.isAnimating) c.repeat(reverse: true);
+      } else {
+        c.stop();
+        // Возвращаем к нейтральному значению, чтобы полоски выглядели "ровными"
+        c.animateTo(0.0, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+      }
+    }
   }
 
   @override
@@ -197,6 +222,8 @@ class _PlayingIndicatorState extends State<_PlayingIndicator>
 
   @override
   Widget build(BuildContext context) {
+    final color = widget.isPlaying ? widget.color : Colors.white38;
+
     return SizedBox(
       width: 24,
       height: 24,
@@ -211,7 +238,7 @@ class _PlayingIndicatorState extends State<_PlayingIndicator>
                 width: 4,
                 height: 6 + (_controllers[i].value * 14),
                 decoration: BoxDecoration(
-                  color: widget.color,
+                  color: color,
                   borderRadius: BorderRadius.circular(2),
                 ),
               );

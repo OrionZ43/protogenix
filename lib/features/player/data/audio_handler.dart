@@ -60,6 +60,26 @@ class ProtogenixAudioHandler extends BaseAudioHandler
   @override
   Future<void> skipToPrevious() => _player.seekToPrevious();
 
+  @override
+  Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
+    final enabled = shuffleMode != AudioServiceShuffleMode.none;
+    await _player.setShuffleModeEnabled(enabled);
+    if (enabled) {
+      await _player.shuffle();
+    }
+  }
+
+  @override
+  Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
+    final loopMode = switch (repeatMode) {
+      AudioServiceRepeatMode.none => LoopMode.off,
+      AudioServiceRepeatMode.one => LoopMode.one,
+      AudioServiceRepeatMode.all => LoopMode.all,
+      AudioServiceRepeatMode.group => LoopMode.all,
+    };
+    await _player.setLoopMode(loopMode);
+  }
+
   Future<void> loadPlaylist({
     required List<MediaItem> items,
     required List<AudioSource> sources,

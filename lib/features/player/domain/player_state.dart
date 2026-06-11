@@ -99,4 +99,29 @@ class ProtogenixPlayerState {
       sleepTimerRemaining: sleepTimerRemaining ?? this.sleepTimerRemaining,
     );
   }
+
+  /// Возвращает копию состояния с обнулённым sleepTimerRemaining.
+  /// Нужен, т.к. обычный copyWith не может занулить поле через `??`.
+  ProtogenixPlayerState clearSleepTimerRemaining() {
+    return ProtogenixPlayerState(
+      currentTrack: currentTrack,
+      queue: queue,
+      currentIndex: currentIndex,
+      isPlaying: isPlaying,
+      isLoading: isLoading,
+      isBuffering: isBuffering,
+      position: position,
+      buffered: buffered,
+      total: total,
+      volume: volume,
+      speed: speed,
+      repeatMode: repeatMode,
+      isShuffle: isShuffle,
+      eqEnabled: eqEnabled,
+      eqBandGains: eqBandGains,
+      sleepTimerActive: sleepTimerActive,
+      stopAfterTrack: stopAfterTrack,
+      sleepTimerRemaining: null, // ← явный null
+    );
+  }
 }

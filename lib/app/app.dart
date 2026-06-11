@@ -2,19 +2,30 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:io';
 import '../core/theme/app_theme.dart';
 import 'app_shell.dart';
+import '../core/widgets/window_title_bar.dart';
 
 class ProtogenixApp extends ConsumerWidget {
   const ProtogenixApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return MaterialApp(
-      title: 'Protogenix',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark(),
-      home: const AppShell(),
+    final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
+    return Column(
+      children: [
+        if (isDesktop) const WindowTitleBar(),
+        Expanded(
+          child: MaterialApp(
+            title: 'Protogenix',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.dark(),
+            home: const AppShell(),
+          ),
+        ),
+      ],
     );
   }
 }

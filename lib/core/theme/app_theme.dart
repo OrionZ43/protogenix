@@ -15,6 +15,26 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
+
+      splashFactory: NoSplash.splashFactory,
+      hoverColor: Colors.white.withAlpha(12),
+      splashColor: Colors.white.withAlpha(20),
+      highlightColor: Colors.white.withAlpha(15),
+
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return Colors.white.withAlpha(25);
+            }
+            if (states.contains(WidgetState.hovered)) {
+              return Colors.white.withAlpha(12);
+            }
+            return Colors.transparent;
+          }),
+        ),
+      ),
+
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
