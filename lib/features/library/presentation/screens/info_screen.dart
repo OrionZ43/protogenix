@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/widgets/z43_branding.dart';
+import '../../../../core/widgets/neon_logo.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
 
@@ -27,27 +28,17 @@ class InfoScreen extends StatelessWidget {
                 children: [
                   // Логотип
                   Container(
-                    width: 80,
-                    height: 80,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFCE93D8), Color(0xFF80DEEA)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'P',
-                        style: TextStyle(
-                          color: Colors.black87,
-                          fontSize: 40,
-                          fontWeight: FontWeight.w900,
-                          height: 1,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFCE93D8).withAlpha(60),
+                          blurRadius: 40,
+                          spreadRadius: 10,
                         ),
-                      ),
+                      ],
                     ),
+                    child: const NeonLogo(size: 80),
                   ),
                   const SizedBox(height: 24),
                   const Text(

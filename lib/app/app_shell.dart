@@ -45,6 +45,7 @@ import '../features/player/presentation/widgets/queue_panel.dart';
 import '../features/player/presentation/widgets/beautiful_lyrics_view.dart';
 import '../features/player/presentation/widgets/protogenix_background.dart';
 import '../features/library/presentation/screens/info_screen.dart';
+import '../core/widgets/neon_logo.dart';
 
 // ── Провайдер текущей вкладки ─────────────────────────────────────────────────
 
@@ -764,14 +765,20 @@ class _DesktopSidebar extends StatelessWidget {
           // ── Логотип ────────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
-            child: Text(
-              'PROTOGENIX',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 3,
-              ),
+            child: Row(
+              children: [
+                const NeonLogo(size: 28),
+                const SizedBox(width: 12),
+                Text(
+                  'PROTOGENIX',
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(200),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 3,
+                  ),
+                ),
+              ],
             ),
           ),
 
