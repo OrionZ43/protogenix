@@ -35,7 +35,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
     if (track == null) return const SizedBox.shrink();
 
     return Container(
-      height: 120,
+      height: 135 * scale,
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.8),

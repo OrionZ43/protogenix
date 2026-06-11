@@ -95,6 +95,7 @@ class _GlassTabBar extends StatelessWidget {
           labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
           dividerColor: Colors.transparent,
           splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStateProperty.all(Colors.transparent),
         ),
       ),
     );

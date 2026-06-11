@@ -223,6 +223,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                 itemPositionsListener: _positions,
                 padding: EdgeInsets.symmetric(
                   vertical: MediaQuery.of(context).size.height * 0.42,
+                  horizontal: 24.0,
                 ),
                 itemCount: karaoke.lines.length,
                 itemBuilder: (context, index) {
