@@ -395,7 +395,7 @@ class _TrackInfo extends ConsumerWidget {
             children: [
               Text(
                 track.title,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: titleStyle,
@@ -442,99 +442,102 @@ class _Controls extends StatelessWidget {
     final iconSize = compact ? 20.0 : 24.0;
     final playSize = compact ? 52.0 : 64.0;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _CtrlButton(
-          tooltip: 'Shuffle',
-          icon: Icons.shuffle_rounded,
-          color: player.isShuffle ? palette.primary : Colors.white38,
-          size: iconSize,
-          onTap: () {
-            player.isShuffle
-                ? HapticPatterns.shuffleOff()
-                : HapticPatterns.shuffleOn();
-            notifier.toggleShuffle();
-          },
-        ),
-        const Spacer(),
-        _CtrlButton(
-          tooltip: 'Previous',
-          icon: Icons.skip_previous_rounded,
-          color: Colors.white,
-          size: iconSize + 4,
-          onTap: () {
-            HapticPatterns.previous();
-            notifier.previous();
-          },
-        ),
-        const SizedBox(width: 16),
-        Tooltip(
-          message: playing ? 'Pause' : 'Play',
-          decoration: BoxDecoration(
-            color: Colors.black.withAlpha(200),
-            borderRadius: BorderRadius.circular(8),
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _CtrlButton(
+            tooltip: 'Shuffle',
+            icon: Icons.shuffle_rounded,
+            color: player.isShuffle ? palette.primary : Colors.white38,
+            size: iconSize,
+            onTap: () {
+              player.isShuffle
+                  ? HapticPatterns.shuffleOff()
+                  : HapticPatterns.shuffleOn();
+              notifier.toggleShuffle();
+            },
           ),
-          textStyle: const TextStyle(color: Colors.white70, fontSize: 12),
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () {
-                HapticPatterns.playPause();
-                notifier.playPause();
-              },
-              child: Container(
-                width: playSize,
-                height: playSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: palette.primary,
-                  boxShadow: [
-                    BoxShadow(
-                      color: palette.primary.withAlpha(80),
-                      blurRadius: 16,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: playSize * 0.5,
+          const SizedBox(width: 16),
+          _CtrlButton(
+            tooltip: 'Previous',
+            icon: Icons.skip_previous_rounded,
+            color: Colors.white,
+            size: iconSize + 4,
+            onTap: () {
+              HapticPatterns.previous();
+              notifier.previous();
+            },
+          ),
+          const SizedBox(width: 16),
+          Tooltip(
+            message: playing ? 'Pause' : 'Play',
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(200),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            textStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {
+                  HapticPatterns.playPause();
+                  notifier.playPause();
+                },
+                child: Container(
+                  width: playSize,
+                  height: playSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: palette.primary,
+                    boxShadow: [
+                      BoxShadow(
+                        color: palette.primary.withAlpha(80),
+                        blurRadius: 16,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: playSize * 0.5,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 16),
-        _CtrlButton(
-          tooltip: 'Next',
-          icon: Icons.skip_next_rounded,
-          color: Colors.white,
-          size: iconSize + 4,
-          onTap: () {
-            HapticPatterns.next();
-            notifier.next();
-          },
-        ),
-        const Spacer(),
-        _CtrlButton(
-          tooltip: 'Repeat',
-          icon: switch (player.repeatMode) {
-            ps.RepeatMode.none => Icons.repeat_rounded,
-            ps.RepeatMode.all => Icons.repeat_rounded,
-            ps.RepeatMode.one => Icons.repeat_one_rounded,
-          },
-          color: player.repeatMode != ps.RepeatMode.none
-              ? palette.primary
-              : Colors.white38,
-          size: iconSize,
-          onTap: () {
-            HapticPatterns.repeat();
-            notifier.toggleRepeat();
-          },
-        ),
-      ],
+          const SizedBox(width: 16),
+          _CtrlButton(
+            tooltip: 'Next',
+            icon: Icons.skip_next_rounded,
+            color: Colors.white,
+            size: iconSize + 4,
+            onTap: () {
+              HapticPatterns.next();
+              notifier.next();
+            },
+          ),
+          const SizedBox(width: 16),
+          _CtrlButton(
+            tooltip: 'Repeat',
+            icon: switch (player.repeatMode) {
+              ps.RepeatMode.none => Icons.repeat_rounded,
+              ps.RepeatMode.all => Icons.repeat_rounded,
+              ps.RepeatMode.one => Icons.repeat_one_rounded,
+            },
+            color: player.repeatMode != ps.RepeatMode.none
+                ? palette.primary
+                : Colors.white38,
+            size: iconSize,
+            onTap: () {
+              HapticPatterns.repeat();
+              notifier.toggleRepeat();
+            },
+          ),
+        ],
+      ),
     );
   }
 }

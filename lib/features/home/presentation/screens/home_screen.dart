@@ -133,7 +133,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     maxCrossAxisExtent: 280 * scale,
                     mainAxisSpacing: 16 * scale,
                     crossAxisSpacing: 16 * scale,
-                    childAspectRatio: 2.8,
+                    childAspectRatio: 2.2,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -217,7 +217,7 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
         child: GlassCard(
           padding: EdgeInsets.zero,
           borderRadius: 8,
-          opacity: _isHovered ? 0.2 : 0.12,
+          opacity: _isHovered ? 0.25 : 0.15,
           child: Row(
             children: [
               // Cover
@@ -264,7 +264,7 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
                   children: [
                     Text(
                       widget.track.toTrackModel().title,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,

@@ -120,6 +120,7 @@ class _QueueItem extends StatelessWidget {
                     children: [
                       Text(
                         track.title,
+                        maxLines: 2,
                         style: TextStyle(
                           color: isCurrent ? Colors.white : Colors.white70,
                           fontWeight:
