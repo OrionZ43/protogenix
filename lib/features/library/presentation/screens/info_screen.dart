@@ -38,7 +38,7 @@ class InfoScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const NeonLogo(size: 80),
+                    child: const NeonLogo(size: 140),
                   ),
                   const SizedBox(height: 24),
                   const Text(

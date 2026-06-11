@@ -57,9 +57,28 @@ dev_dependencies:
   build_runner: ^2.4.11
   riverpod_generator: ^2.4.3
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
     - assets/mock/
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/images/icon_windows.png"
+  min_sdk_size: 21 # Required for android adaptive icons
+  windows:
+    generate: true
+    image_path: "assets/images/icon_windows.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/images/icon_windows.png"
+
+  # Настройки Android Adaptive и Material 3 Monochrome
+  adaptive_icon_background: "#080810"
+  adaptive_icon_foreground: "assets/images/icon_foreground.png"
+  adaptive_icon_monochrome: "assets/images/icon_monochrome.png"
