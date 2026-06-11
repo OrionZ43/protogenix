@@ -1,6 +1,5 @@
 // lib/core/widgets/window_title_bar.dart
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -52,56 +51,52 @@ class _WindowTitleBarState extends ConsumerState<WindowTitleBar>
 
     return Material(
       color: Colors.transparent,
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            height: 32,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  palette.primary.withAlpha(40),
-                  Colors.black.withAlpha(160),
-                ],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              border: Border(
-                bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-              ),
-            ),
-            child: Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch, // Растягиваем на всю высоту
-              children: [
-                // 1. macOS Кнопки (отдельно от DragToMoveArea = моментальный клик)
-                if (_isMacOS) ...[
-                  const SizedBox(width: 12),
-                  Align(
-                    alignment: Alignment.center,
-                    child: _MacOsControls(isMaximized: _isMaximized),
-                  ),
-                  const SizedBox(width: 16),
-                ],
-
-                // 2. Зона перетаскивания окна
-                Expanded(
-                  child: DragToMoveArea(
-                    child: Container(
-                      // Прозрачный цвет нужен, чтобы Flutter "видел" эту зону для мыши
-                      color: Colors.transparent,
-                      alignment: Alignment.centerLeft,
-                      padding: EdgeInsets.only(left: _isMacOS ? 0 : 16),
-                      child: const _Logo(),
-                    ),
-                  ),
-                ),
-
-                // 3. Windows/Linux Кнопки (отдельно от DragToMoveArea = моментальный клик)
-                if (!_isMacOS) _WindowsControls(isMaximized: _isMaximized),
-              ],
-            ),
+      child: Container(
+        height: 32,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color.lerp(const Color(0xFF080810), palette.primary, 0.25) ??
+                  const Color(0xFF080810),
+              const Color(0xFF080810),
+            ],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
           ),
+          border: Border(
+            bottom: BorderSide(color: Colors.white.withAlpha(15)),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch, // Растягиваем на всю высоту
+          children: [
+            // 1. macOS Кнопки (отдельно от DragToMoveArea = моментальный клик)
+            if (_isMacOS) ...[
+              const SizedBox(width: 12),
+              Align(
+                alignment: Alignment.center,
+                child: _MacOsControls(isMaximized: _isMaximized),
+              ),
+              const SizedBox(width: 16),
+            ],
+
+            // 2. Зона перетаскивания окна
+            Expanded(
+              child: DragToMoveArea(
+                child: Container(
+                  // Прозрачный цвет нужен, чтобы Flutter "видел" эту зону для мыши
+                  color: Colors.transparent,
+                  alignment: Alignment.centerLeft,
+                  padding: EdgeInsets.only(left: _isMacOS ? 0 : 16),
+                  child: const _Logo(),
+                ),
+              ),
+            ),
+
+            // 3. Windows/Linux Кнопки (отдельно от DragToMoveArea = моментальный клик)
+            if (!_isMacOS) _WindowsControls(isMaximized: _isMaximized),
+          ],
         ),
       ),
     );
