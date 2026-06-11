@@ -59,7 +59,7 @@ class ExpandedPlayerScreen extends ConsumerWidget {
                       children: [
                         // Левая колонка — плеер (PlayerMainControls)
                         Expanded(
-                          flex: isWideDesktop ? 5 : 1,
+                          flex: isWideDesktop ? 4 : 1,
                           child: Padding(
                             padding: EdgeInsets.symmetric(
                                 vertical: isWideDesktop ? 24.0 : 0.0),
@@ -79,26 +79,19 @@ class ExpandedPlayerScreen extends ConsumerWidget {
 
                         // Правая колонка — текст песни
                         Expanded(
-                          flex: isWideDesktop ? 4 : 1,
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                                left: isWideDesktop ? 24.0 : 16.0,
-                                top: isWideDesktop ? 48.0 : 24.0,
-                                right: isWideDesktop ? 48.0 : 32.0,
-                                bottom: isWideDesktop ? 48.0 : 24.0),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withAlpha(100),
-                                    blurRadius: 40,
-                                    spreadRadius: -10,
-                                    offset: const Offset(-20, 0),
-                                  ),
-                                ],
-                              ),
-                              child: const BeautifulLyricsView(),
+                          flex: isWideDesktop ? 6 : 1,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withAlpha(100),
+                                  blurRadius: 40,
+                                  spreadRadius: -10,
+                                  offset: const Offset(-20, 0),
+                                ),
+                              ],
                             ),
+                            child: const BeautifulLyricsView(),
                           ),
                         ),
                       ],
