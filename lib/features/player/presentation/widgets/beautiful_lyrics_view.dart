@@ -52,8 +52,6 @@ import '../providers/player_provider.dart';
 const _kDistanceToMaxBlur = 4;
 const _kBlurScale = 1.25;
 const _kUserScrollStopMs = 750;
-const _kFontSize = 32.0;
-const _kBgFontSize = _kFontSize * 0.62; // бэк-вокал: 62% от основного
 
 // ── Цели пружин для каждого состояния ─────────────────────────────────────
 const _kWaitingScale = 1.00;
@@ -161,6 +159,9 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     final karaoke = ref.watch(karaokeProvider);
     final palette = ref.watch(paletteProvider);
 
+    final scale = (MediaQuery.sizeOf(context).width / 1200).clamp(0.8, 2.0);
+    final baseFontSize = 32.0 * scale;
+
     ref.listen(karaokeProvider.select((s) => s.currentIndex), (prev, next) {
       if (prev != next && next >= 0) {
         if (!_userScrolling) _scrollTo(next);
@@ -178,7 +179,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     if (karaoke.lines.isEmpty) return _EmptyState(palette: palette);
 
     if (karaoke.format == LyricsFormat.plain) {
-      return _PlainLyricsView(lines: karaoke.lines, palette: palette);
+      return _PlainLyricsView(lines: karaoke.lines, palette: palette, baseFontSize: baseFontSize);
     }
 
     final activeIndex = karaoke.currentIndex;
@@ -249,6 +250,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                       userScrolling: _userScrolling,
                       positionMs: _positionMs,
                       hasWordSync: hasWordSync,
+                      baseFontSize: baseFontSize,
                     ),
                   );
                 },
@@ -328,6 +330,7 @@ class _LineItem extends StatelessWidget {
     required this.userScrolling,
     required this.positionMs,
     required this.hasWordSync,
+    required this.baseFontSize,
   });
 
   final LyricLine line;
@@ -338,6 +341,7 @@ class _LineItem extends StatelessWidget {
   final bool userScrolling;
   final ValueNotifier<double> positionMs;
   final bool hasWordSync;
+  final double baseFontSize;
 
   @override
   Widget build(BuildContext context) {
@@ -351,6 +355,7 @@ class _LineItem extends StatelessWidget {
           line: line,
           positionMs: positionMs,
           palette: palette,
+          baseFontSize: baseFontSize,
         );
       } else {
         activeContent = _HighlightedLineWidget(
@@ -358,6 +363,7 @@ class _LineItem extends StatelessWidget {
           line: line,
           positionMs: positionMs,
           palette: palette,
+          baseFontSize: baseFontSize,
         );
       }
     } else {
@@ -365,6 +371,7 @@ class _LineItem extends StatelessWidget {
         key: ValueKey('inactive_${line.startMs}'),
         line: line,
         distance: distance,
+        baseFontSize: baseFontSize,
       );
     }
 
@@ -436,11 +443,13 @@ class _SpringLineWidget extends StatefulWidget {
     required this.line,
     required this.positionMs,
     required this.palette,
+    required this.baseFontSize,
   });
 
   final LyricLine line;
   final ValueListenable<double> positionMs;
   final PaletteState palette;
+  final double baseFontSize;
 
   @override
   State<_SpringLineWidget> createState() => _SpringLineWidgetState();
@@ -555,6 +564,7 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
             syllable: syl,
             positionMs: widget.positionMs,
             palette: widget.palette,
+            baseFontSize: widget.baseFontSize,
           );
         } else {
           final vals = _vals[syl] ??
@@ -571,6 +581,7 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
             glow: vals.glow,
             isBackground: syl.isBackground,
             palette: widget.palette,
+            baseFontSize: widget.baseFontSize,
           );
         }
 
@@ -620,11 +631,13 @@ class _HighlightedLineWidget extends StatefulWidget {
     required this.line,
     required this.positionMs,
     required this.palette,
+    required this.baseFontSize,
   });
 
   final LyricLine line;
   final ValueListenable<double> positionMs;
   final PaletteState palette;
+  final double baseFontSize;
 
   @override
   State<_HighlightedLineWidget> createState() => _HighlightedLineWidgetState();
@@ -742,7 +755,7 @@ class _HighlightedLineWidgetState extends State<_HighlightedLineWidget>
           Text(
             _mainText,
             style: TextStyle(
-              fontSize: _kFontSize,
+              fontSize: widget.baseFontSize,
               fontWeight: FontWeight.w800,
               color: mainColor,
               height: 1.25,
@@ -754,7 +767,7 @@ class _HighlightedLineWidgetState extends State<_HighlightedLineWidget>
           Text(
             _bgText,
             style: TextStyle(
-              fontSize: _kBgFontSize,
+              fontSize: widget.baseFontSize * 0.62,
               fontWeight: FontWeight.w500,
               fontStyle: FontStyle.italic,
               color: bgColor,
@@ -801,11 +814,13 @@ class _EmphasizedSyllable extends StatefulWidget {
     required this.syllable,
     required this.positionMs,
     required this.palette,
+    required this.baseFontSize,
   });
 
   final LyricSyllable syllable;
   final ValueListenable<double> positionMs;
   final PaletteState palette;
+  final double baseFontSize;
 
   @override
   State<_EmphasizedSyllable> createState() => _EmphasizedSyllableState();
@@ -903,6 +918,7 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
           yOffset: slot.yOffset,
           glow: slot.glow,
           palette: widget.palette,
+          baseFontSize: widget.baseFontSize,
         );
       }).toList(),
     );
@@ -920,6 +936,7 @@ class _LetterWidget extends StatelessWidget {
     required this.yOffset,
     required this.glow,
     required this.palette,
+    required this.baseFontSize,
     this.isBackground = false,
   });
 
@@ -928,6 +945,7 @@ class _LetterWidget extends StatelessWidget {
   final double yOffset;
   final double glow;
   final PaletteState palette;
+  final double baseFontSize;
   final bool isBackground;
 
   @override
@@ -939,13 +957,13 @@ class _LetterWidget extends StatelessWidget {
       g,
     )!;
 
-    final fontSize = isBackground ? _kBgFontSize : _kFontSize;
+    final fontSize = isBackground ? baseFontSize * 0.62 : baseFontSize;
     final shadowAlpha =
         isBackground ? (g * 0.22 * 255).round() : (g * 0.45 * 255).round();
     final blurRadius = 4.0 + 6.0 * g;
 
     return Transform.translate(
-      offset: Offset(0, _kFontSize * yOffset),
+      offset: Offset(0, baseFontSize * yOffset),
       child: Transform.scale(
         scale: scale.clamp(0.8, 1.8),
         alignment: Alignment.bottomCenter,
@@ -985,10 +1003,11 @@ class _LetterWidget extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _InactiveLine extends StatelessWidget {
-  const _InactiveLine({super.key, required this.line, required this.distance});
+  const _InactiveLine({super.key, required this.line, required this.distance, required this.baseFontSize});
 
   final LyricLine line;
   final int distance;
+  final double baseFontSize;
 
   static double _scaleFor(int d) => switch (d) {
         1 => 0.78,
@@ -1018,8 +1037,8 @@ class _InactiveLine extends StatelessWidget {
             Text(
               mainText,
               softWrap: true,
-              style: const TextStyle(
-                fontSize: _kFontSize,
+              style: TextStyle(
+                fontSize: baseFontSize,
                 fontWeight: FontWeight.w500,
                 color: Colors.white,
                 height: 1.35,
@@ -1031,7 +1050,7 @@ class _InactiveLine extends StatelessWidget {
               bgText,
               softWrap: true,
               style: TextStyle(
-                fontSize: _kBgFontSize,
+                fontSize: baseFontSize * 0.62,
                 fontWeight: FontWeight.w400,
                 fontStyle: FontStyle.italic,
                 color: Colors.white.withAlpha(140),
@@ -1050,10 +1069,11 @@ class _InactiveLine extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _PlainLyricsView extends StatelessWidget {
-  const _PlainLyricsView({required this.lines, required this.palette});
+  const _PlainLyricsView({required this.lines, required this.palette, required this.baseFontSize});
 
   final List<LyricLine> lines;
   final PaletteState palette;
+  final double baseFontSize;
 
   @override
   Widget build(BuildContext context) {
@@ -1086,7 +1106,7 @@ class _PlainLyricsView extends StatelessWidget {
                 lines[i].plainText,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: baseFontSize * 0.6,
                   fontWeight: FontWeight.w500,
                   color: Colors.white.withAlpha(180),
                   height: 1.6,
