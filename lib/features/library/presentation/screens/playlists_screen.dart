@@ -79,7 +79,7 @@ class PlaylistsScreen extends ConsumerWidget {
                       childAspectRatio: 1.1,
                     ),
                     delegate: SliverChildBuilderDelegate(
-                      (context, i) => _PlaylistCard(
+                      (context, i) => PlaylistCard(
                         playlist: playlists[i],
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
