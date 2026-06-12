@@ -770,15 +770,18 @@ class _DesktopSidebar extends StatelessWidget {
                 const NeonLogo(size: 64),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(
-                    'PROTOGENIX',
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(200),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 3,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'PROTOGENIX',
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(200),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 3,
+                      ),
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
