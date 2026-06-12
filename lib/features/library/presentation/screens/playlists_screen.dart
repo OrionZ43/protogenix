@@ -27,7 +27,7 @@ class PlaylistsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: _CreateFab(
-        onTap: () => showCreatePlaylistSheet(context, ref),
+        onTap: () => _showCreatePlaylistSheet(context, ref),
       ),
       body: ProtogenixBackground(
         child: SafeArea(
@@ -64,7 +64,7 @@ class PlaylistsScreen extends ConsumerWidget {
               if (playlists.isEmpty)
                 SliverFillRemaining(
                   child: _EmptyPlaylists(
-                    onTap: () => showCreatePlaylistSheet(context, ref),
+                    onTap: () => _showCreatePlaylistSheet(context, ref),
                   ),
                 )
               else
@@ -90,7 +90,7 @@ class PlaylistsScreen extends ConsumerWidget {
                         onDelete: () => ref
                             .read(playlistsProvider.notifier)
                             .delete(playlists[i].id),
-                        onRename: () => showCreatePlaylistSheet(
+                        onRename: () => _showCreatePlaylistSheet(
                           context,
                           ref,
                           initialName: playlists[i].name,
@@ -404,8 +404,8 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
 
 // ── Playlist card ─────────────────────────────────────────────────────────────
 
-class PlaylistCard extends ConsumerWidget {
-  const PlaylistCard({
+class _PlaylistCard extends ConsumerWidget {
+  const _PlaylistCard({
     required this.playlist,
     required this.onTap,
     required this.onDelete,
@@ -536,7 +536,7 @@ class PlaylistCard extends ConsumerWidget {
 
 // ── Create/Rename Playlist Sheet ──────────────────────────────────────────────
 
-Future<void> showCreatePlaylistSheet(
+Future<void> _showCreatePlaylistSheet(
   BuildContext context,
   WidgetRef ref, {
   String? initialName,
