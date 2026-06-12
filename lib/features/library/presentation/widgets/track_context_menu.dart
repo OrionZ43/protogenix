@@ -4,6 +4,7 @@
 // Действия: избранное, добавить в плейлист, найти текст, удалить.
 
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,18 +44,23 @@ class _TrackContextMenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isFav = ref.watch(isFavoriteProvider(track.id));
+    final container = ProviderScope.containerOf(context);
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0E0E1C),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Ручка
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(200),
+            border: Border(top: BorderSide(color: Colors.white.withAlpha(30))),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Ручка
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
               width: 40,
@@ -118,87 +124,89 @@ class _TrackContextMenu extends ConsumerWidget {
 
             // ── Действия ──────────────────────────────────────────────────────
 
-            // Играть сразу
-            _MenuItem(
-              icon: Icons.play_arrow_rounded,
-              label: 'Играть сразу',
-              onTap: () {
-                ref
-                    .read(playerProvider.notifier)
-                    .playNext(track.toTrackModel());
-                Navigator.of(context).pop();
-              },
-            ),
+                // Играть сразу
+                _MenuItem(
+                  icon: Icons.play_arrow_rounded,
+                  label: 'Играть сразу',
+                  onTap: () {
+                    container
+                        .read(playerProvider.notifier)
+                        .playNext(track.toTrackModel());
+                    Navigator.of(context).pop();
+                  },
+                ),
 
-            // В конец очереди
-            _MenuItem(
-              icon: Icons.queue_music_rounded,
-              label: 'В конец очереди',
-              onTap: () {
-                ref
-                    .read(playerProvider.notifier)
-                    .addToQueue(track.toTrackModel());
-                Navigator.of(context).pop();
-              },
-            ),
+                // В конец очереди
+                _MenuItem(
+                  icon: Icons.queue_music_rounded,
+                  label: 'В конец очереди',
+                  onTap: () {
+                    container
+                        .read(playerProvider.notifier)
+                        .addToQueue(track.toTrackModel());
+                    Navigator.of(context).pop();
+                  },
+                ),
 
-            // Избранное
-            _MenuItem(
-              icon: isFav
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_outline_rounded,
-              iconColor: isFav ? Colors.redAccent : Colors.white70,
-              label: isFav ? 'Убрать из избранного' : 'В избранное',
-              onTap: () {
-                ref.read(favoritesProvider.notifier).toggle(track.id);
-                Navigator.of(context).pop();
-              },
-            ),
+                // Избранное
+                _MenuItem(
+                  icon: isFav
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_outline_rounded,
+                  iconColor: isFav ? Colors.redAccent : Colors.white70,
+                  label: isFav ? 'Убрать из избранного' : 'В избранное',
+                  onTap: () {
+                    container.read(favoritesProvider.notifier).toggle(track.id);
+                    Navigator.of(context).pop();
+                  },
+                ),
 
-            // Добавить в плейлист
-            _MenuItem(
-              icon: Icons.playlist_add_rounded,
-              label: 'Добавить в плейлист',
-              onTap: () {
-                Navigator.of(context).pop();
-                _showAddToPlaylistSheet(context, ref, track);
-              },
-            ),
+                // Добавить в плейлист
+                _MenuItem(
+                  icon: Icons.playlist_add_rounded,
+                  label: 'Добавить в плейлист',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showAddToPlaylistSheet(context, container, track);
+                  },
+                ),
 
-            // Найти текст
-            _MenuItem(
-              icon: Icons.manage_search_rounded,
-              label: 'Найти текст вручную',
-              onTap: () {
-                Navigator.of(context).pop();
-                showLyricsSearchSheet(context, ref, track.toTrackModel());
-              },
-            ),
+                // Найти текст
+                _MenuItem(
+                  icon: Icons.manage_search_rounded,
+                  label: 'Найти текст вручную',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    showLyricsSearchSheet(context, container, track.toTrackModel());
+                  },
+                ),
 
-            // Редактировать
-            _MenuItem(
-              icon: Icons.edit_outlined,
-              label: 'Редактировать',
-              onTap: () {
-                Navigator.of(context).pop();
-                showTrackEditSheet(context, ref, track);
-              },
-            ),
+                // Редактировать
+                _MenuItem(
+                  icon: Icons.edit_outlined,
+                  label: 'Редактировать',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    showTrackEditSheet(context, container, track);
+                  },
+                ),
 
-            // Удалить трек
-            _MenuItem(
-              icon: Icons.delete_outline_rounded,
-              iconColor: Colors.redAccent,
-              label: 'Удалить трек',
-              labelColor: Colors.redAccent,
-              onTap: () {
-                Navigator.of(context).pop();
-                _confirmDelete(context, ref, track);
-              },
-            ),
+                // Удалить трек
+                _MenuItem(
+                  icon: Icons.delete_outline_rounded,
+                  iconColor: Colors.redAccent,
+                  label: 'Удалить трек',
+                  labelColor: Colors.redAccent,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _confirmDelete(context, container, track);
+                  },
+                ),
 
-            const SizedBox(height: 12),
-          ],
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -209,7 +217,7 @@ class _TrackContextMenu extends ConsumerWidget {
 
 void _showAddToPlaylistSheet(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   LibraryTrack track,
 ) {
   showModalBottomSheet(
@@ -217,7 +225,7 @@ void _showAddToPlaylistSheet(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => UncontrolledProviderScope(
-      container: ProviderScope.containerOf(context),
+      container: container,
       child: _AddToPlaylistSheet(track: track),
     ),
   );
@@ -230,59 +238,64 @@ class _AddToPlaylistSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playlists = ref.watch(playlistsProvider);
+    final container = ProviderScope.containerOf(context);
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0E0E1C),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 16),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Добавить в плейлист',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(200),
+            border: Border(top: BorderSide(color: Colors.white.withAlpha(30))),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 16),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-            ),
 
-            // Создать новый
-            _MenuItem(
-              icon: Icons.add_circle_outline_rounded,
-              label: 'Создать новый плейлист',
-              onTap: () async {
-                Navigator.of(context).pop();
-                final name = await _promptPlaylistName(context);
-                if (name != null && name.isNotEmpty) {
-                  final pl =
-                      await ref.read(playlistsProvider.notifier).create(name);
-                  await PlaylistDatabase.instance.addTrackToPlaylist(
-                    playlistId: pl.id,
-                    trackId: track.id,
-                  );
-                }
-              },
-            ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Добавить в плейлист',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Создать новый
+                _MenuItem(
+                  icon: Icons.add_circle_outline_rounded,
+                  label: 'Создать новый плейлист',
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    final name = await _promptPlaylistName(context);
+                    if (name != null && name.isNotEmpty) {
+                      final pl =
+                          await container.read(playlistsProvider.notifier).create(name);
+                      await PlaylistDatabase.instance.addTrackToPlaylist(
+                        playlistId: pl.id,
+                        trackId: track.id,
+                      );
+                    }
+                  },
+                ),
 
             if (playlists.isEmpty)
               const Padding(
@@ -319,8 +332,10 @@ class _AddToPlaylistSheet extends ConsumerWidget {
                 ),
               ),
 
-            const SizedBox(height: 12),
-          ],
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -376,7 +391,7 @@ Future<String?> _promptPlaylistName(BuildContext context) {
 
 void _confirmDelete(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   LibraryTrack track,
 ) {
   showDialog(
@@ -402,16 +417,16 @@ void _confirmDelete(
             Navigator.of(ctx).pop();
 
             final isCurrentTrack =
-                ref.read(playerProvider).currentTrack?.id == track.id;
+                container.read(playerProvider).currentTrack?.id == track.id;
 
             // Удаляем из БД + физические файлы с диска
-            await ref
+            await container
                 .read(libraryProvider.notifier)
                 .removeTrackWithFiles(track);
 
             // Если удалённый трек сейчас играл — перезагружаем плеер
             if (isCurrentTrack) {
-              await ref.read(playerProvider.notifier).reloadFromLibrary();
+              await container.read(playerProvider.notifier).reloadFromLibrary();
             }
           },
           child:

@@ -114,7 +114,7 @@ class _Logo extends StatelessWidget {
     return const Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        NeonLogo(size: 22),
+        NeonLogo(size: 26),
         SizedBox(width: 8),
         Text(
           'Protogenix',

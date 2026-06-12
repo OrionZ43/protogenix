@@ -22,15 +22,19 @@ import '../../../../features/library/presentation/library_provider.dart';
 /// Открыть шторку ручного поиска текста
 void showLyricsSearchSheet(
   BuildContext context,
-  WidgetRef ref,
+  dynamic refOrContainer,
   TrackModel track,
 ) {
+  final container = refOrContainer is ProviderContainer
+    ? refOrContainer
+    : ProviderScope.containerOf(context);
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => UncontrolledProviderScope(
-      container: ProviderScope.containerOf(context),
+      container: container,
       child: LyricsSearchSheet(track: track),
     ),
   );
