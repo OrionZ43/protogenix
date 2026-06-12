@@ -203,6 +203,25 @@ class PlaylistDatabase {
     return maps.map((m) => m['trackId'] as String).toList();
   }
 
+  /// Перезаписывает поле position для треков плейлиста в новом порядке.
+  /// [orderedTrackIds] — список id треков в желаемом порядке.
+  Future<void> reorderTracks({
+    required String playlistId,
+    required List<String> orderedTrackIds,
+  }) async {
+    final database = await db;
+    final batch = database.batch();
+    for (int i = 0; i < orderedTrackIds.length; i++) {
+      batch.update(
+        'playlist_tracks',
+        {'position': i},
+        where: 'playlistId = ? AND trackId = ?',
+        whereArgs: [playlistId, orderedTrackIds[i]],
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<bool> isTrackInPlaylist({
     required String playlistId,
     required String trackId,

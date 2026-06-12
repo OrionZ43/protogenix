@@ -1,4 +1,15 @@
-import 'dart:io';
+import re
+
+with open('lib/features/library/presentation/screens/playlists_screen.dart', 'r') as f:
+    original = f.read()
+
+# We need to construct the new playlists_screen.dart file based on the requirements.
+# The user wants to keep PlaylistsScreen, _CreateFab, _EmptyPlaylists, _PlaylistTrackOptionsSheet, _OptionTile.
+# We will completely replace _PlaylistCard, PlaylistDetailScreen, _PlaylistContent, _PlaylistTrackTile.
+# We will delete _AnimatedCoversBackground, _createPlaylistDialog, _renameDialog, _GlassDialog.
+# We will add _PlaylistCoverCollage, _CreatePlaylistSheet, _ReorderableTrackTile.
+
+imports = """import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,7 +23,9 @@ import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../../core/theme/app_colors.dart';
+"""
 
+playlists_screen_code = """
 // ═════════════════════════════════════════════════════════════════════════════
 // PLAYLISTS SCREEN
 // ═════════════════════════════════════════════════════════════════════════════
@@ -27,7 +40,7 @@ class PlaylistsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: _CreateFab(
-        onTap: () => showCreatePlaylistSheet(context, ref),
+        onTap: () => _showCreatePlaylistSheet(context, ref),
       ),
       body: ProtogenixBackground(
         child: SafeArea(
@@ -64,7 +77,7 @@ class PlaylistsScreen extends ConsumerWidget {
               if (playlists.isEmpty)
                 SliverFillRemaining(
                   child: _EmptyPlaylists(
-                    onTap: () => showCreatePlaylistSheet(context, ref),
+                    onTap: () => _showCreatePlaylistSheet(context, ref),
                   ),
                 )
               else
@@ -79,7 +92,7 @@ class PlaylistsScreen extends ConsumerWidget {
                       childAspectRatio: 1.1,
                     ),
                     delegate: SliverChildBuilderDelegate(
-                      (context, i) => PlaylistCard(
+                      (context, i) => _PlaylistCard(
                         playlist: playlists[i],
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
@@ -90,12 +103,8 @@ class PlaylistsScreen extends ConsumerWidget {
                         onDelete: () => ref
                             .read(playlistsProvider.notifier)
                             .delete(playlists[i].id),
-                        onRename: () => showCreatePlaylistSheet(
-                          context,
-                          ref,
-                          initialName: playlists[i].name,
-                          playlistId: playlists[i].id,
-                        ),
+                        onRename: () => _showCreatePlaylistSheet(
+                            context, ref, initialName: playlists[i].name, playlistId: playlists[i].id),
                       ),
                       childCount: playlists.length,
                     ),
@@ -109,7 +118,9 @@ class PlaylistsScreen extends ConsumerWidget {
     );
   }
 }
+"""
 
+create_fab_and_empty = """
 // ── FAB ───────────────────────────────────────────────────────────────────────
 
 class _CreateFab extends StatelessWidget {
@@ -222,7 +233,9 @@ class _EmptyPlaylists extends StatelessWidget {
     );
   }
 }
+"""
 
+playlist_cover_collage_code = """
 // ── Playlist Cover Collage ────────────────────────────────────────────────────
 
 class _PlaylistCoverCollage extends StatefulWidget {
@@ -242,8 +255,7 @@ class _PlaylistCoverCollage extends StatefulWidget {
   State<_PlaylistCoverCollage> createState() => _PlaylistCoverCollageState();
 }
 
-class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
-    with SingleTickerProviderStateMixin {
+class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage> with SingleTickerProviderStateMixin {
   late AnimationController _animCtrl;
   late Animation<double> _scaleAnimation;
 
@@ -254,10 +266,9 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
       vsync: this,
       duration: const Duration(seconds: 8),
     );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.06,
-    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeInOutSine));
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.06).animate(
+      CurvedAnimation(parent: _animCtrl, curve: Curves.easeInOutSine),
+    );
     if (widget.animate) {
       _animCtrl.repeat(reverse: true);
     }
@@ -290,14 +301,9 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
   }
 
   Widget _buildCollageContent(List<LibraryTrack> tracks) {
-    final covers = tracks
-        .where((t) => t.coverPath != null)
-        .map((t) => t.coverPath)
-        .toList();
+    final covers = tracks.where((t) => t.coverPath != null).map((t) => t.coverPath).toList();
     if (covers.isEmpty && tracks.isNotEmpty) {
-      covers.add(
-        null,
-      ); // Fallback to mock cover if there are tracks but no covers
+      covers.add(null); // Fallback to mock cover if there are tracks but no covers
     }
 
     if (covers.isEmpty) {
@@ -306,19 +312,15 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
           shape: BoxShape.circle,
           gradient: RadialGradient(
             colors: [
-              AppColors.neonPurple.withValues(alpha: 0.35),
-              AppColors.neonCyan.withValues(alpha: 0.15),
+              AppColors.neonPurple.withOpacity(0.35),
+              AppColors.neonCyan.withOpacity(0.15),
             ],
             center: Alignment.topLeft,
             radius: 1.2,
           ),
         ),
         child: Center(
-          child: Icon(
-            Icons.queue_music_rounded,
-            color: Colors.white.withValues(alpha: 0.5),
-            size: widget.diameter * 0.4,
-          ),
+          child: Icon(Icons.queue_music_rounded, color: Colors.white.withOpacity(0.5), size: widget.diameter * 0.4),
         ),
       );
     } else if (covers.length == 1) {
@@ -333,12 +335,7 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
     } else if (covers.length == 3) {
       return Column(
         children: [
-          Expanded(
-            child: SizedBox(
-              width: double.infinity,
-              child: _buildCover(covers[0]),
-            ),
-          ),
+          Expanded(child: SizedBox(width: double.infinity, child: _buildCover(covers[0]))),
           Expanded(
             child: Row(
               children: [
@@ -383,11 +380,7 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
           shape: BoxShape.circle,
           boxShadow: widget.glowColor != null
               ? [
-                  BoxShadow(
-                    color: widget.glowColor!.withValues(alpha: 0.4),
-                    blurRadius: 30,
-                    spreadRadius: 5,
-                  ),
+                  BoxShadow(color: widget.glowColor!.withOpacity(0.4), blurRadius: 30, spreadRadius: 5),
                 ]
               : null,
         ),
@@ -401,11 +394,13 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
     );
   }
 }
+"""
 
+playlist_card_code = """
 // ── Playlist card ─────────────────────────────────────────────────────────────
 
-class PlaylistCard extends ConsumerWidget {
-  const PlaylistCard({
+class _PlaylistCard extends ConsumerWidget {
+  const _PlaylistCard({
     required this.playlist,
     required this.onTap,
     required this.onDelete,
@@ -442,8 +437,7 @@ class PlaylistCard extends ConsumerWidget {
                 Positioned.fill(
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-                    child:
-                        Container(color: Colors.black.withValues(alpha: 0.35)),
+                    child: Container(color: Colors.black.withOpacity(0.35)),
                   ),
                 ),
                 Positioned(
@@ -457,8 +451,8 @@ class PlaylistCard extends ConsumerWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withValues(alpha: 0),
-                          Colors.black.withValues(alpha: 0.85),
+                          Colors.black.withOpacity(0),
+                          Colors.black.withOpacity(0.85),
                         ],
                       ),
                     ),
@@ -500,22 +494,14 @@ class PlaylistCard extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(
-                              Icons.edit_rounded,
-                              color: Colors.white38,
-                              size: 16,
-                            ),
+                            icon: const Icon(Icons.edit_rounded, color: Colors.white38, size: 16),
                             onPressed: onRename,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                           ),
                           const SizedBox(width: 8),
                           IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: Colors.white38,
-                              size: 16,
-                            ),
+                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.white38, size: 16),
                             onPressed: onDelete,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -533,20 +519,17 @@ class PlaylistCard extends ConsumerWidget {
     );
   }
 }
+"""
 
+create_playlist_sheet = """
 // ── Create/Rename Playlist Sheet ──────────────────────────────────────────────
 
-Future<void> showCreatePlaylistSheet(
-  BuildContext context,
-  WidgetRef ref, {
-  String? initialName,
-  String? playlistId,
-}) {
+Future<void> _showCreatePlaylistSheet(BuildContext context, WidgetRef ref, {String? initialName, String? playlistId}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.5),
+    barrierColor: Colors.black.withOpacity(0.5),
     builder: (ctx) => UncontrolledProviderScope(
       container: ProviderScope.containerOf(context),
       child: _CreatePlaylistSheet(
@@ -601,11 +584,9 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
-            color: Colors.white.withValues(alpha: 0.07),
+            color: Colors.white.withOpacity(0.07),
             decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
-              ),
+              border: Border(top: BorderSide(color: Colors.white.withOpacity(0.15))),
             ),
             child: SafeArea(
               top: false,
@@ -628,9 +609,7 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
-                      widget.initialName != null
-                          ? 'ПЕРЕИМЕНОВАТЬ'
-                          : 'НОВЫЙ ПЛЕЙЛИСТ',
+                      widget.initialName != null ? 'ПЕРЕИМЕНОВАТЬ' : 'НОВЫЙ ПЛЕЙЛИСТ',
                       style: const TextStyle(
                         fontSize: 13,
                         color: Colors.white38,
@@ -640,19 +619,11 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.only(
-                      left: 24,
-                      right: 24,
-                      top: 12,
-                    ),
+                    padding: const EdgeInsets.only(left: 24, right: 24, top: 12),
                     child: TextField(
                       controller: _nameCtrl,
                       autofocus: true,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: Colors.white),
                       decoration: const InputDecoration(
                         hintText: 'Название...',
                         hintStyle: TextStyle(color: Colors.white24),
@@ -660,22 +631,12 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
                       ),
                     ),
                   ),
-                  Divider(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    indent: 24,
-                    endIndent: 24,
-                  ),
+                  Divider(color: Colors.white.withOpacity(0.08), indent: 24, endIndent: 24),
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 4,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
                     child: TextField(
                       controller: _descCtrl,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white54,
-                      ),
+                      style: const TextStyle(fontSize: 14, color: Colors.white54),
                       maxLines: 2,
                       decoration: const InputDecoration(
                         hintText: 'Описание (необязательно)',
@@ -686,11 +647,7 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
                   ),
                   const SizedBox(height: 16),
                   Padding(
-                    padding: const EdgeInsets.only(
-                      left: 24,
-                      right: 24,
-                      bottom: 16,
-                    ),
+                    padding: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
                     child: Row(
                       children: [
                         Expanded(
@@ -703,15 +660,10 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _GlassButton(
-                            label: widget.initialName != null
-                                ? 'Сохранить'
-                                : 'Создать',
+                            label: widget.initialName != null ? 'Сохранить' : 'Создать',
                             onTap: () {
                               if (_nameCtrl.text.trim().isNotEmpty) {
-                                widget.onCreated(
-                                  _nameCtrl.text.trim(),
-                                  _descCtrl.text.trim(),
-                                );
+                                widget.onCreated(_nameCtrl.text.trim(), _descCtrl.text.trim());
                               }
                             },
                             primary: true,
@@ -731,12 +683,7 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
 }
 
 class _GlassButton extends StatelessWidget {
-  const _GlassButton({
-    required this.label,
-    required this.onTap,
-    this.primary = false,
-    this.subtle = false,
-  });
+  const _GlassButton({required this.label, required this.onTap, this.primary = false, this.subtle = false});
   final String label;
   final VoidCallback onTap;
   final bool primary;
@@ -749,7 +696,8 @@ class _GlassButton extends StatelessWidget {
       child: GlassCard(
         borderRadius: 16,
         padding: const EdgeInsets.symmetric(vertical: 14),
-        opacity: primary ? 0.15 : (subtle ? 0.0 : 0.05),
+        backgroundColor: primary ? Colors.white.withOpacity(0.15) : (subtle ? Colors.transparent : Colors.white.withOpacity(0.05)),
+        borderColor: primary ? Colors.white.withOpacity(0.3) : Colors.transparent,
         child: Center(
           child: Text(
             label,
@@ -763,7 +711,9 @@ class _GlassButton extends StatelessWidget {
     );
   }
 }
+"""
 
+playlist_detail_screen_code = """
 // ── Playlist Detail Screen ────────────────────────────────────────────────────
 
 class PlaylistDetailScreen extends ConsumerStatefulWidget {
@@ -771,8 +721,7 @@ class PlaylistDetailScreen extends ConsumerStatefulWidget {
   final Playlist playlist;
 
   @override
-  ConsumerState<PlaylistDetailScreen> createState() =>
-      _PlaylistDetailScreenState();
+  ConsumerState<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
 }
 
 class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
@@ -800,23 +749,14 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final asyncTracks = ref.watch(
-      playlistTracksNotifierProvider(widget.playlist.id),
-    );
+    final asyncTracks = ref.watch(playlistTracksNotifierProvider(widget.playlist.id));
 
     return Scaffold(
       backgroundColor: const Color(0xFF080810),
       body: ProtogenixBackground(
         child: asyncTracks.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(color: Colors.white24),
-          ),
-          error: (e, _) => Center(
-            child: Text(
-              'Ошибка: $e',
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
+          loading: () => const Center(child: CircularProgressIndicator(color: Colors.white24)),
+          error: (e, _) => Center(child: Text('Ошибка: $e', style: const TextStyle(color: Colors.red))),
           data: (tracks) => _buildContent(context, tracks),
         ),
       ),
@@ -831,7 +771,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           expandedHeight: 320,
           pinned: true,
           stretch: true,
-          backgroundColor: Colors.black.withValues(alpha: 0.4),
+          backgroundColor: Colors.black.withOpacity(0.4),
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white),
@@ -840,22 +780,14 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           title: AnimatedOpacity(
             opacity: _isCollapsed ? 1.0 : 0.0,
             duration: const Duration(milliseconds: 200),
-            child: Text(
-              widget.playlist.name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            child: Text(widget.playlist.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
           flexibleSpace: FlexibleSpaceBar(
             collapseMode: CollapseMode.parallax,
-            background: _PlaylistHeroSection(
-              playlist: widget.playlist,
-              tracks: tracks,
-            ),
+            background: _PlaylistHeroSection(playlist: widget.playlist, tracks: tracks),
           ),
         ),
+
         if (tracks.isNotEmpty)
           SliverToBoxAdapter(
             child: Padding(
@@ -867,9 +799,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       icon: Icons.play_arrow_rounded,
                       label: 'Слушать',
                       onTap: () {
-                        ref.read(playerProvider.notifier).loadPlaylist(
-                              tracks.map((t) => t.toTrackModel()).toList(),
-                            );
+                        ref.read(playerProvider.notifier).loadPlaylist(tracks.map((t) => t.toTrackModel()).toList());
                         ref.read(playerProvider.notifier).play();
                       },
                     ),
@@ -881,9 +811,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       label: 'Перемешать',
                       onTap: () {
                         final shuffled = List.of(tracks)..shuffle();
-                        ref.read(playerProvider.notifier).loadPlaylist(
-                              shuffled.map((t) => t.toTrackModel()).toList(),
-                            );
+                        ref.read(playerProvider.notifier).loadPlaylist(shuffled.map((t) => t.toTrackModel()).toList());
                         ref.read(playerProvider.notifier).play();
                       },
                     ),
@@ -892,60 +820,41 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
               ),
             ),
           ),
+
         if (tracks.isNotEmpty)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
               child: Row(
                 children: [
-                  const Text(
-                    'ТРЕКИ',
-                    style: TextStyle(
-                      color: Colors.white38,
-                      fontSize: 11,
-                      letterSpacing: 2,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  const Text('ТРЕКИ', style: TextStyle(color: Colors.white38, fontSize: 11, letterSpacing: 2, fontWeight: FontWeight.w600)),
                   const Spacer(),
                   GestureDetector(
                     onTap: () => setState(() => _isReordering = !_isReordering),
                     child: Text(
                       _isReordering ? 'Готово' : 'Изменить порядок',
-                      style: const TextStyle(
-                        color: AppColors.neonPurple,
-                        fontSize: 13,
-                      ),
+                      style: const TextStyle(color: AppColors.neonPurple, fontSize: 13),
                     ),
                   ),
                 ],
               ),
             ),
           ),
+
         if (tracks.isEmpty)
           SliverFillRemaining(
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(
-                    Icons.music_off_rounded,
-                    size: 60,
-                    color: Colors.white12,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Плейлист пуст',
-                    style: TextStyle(color: Colors.white38, fontSize: 16),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Добавь треки из библиотеки',
-                    style: TextStyle(color: Colors.white24, fontSize: 13),
-                  ),
+                children: [
+                  const Icon(Icons.music_off_rounded, size: 60, color: Colors.white12),
+                  const SizedBox(height: 16),
+                  const Text('Плейлист пуст', style: TextStyle(color: Colors.white38, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  const Text('Добавь треки из библиотеки', style: TextStyle(color: Colors.white24, fontSize: 13)),
                 ],
-              ).animate().fadeIn(duration: 400.ms),
-            ),
+              ),
+            ).animate().fadeIn(duration: 400.ms),
           )
         else
           SliverToBoxAdapter(
@@ -954,13 +863,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
               physics: const NeverScrollableScrollPhysics(),
               buildDefaultDragHandles: false,
               onReorder: (oldIndex, newIndex) {
-                ref
-                    .read(
-                      playlistTracksNotifierProvider(
-                        widget.playlist.id,
-                      ).notifier,
-                    )
-                    .reorder(oldIndex, newIndex);
+                ref.read(playlistTracksNotifierProvider(widget.playlist.id).notifier).reorder(oldIndex, newIndex);
               },
               itemCount: tracks.length,
               itemBuilder: (context, i) {
@@ -971,17 +874,12 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   allTracks: tracks,
                   playlistId: widget.playlist.id,
                   isReordering: _isReordering,
-                  onRemove: () => ref
-                      .read(
-                        playlistTracksNotifierProvider(
-                          widget.playlist.id,
-                        ).notifier,
-                      )
-                      .remove(tracks[i].id),
+                  onRemove: () => ref.read(playlistTracksNotifierProvider(widget.playlist.id).notifier).remove(tracks[i].id),
                 );
               },
             ),
           ),
+
         const SliverToBoxAdapter(child: SizedBox(height: 120)),
       ],
     );
@@ -997,7 +895,7 @@ class _PlaylistHeroSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        const Positioned.fill(child: ProtogenixBackground(child: SizedBox())),
+        const Positioned.fill(child: ProtogenixBackground()),
         Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1012,11 +910,7 @@ class _PlaylistHeroSection extends StatelessWidget {
               const SizedBox(height: 20),
               Text(
                 playlist.name,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
                 textAlign: TextAlign.center,
               ),
               Text(
@@ -1027,19 +921,14 @@ class _PlaylistHeroSection extends StatelessWidget {
           ),
         ),
         Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
+          bottom: 0, left: 0, right: 0,
           child: Container(
             height: 80,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0),
-                  const Color(0xFF080810)
-                ],
+                colors: [Colors.black.withOpacity(0), const Color(0xFF080810)],
               ),
             ),
           ),
@@ -1050,11 +939,7 @@ class _PlaylistHeroSection extends StatelessWidget {
 }
 
 class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  const _ActionButton({required this.icon, required this.label, required this.onTap});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -1071,13 +956,7 @@ class _ActionButton extends StatelessWidget {
           children: [
             Icon(icon, color: Colors.white, size: 20),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -1117,11 +996,7 @@ class _ReorderableTrackTile extends ConsumerWidget {
           if (isReordering)
             ReorderableDragStartListener(
               index: index,
-              child: const Icon(
-                Icons.drag_handle_rounded,
-                color: Colors.white38,
-                size: 20,
-              ),
+              child: const Icon(Icons.drag_handle_rounded, color: Colors.white38, size: 20),
             )
           else
             SizedBox(
@@ -1176,8 +1051,7 @@ class _ReorderableTrackTile extends ConsumerWidget {
               iconSize: 20,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: () =>
-                  _showPlaylistTrackOptions(context, ref, track, playlistId),
+              onPressed: () => _showPlaylistTrackOptions(context, ref, track, playlistId),
             ),
         ],
       ),
@@ -1193,21 +1067,15 @@ class _ReorderableTrackTile extends ConsumerWidget {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
-        color: Colors.red.withValues(alpha: 0.15),
-        child: const Icon(
-          Icons.delete_outline_rounded,
-          color: Colors.redAccent,
-          size: 24,
-        ),
+        color: Colors.red.withOpacity(0.15),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 24),
       ),
       child: isReordering
           ? content
           : InkWell(
               onTap: () {
                 final models = allTracks.map((t) => t.toTrackModel()).toList();
-                ref
-                    .read(playerProvider.notifier)
-                    .loadPlaylist(models, initialIndex: index);
+                ref.read(playerProvider.notifier).loadPlaylist(models, initialIndex: index);
                 ref.read(playerProvider.notifier).play();
               },
               child: content,
@@ -1215,7 +1083,9 @@ class _ReorderableTrackTile extends ConsumerWidget {
     );
   }
 }
+"""
 
+track_options_sheet_code = """
 // ── Меню трека внутри плейлиста ───────────────────────────────────────────────
 
 void _showPlaylistTrackOptions(
@@ -1298,9 +1168,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
               onTap: () async {
                 Navigator.of(context).pop();
                 // This updates DB and cache in PlaylistTracksNotifier
-                ref
-                    .read(playlistTracksNotifierProvider(playlistId).notifier)
-                    .remove(track.id);
+                ref.read(playlistTracksNotifierProvider(playlistId).notifier).remove(track.id);
                 // Also invalidate standard cache for cards
                 ref.invalidate(playlistTracksProvider(playlistId));
               },
@@ -1357,3 +1225,7 @@ class _OptionTile extends StatelessWidget {
     );
   }
 }
+"""
+
+with open('lib/features/library/presentation/screens/playlists_screen.dart', 'w') as f:
+    f.write(imports + playlists_screen_code + create_fab_and_empty + playlist_cover_collage_code + playlist_card_code + create_playlist_sheet + playlist_detail_screen_code + track_options_sheet_code)

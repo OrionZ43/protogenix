@@ -73,6 +73,61 @@ final playlistTracksProvider =
   },
 );
 
+/// Notifier для треков одного плейлиста с поддержкой reorder и remove.
+class PlaylistTracksNotifier extends StateNotifier<AsyncValue<List<LibraryTrack>>> {
+  PlaylistTracksNotifier(this._playlistId) : super(const AsyncLoading()) {
+    _load();
+  }
+
+  final String _playlistId;
+
+  Future<void> _load() async {
+    try {
+      final ids = await PlaylistDatabase.instance.getTrackIdsForPlaylist(_playlistId);
+      final db = LibraryDatabase.instance;
+      final allTracks = await db.getAllTracks();
+      final trackMap = {for (final t in allTracks) t.id: t};
+      final result = ids.map((id) => trackMap[id]).whereType<LibraryTrack>().toList();
+      state = AsyncData(result);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
+
+  Future<void> reorder(int oldIndex, int newIndex) async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+
+    final updated = List<LibraryTrack>.from(current);
+    final item = updated.removeAt(oldIndex);
+    // ReorderableListView передаёт newIndex уже с учётом удалённого элемента
+    final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
+    updated.insert(insertAt, item);
+    state = AsyncData(updated);
+
+    await PlaylistDatabase.instance.reorderTracks(
+      playlistId: _playlistId,
+      orderedTrackIds: updated.map((t) => t.id).toList(),
+    );
+  }
+
+  Future<void> remove(String trackId) async {
+    await PlaylistDatabase.instance.removeTrackFromPlaylist(
+      playlistId: _playlistId,
+      trackId: trackId,
+    );
+    final current = state.valueOrNull;
+    if (current != null) {
+      state = AsyncData(current.where((t) => t.id != trackId).toList());
+    }
+  }
+}
+
+final playlistTracksNotifierProvider = StateNotifierProvider.family<
+    PlaylistTracksNotifier, AsyncValue<List<LibraryTrack>>, String>(
+  (ref, playlistId) => PlaylistTracksNotifier(playlistId),
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ИЗБРАННОЕ
 // ─────────────────────────────────────────────────────────────────────────────
