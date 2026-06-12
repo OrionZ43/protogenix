@@ -9,12 +9,19 @@ import 'package:protogenix/features/player/presentation/providers/player_provide
 import 'package:protogenix/features/player/presentation/providers/palette_provider.dart';
 
 void showTrackEditSheet(
-    BuildContext context, WidgetRef ref, LibraryTrack track) {
+    BuildContext context, dynamic refOrContainer, LibraryTrack track) {
+  final container = refOrContainer is ProviderContainer
+      ? refOrContainer
+      : ProviderScope.containerOf(context);
+
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => _TrackEditSheet(track: track),
+    builder: (_) => UncontrolledProviderScope(
+      container: container,
+      child: _TrackEditSheet(track: track),
+    ),
   );
 }
 

@@ -767,8 +767,8 @@ class _DesktopSidebar extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
             child: Row(
               children: [
-                const NeonLogo(size: 46),
-                const SizedBox(width: 12),
+                const NeonLogo(size: 64),
+                const SizedBox(width: 16),
                 Text(
                   'PROTOGENIX',
                   style: TextStyle(
