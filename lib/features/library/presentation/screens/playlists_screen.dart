@@ -601,8 +601,8 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
-            color: Colors.white.withValues(alpha: 0.07),
             decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.07),
               border: Border(
                 top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
               ),
