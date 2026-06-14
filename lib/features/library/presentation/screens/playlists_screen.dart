@@ -1,3 +1,4 @@
+import '../../data/library_database.dart';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -406,6 +407,7 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
 
 class PlaylistCard extends ConsumerWidget {
   const PlaylistCard({
+    super.key,
     required this.playlist,
     required this.onTap,
     required this.onDelete,
@@ -427,107 +429,65 @@ class PlaylistCard extends ConsumerWidget {
       child: GlassCard(
         borderRadius: 20,
         padding: EdgeInsets.zero,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth = constraints.maxWidth;
-            return Stack(
+        child: Stack(
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Positioned.fill(
-                  child: _PlaylistCoverCollage(
-                    tracks: tracks,
-                    diameter: cardWidth,
-                    animate: true,
-                  ),
+                const SizedBox(height: 16),
+                _PlaylistCoverCollage(
+                  tracks: tracks,
+                  diameter: 100,
+                  animate: true,
                 ),
-                Positioned.fill(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-                    child:
-                        Container(color: Colors.black.withValues(alpha: 0.35)),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 80,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0),
-                          Colors.black.withValues(alpha: 0.85),
-                        ],
-                      ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    playlist.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                Positioned(
-                  bottom: 14,
-                  left: 14,
-                  right: 8,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              playlist.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${tracks.length} треков',
-                              style: const TextStyle(
-                                color: Colors.white38,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.edit_rounded,
-                              color: Colors.white38,
-                              size: 16,
-                            ),
-                            onPressed: onRename,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: Colors.white38,
-                              size: 16,
-                            ),
-                            onPressed: onDelete,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                    ],
+                const SizedBox(height: 4),
+                Text(
+                  '${tracks.length} треков',
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 11,
                   ),
                 ),
+                const SizedBox(height: 16),
               ],
-            );
-          },
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_rounded, color: Colors.white38, size: 16),
+                    onPressed: onRename,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.white38, size: 16),
+                    onPressed: onDelete,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -576,19 +536,16 @@ class _CreatePlaylistSheet extends StatefulWidget {
 
 class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _descCtrl;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.initialName);
-    _descCtrl = TextEditingController();
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _descCtrl.dispose();
     super.dispose();
   }
 
@@ -660,30 +617,6 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
                       ),
                     ),
                   ),
-                  Divider(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    indent: 24,
-                    endIndent: 24,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 4,
-                    ),
-                    child: TextField(
-                      controller: _descCtrl,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white54,
-                      ),
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        hintText: 'Описание (необязательно)',
-                        hintStyle: TextStyle(color: Colors.white24),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.only(
@@ -710,7 +643,7 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
                               if (_nameCtrl.text.trim().isNotEmpty) {
                                 widget.onCreated(
                                   _nameCtrl.text.trim(),
-                                  _descCtrl.text.trim(),
+                                  '',
                                 );
                               }
                             },
@@ -874,7 +807,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: _ActionButton(
                       icon: Icons.shuffle_rounded,
@@ -885,6 +818,30 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                               shuffled.map((t) => t.toTrackModel()).toList(),
                             );
                         ref.read(playerProvider.notifier).play();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.add_rounded,
+                      label: 'Добавить',
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          barrierColor: Colors.black.withValues(alpha: 0.5),
+                          builder: (ctx) => UncontrolledProviderScope(
+                            container: ProviderScope.containerOf(context),
+                            child: FractionallySizedBox(
+                              heightFactor: 0.8,
+                              child: _AddTrackToPlaylistSheet(
+                                playlistId: widget.playlist.id,
+                              ),
+                            ),
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -910,11 +867,16 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   const Spacer(),
                   GestureDetector(
                     onTap: () => setState(() => _isReordering = !_isReordering),
-                    child: Text(
-                      _isReordering ? 'Готово' : 'Изменить порядок',
-                      style: const TextStyle(
-                        color: AppColors.neonPurple,
-                        fontSize: 13,
+                    child: GlassCard(
+                      borderRadius: 20,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Text(
+                        _isReordering ? 'Готово' : 'Изменить порядок',
+                        style: const TextStyle(
+                          color: AppColors.neonPurple,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -1246,78 +1208,87 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0E0E1C),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 200),
+            border: Border(
+              top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
             ),
-
-            // Заголовок
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      track.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                ],
-              ),
+                ),
+
+                // Заголовок
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          track.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Divider(color: Colors.white.withAlpha(20), height: 1),
+                const SizedBox(height: 8),
+
+                // Убрать из плейлиста
+                _OptionTile(
+                  icon: Icons.remove_circle_outline_rounded,
+                  iconColor: Colors.orangeAccent,
+                  label: 'Убрать из плейлиста',
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    // This updates DB and cache in PlaylistTracksNotifier
+                    ref
+                        .read(
+                            playlistTracksNotifierProvider(playlistId).notifier)
+                        .remove(track.id);
+                    // Also invalidate standard cache for cards
+                    ref.invalidate(playlistTracksProvider(playlistId));
+                  },
+                ),
+
+                // Другие действия (открывает общее меню трека)
+                _OptionTile(
+                  icon: Icons.more_horiz_rounded,
+                  label: 'Другие действия',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    showTrackContextMenu(context, ref, track);
+                  },
+                ),
+
+                const SizedBox(height: 12),
+              ],
             ),
-
-            Divider(color: Colors.white.withAlpha(20), height: 1),
-            const SizedBox(height: 8),
-
-            // Убрать из плейлиста
-            _OptionTile(
-              icon: Icons.remove_circle_outline_rounded,
-              iconColor: Colors.orangeAccent,
-              label: 'Убрать из плейлиста',
-              onTap: () async {
-                Navigator.of(context).pop();
-                // This updates DB and cache in PlaylistTracksNotifier
-                ref
-                    .read(playlistTracksNotifierProvider(playlistId).notifier)
-                    .remove(track.id);
-                // Also invalidate standard cache for cards
-                ref.invalidate(playlistTracksProvider(playlistId));
-              },
-            ),
-
-            // Другие действия (открывает общее меню трека)
-            _OptionTile(
-              icon: Icons.more_horiz_rounded,
-              label: 'Другие действия',
-              onTap: () {
-                Navigator.of(context).pop();
-                showTrackContextMenu(context, ref, track);
-              },
-            ),
-
-            const SizedBox(height: 12),
-          ],
+          ),
         ),
       ),
     );
@@ -1352,6 +1323,155 @@ class _OptionTile extends StatelessWidget {
               style: const TextStyle(color: Colors.white, fontSize: 15),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AddTrackToPlaylistSheet extends ConsumerStatefulWidget {
+  const _AddTrackToPlaylistSheet({required this.playlistId});
+  final String playlistId;
+
+  @override
+  ConsumerState<_AddTrackToPlaylistSheet> createState() => _AddTrackToPlaylistSheetState();
+}
+
+class _AddTrackToPlaylistSheetState extends ConsumerState<_AddTrackToPlaylistSheet> {
+  List<LibraryTrack>? _allTracks;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllTracks();
+  }
+
+  Future<void> _loadAllTracks() async {
+    final db = LibraryDatabase.instance;
+    final tracks = await db.getAllTracks();
+    setState(() {
+      _allTracks = tracks;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.78),
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      Text(
+                        'ДОБАВИТЬ ТРЕКИ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white38,
+                          letterSpacing: 2,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Divider(color: Colors.white12, height: 1),
+                Expanded(
+                  child: _allTracks == null
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white24,
+                          ),
+                        )
+                      : _allTracks!.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Библиотека пуста',
+                                style: TextStyle(color: Colors.white38),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _allTracks!.length,
+                              itemBuilder: (context, index) {
+                                final track = _allTracks![index];
+                                return ListTile(
+                                  leading: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image(
+                                      image: track.toTrackModel().coverImage,
+                                      width: 40,
+                                      height: 40,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    track.title,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    track.artist,
+                                    style: const TextStyle(
+                                      color: Colors.white38,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(
+                                      Icons.add_circle_outline_rounded,
+                                      color: Colors.white38,
+                                    ),
+                                    onPressed: () {
+                                      ref
+                                          .read(playlistTracksNotifierProvider(
+                                                  widget.playlistId)
+                                              .notifier)
+                                          .add(track.id);
+                                      HapticFeedback.lightImpact();
+                                      // Optional: visually show it's added
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

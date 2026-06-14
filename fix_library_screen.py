@@ -3,14 +3,56 @@ import re
 with open('lib/features/library/presentation/screens/library_screen.dart', 'r') as f:
     content = f.read()
 
-# Make sure we import playlists_screen.dart
-if "import 'playlists_screen.dart';" not in content:
-    content = content.replace(
-        "import '../widgets/track_context_menu.dart';",
-        "import '../widgets/track_context_menu.dart';\nimport 'playlists_screen.dart';"
-    )
+# Replace sorting icon button
+sort_btn_old = """                  GestureDetector(
+                    onTap: () => _showSortSheet(context, ref),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withAlpha(0),
+                      ),
+                      child: Icon(
+                        Icons.sort_rounded,
+                        size: 20,
+                        color: sortMode != LibrarySortMode.dateAdded
+                            ? palette.primary
+                            : Colors.white24,
+                      ),
+                    ),
+                  ),"""
 
-# Instead of modifying the massive library_screen.dart piece by piece and risking syntax errors,
-# let's just make the _PlaylistsTab widget return PlaylistsScreen directly.
-# Wait, PlaylistsScreen is a Scaffold. TabBarView children should ideally not be Scaffolds (though they can be).
-# Actually, the user's issue is that the text "PROTOGENIX" overflowed!
+sort_btn_new = """                  GestureDetector(
+                    onTap: () => _showSortSheet(context, ref),
+                    child: GlassCard(
+                      borderRadius: 20,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.sort_rounded,
+                            size: 16,
+                            color: sortMode != LibrarySortMode.dateAdded
+                                ? palette.primary
+                                : Colors.white54,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Сортировка',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: sortMode != LibrarySortMode.dateAdded
+                                  ? palette.primary
+                                  : Colors.white54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),"""
+
+content = content.replace(sort_btn_old, sort_btn_new)
+
+with open('lib/features/library/presentation/screens/library_screen.dart', 'w') as f:
+    f.write(content)

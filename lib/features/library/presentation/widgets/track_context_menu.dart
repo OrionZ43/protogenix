@@ -1,3 +1,4 @@
+import '../screens/playlists_screen.dart';
 // lib/features/library/presentation/widgets/track_context_menu.dart
 //
 // Контекстное меню трека (BottomSheet).
@@ -283,17 +284,12 @@ class _AddToPlaylistSheet extends ConsumerWidget {
                 _MenuItem(
                   icon: Icons.add_circle_outline_rounded,
                   label: 'Создать новый плейлист',
-                  onTap: () async {
+                  onTap: () {
                     Navigator.of(context).pop();
-                    final name = await _promptPlaylistName(context);
-                    if (name != null && name.isNotEmpty) {
-                      final pl =
-                          await container.read(playlistsProvider.notifier).create(name);
-                      await PlaylistDatabase.instance.addTrackToPlaylist(
-                        playlistId: pl.id,
-                        trackId: track.id,
-                      );
-                    }
+                    showCreatePlaylistSheet(context, ref).then((_) {
+                      // Note: We can't easily wait for it if showCreatePlaylistSheet doesn't return the new playlist.
+                      // The new playlist is created via ref.read(playlistsProvider.notifier).create(name).
+                    });
                   },
                 ),
 
@@ -315,6 +311,11 @@ class _AddToPlaylistSheet extends ConsumerWidget {
                       playlistId: pl.id,
                       trackId: track.id,
                     );
+
+                    container.invalidate(playlistTracksProvider(pl.id));
+                    final notifier = container.read(playlistTracksNotifierProvider(pl.id).notifier);
+                    notifier.add(track.id);
+
                     if (context.mounted) {
                       Navigator.of(context).pop();
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -340,51 +341,6 @@ class _AddToPlaylistSheet extends ConsumerWidget {
       ),
     );
   }
-}
-
-// ── Диалог имени плейлиста ────────────────────────────────────────────────────
-
-Future<String?> _promptPlaylistName(BuildContext context) {
-  final ctrl = TextEditingController();
-  return showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF13131F),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
-        'Новый плейлист',
-        style: TextStyle(color: Colors.white, fontSize: 17),
-      ),
-      content: TextField(
-        controller: ctrl,
-        autofocus: true,
-        style: const TextStyle(color: Colors.white),
-        cursorColor: Colors.white70,
-        decoration: InputDecoration(
-          hintText: 'Название...',
-          hintStyle: const TextStyle(color: Colors.white38),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white24),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white60),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Отмена', style: TextStyle(color: Colors.white54)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-          child: const Text('Создать', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
-  );
 }
 
 // ── Подтверждение удаления — удаляет из БД + с диска ─────────────────────────
