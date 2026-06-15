@@ -1,12 +1,9 @@
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/playlist_database.dart';
 import '../../domain/library_track.dart';
 import '../library_provider.dart';
 import '../playlist_provider.dart';
@@ -430,18 +427,30 @@ class _TrackListState extends ConsumerState<_TrackList> {
                   // Кнопка сортировки
                   GestureDetector(
                     onTap: () => _showSortSheet(context, ref),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withAlpha(0),
-                      ),
-                      child: Icon(
-                        Icons.sort_rounded,
-                        size: 20,
-                        color: sortMode != LibrarySortMode.dateAdded
-                            ? palette.primary
-                            : Colors.white24,
+                    child: GlassCard(
+                      borderRadius: 20,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.sort_rounded,
+                            size: 16,
+                            color: sortMode != LibrarySortMode.dateAdded
+                                ? palette.primary
+                                : Colors.white54,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Сортировка',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: sortMode != LibrarySortMode.dateAdded
+                                  ? palette.primary
+                                  : Colors.white54,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

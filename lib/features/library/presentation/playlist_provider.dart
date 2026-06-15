@@ -121,6 +121,14 @@ class PlaylistTracksNotifier extends StateNotifier<AsyncValue<List<LibraryTrack>
       state = AsyncData(current.where((t) => t.id != trackId).toList());
     }
   }
+
+  Future<void> add(String trackId) async {
+    await PlaylistDatabase.instance.addTrackToPlaylist(
+      playlistId: _playlistId,
+      trackId: trackId,
+    );
+    await _load();
+  }
 }
 
 final playlistTracksNotifierProvider = StateNotifierProvider.family<
