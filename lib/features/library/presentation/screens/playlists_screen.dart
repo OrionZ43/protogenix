@@ -1,5 +1,6 @@
 import '../../data/library_database.dart';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -73,14 +74,14 @@ class PlaylistsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverGrid(
                     gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
+                    const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
                       childAspectRatio: 1.1,
                     ),
                     delegate: SliverChildBuilderDelegate(
-                      (context, i) => PlaylistCard(
+                          (context, i) => PlaylistCard(
                         playlist: playlists[i],
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
@@ -245,22 +246,19 @@ class _PlaylistCoverCollage extends StatefulWidget {
 
 class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
     with SingleTickerProviderStateMixin {
+  // Один общий медленный цикл (0..1, по кругу), из которого выводятся фазы
+  // орбит спутников, "дыхание" главной обложки и точки соединительных линий.
   late AnimationController _animCtrl;
-  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
     _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 8),
+      duration: const Duration(seconds: 36),
     );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.06,
-    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeInOutSine));
     if (widget.animate) {
-      _animCtrl.repeat(reverse: true);
+      _animCtrl.repeat();
     }
   }
 
@@ -268,7 +266,7 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
   void didUpdateWidget(_PlaylistCoverCollage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.animate && !oldWidget.animate) {
-      _animCtrl.repeat(reverse: true);
+      _animCtrl.repeat();
     } else if (!widget.animate && oldWidget.animate) {
       _animCtrl.stop();
     }
@@ -280,126 +278,257 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
     super.dispose();
   }
 
-  Widget _buildCover(String? path) {
-    if (path == null) {
-      return Image.asset('assets/images/mock_cover.jpg', fit: BoxFit.cover);
-    }
-    return Image(
+  Widget _cover(String? path, {BoxFit fit = BoxFit.cover}) {
+    final image = path == null
+        ? Image.asset('assets/images/mock_cover.jpg', fit: fit)
+        : Image(
       image: ResizeImage(FileImage(File(path)), width: 200),
-      fit: BoxFit.cover,
+      fit: fit,
+    );
+    return SizedBox.expand(child: image);
+  }
+
+  Widget _emptyState() {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            AppColors.neonPurple.withValues(alpha: 0.35),
+            AppColors.neonCyan.withValues(alpha: 0.15),
+          ],
+          center: Alignment.topLeft,
+          radius: 1.2,
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.queue_music_rounded,
+          color: Colors.white.withValues(alpha: 0.5),
+          size: widget.diameter * 0.4,
+        ),
+      ),
     );
   }
 
-  Widget _buildCollageContent(List<LibraryTrack> tracks) {
-    final covers = tracks
-        .where((t) => t.coverPath != null)
-        .map((t) => t.coverPath)
-        .toList();
-    if (covers.isEmpty && tracks.isNotEmpty) {
-      covers.add(
-        null,
-      ); // Fallback to mock cover if there are tracks but no covers
-    }
+  Widget _satelliteCover(String? coverPath, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipOval(child: _cover(coverPath)),
+    );
+  }
 
-    if (covers.isEmpty) {
-      return Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              AppColors.neonPurple.withValues(alpha: 0.35),
-              AppColors.neonCyan.withValues(alpha: 0.15),
+  /// Созвездие: главная обложка в центре, спутники летают по орбитам вокруг
+  /// и могут выходить за пределы блока, соединённые тонкими линиями —
+  /// с главной обложкой и друг с другом.
+  Widget _buildConstellation(List<String?> covers) {
+    final d = widget.diameter;
+    final mainSize = d * 0.56;
+    final satSize = d * 0.30;
+    // Орбита шире самого блока — спутники "выплывают" за края.
+    final orbitRadius = d * 0.62;
+    // Видимая область больше diameter, чтобы спутники не подрезались layout'ом.
+    final boundsSize = d * 1.6;
+    final center = boundsSize / 2;
+
+    final satellites = covers.skip(1).take(3).toList();
+
+    final phases = [0.0, 0.34, 0.67];
+    final speeds = [0.07, -0.09, 0.05];
+    final bobs = [d * 0.05, d * 0.07, d * 0.04];
+    final radii = [orbitRadius, orbitRadius * 0.92, orbitRadius * 1.05];
+
+    return SizedBox(
+      width: boundsSize,
+      height: boundsSize,
+      child: AnimatedBuilder(
+        animation: _animCtrl,
+        builder: (context, _) {
+          // Считаем позиции спутников один раз за кадр — используются и для
+          // линий (CustomPaint), и для самих картинок (Positioned).
+          final positions = <Offset>[];
+          for (var i = 0; i < satellites.length; i++) {
+            final t = (_animCtrl.value * speeds[i % speeds.length] +
+                phases[i % phases.length]) %
+                1.0;
+            final angle = t * 2 * math.pi;
+            final r = radii[i % radii.length];
+            final dx = math.cos(angle) * r;
+            final dy = math.sin(angle) * r * 0.55; // эллиптическая орбита
+            final bob = math.sin(angle * 2) * bobs[i % bobs.length];
+            positions.add(Offset(center + dx, center + dy + bob));
+          }
+
+          final breathe =
+              1.0 + 0.035 * math.sin(_animCtrl.value * 2 * math.pi);
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Линии-связи: рисуются за обложками.
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _ConstellationPainter(
+                    center: Offset(center, center),
+                    satellitePositions: positions,
+                    color: (widget.glowColor ?? AppColors.neonPurple),
+                  ),
+                ),
+              ),
+              // Главная обложка — крупно в центре, с лёгким "дыханием".
+              Positioned(
+                left: center - (mainSize * breathe) / 2,
+                top: center - (mainSize * breathe) / 2,
+                width: mainSize * breathe,
+                height: mainSize * breathe,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (widget.glowColor ?? AppColors.neonPurple)
+                            .withValues(alpha: 0.3),
+                        blurRadius: 24,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(child: _cover(covers[0])),
+                ),
+              ),
+              // Спутники летают по орбитам.
+              for (var i = 0; i < satellites.length; i++)
+                Positioned(
+                  left: positions[i].dx - satSize / 2,
+                  top: positions[i].dy - satSize / 2,
+                  width: satSize,
+                  height: satSize,
+                  child: _satelliteCover(satellites[i], satSize),
+                ),
             ],
-            center: Alignment.topLeft,
-            radius: 1.2,
-          ),
-        ),
-        child: Center(
-          child: Icon(
-            Icons.queue_music_rounded,
-            color: Colors.white.withValues(alpha: 0.5),
-            size: widget.diameter * 0.4,
-          ),
-        ),
-      );
-    } else if (covers.length == 1) {
-      return _buildCover(covers[0]);
-    } else if (covers.length == 2) {
-      return Row(
-        children: [
-          Expanded(child: _buildCover(covers[0])),
-          Expanded(child: _buildCover(covers[1])),
-        ],
-      );
-    } else if (covers.length == 3) {
-      return Column(
-        children: [
-          Expanded(
-            child: SizedBox(
-              width: double.infinity,
-              child: _buildCover(covers[0]),
-            ),
-          ),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: _buildCover(covers[1])),
-                Expanded(child: _buildCover(covers[2])),
-              ],
-            ),
-          ),
-        ],
-      );
-    } else {
-      return Column(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: _buildCover(covers[0])),
-                Expanded(child: _buildCover(covers[1])),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: _buildCover(covers[2])),
-                Expanded(child: _buildCover(covers[3])),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
+          );
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final covers = widget.tracks
+        .where((t) => t.coverPath != null)
+        .map((t) => t.coverPath)
+        .toList();
+    if (covers.isEmpty && widget.tracks.isNotEmpty) {
+      covers.add(null); // Fallback to mock cover if no covers at all
+    }
+
+    final simple = covers.length <= 1;
+
     return RepaintBoundary(
-      child: Container(
+      child: SizedBox(
         width: widget.diameter,
         height: widget.diameter,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: widget.glowColor != null
-              ? [
-                  BoxShadow(
-                    color: widget.glowColor!.withValues(alpha: 0.4),
-                    blurRadius: 30,
-                    spreadRadius: 5,
-                  ),
-                ]
-              : null,
-        ),
-        child: ClipOval(
-          child: ScaleTransition(
-            scale: _scaleAnimation,
-            child: _buildCollageContent(widget.tracks),
+        // OverflowBox позволяет созвездию визуально выходить за пределы
+        // отведённого диаметра без изменения занимаемого места в layout'е.
+        child: simple
+            ? Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: widget.glowColor != null
+                ? [
+              BoxShadow(
+                color: widget.glowColor!.withValues(alpha: 0.4),
+                blurRadius: 30,
+                spreadRadius: 5,
+              ),
+            ]
+                : null,
           ),
+          child: ClipOval(
+            child: covers.isEmpty
+                ? _emptyState()
+                : AnimatedBuilder(
+              animation: _animCtrl,
+              builder: (context, child) {
+                final breathe = 1.0 +
+                    0.05 *
+                        math.sin(_animCtrl.value * 2 * math.pi);
+                return Transform.scale(
+                    scale: breathe, child: child);
+              },
+              child: _cover(covers[0]),
+            ),
+          ),
+        )
+            : OverflowBox(
+          maxWidth: widget.diameter * 1.6,
+          maxHeight: widget.diameter * 1.6,
+          child: _buildConstellation(covers),
         ),
       ),
     );
+  }
+}
+
+/// Рисует тонкие соединительные линии: от центра к каждому спутнику и между
+/// соседними спутниками — лёгкий эффект "созвездия".
+class _ConstellationPainter extends CustomPainter {
+  _ConstellationPainter({
+    required this.center,
+    required this.satellitePositions,
+    required this.color,
+  });
+
+  final Offset center;
+  final List<Offset> satellitePositions;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (satellitePositions.isEmpty) return;
+
+    final toCenterPaint = Paint()
+      ..color = color.withValues(alpha: 0.35)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+
+    final betweenPaint = Paint()
+      ..color = color.withValues(alpha: 0.18)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    for (final pos in satellitePositions) {
+      canvas.drawLine(center, pos, toCenterPaint);
+    }
+
+    for (var i = 0; i < satellitePositions.length; i++) {
+      final next = satellitePositions[(i + 1) % satellitePositions.length];
+      if (satellitePositions.length > 1) {
+        canvas.drawLine(satellitePositions[i], next, betweenPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConstellationPainter oldDelegate) {
+    return oldDelegate.satellitePositions != satellitePositions ||
+        oldDelegate.center != center ||
+        oldDelegate.color != color;
   }
 }
 
@@ -497,11 +626,11 @@ class PlaylistCard extends ConsumerWidget {
 // ── Create/Rename Playlist Sheet ──────────────────────────────────────────────
 
 Future<void> showCreatePlaylistSheet(
-  BuildContext context,
-  WidgetRef ref, {
-  String? initialName,
-  String? playlistId,
-}) {
+    BuildContext context,
+    WidgetRef ref, {
+      String? initialName,
+      String? playlistId,
+    }) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -556,10 +685,10 @@ class _CreatePlaylistSheetState extends State<_CreatePlaylistSheet> {
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.07),
+              color: Colors.black.withAlpha(200),
               border: Border(
                 top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
               ),
@@ -801,8 +930,8 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       label: 'Слушать',
                       onTap: () {
                         ref.read(playerProvider.notifier).loadPlaylist(
-                              tracks.map((t) => t.toTrackModel()).toList(),
-                            );
+                          tracks.map((t) => t.toTrackModel()).toList(),
+                        );
                         ref.read(playerProvider.notifier).play();
                       },
                     ),
@@ -815,8 +944,8 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       onTap: () {
                         final shuffled = List.of(tracks)..shuffle();
                         ref.read(playerProvider.notifier).loadPlaylist(
-                              shuffled.map((t) => t.toTrackModel()).toList(),
-                            );
+                          shuffled.map((t) => t.toTrackModel()).toList(),
+                        );
                         ref.read(playerProvider.notifier).play();
                       },
                     ),
@@ -866,17 +995,54 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () => setState(() => _isReordering = !_isReordering),
-                    child: GlassCard(
-                      borderRadius: 20,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      child: Text(
-                        _isReordering ? 'Готово' : 'Изменить порядок',
-                        style: const TextStyle(
-                          color: AppColors.neonPurple,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      setState(() => _isReordering = !_isReordering);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        color: _isReordering
+                            ? AppColors.neonPurple.withAlpha(30)
+                            : Colors.white.withAlpha(12),
+                        border: Border.all(
+                          color: _isReordering
+                              ? AppColors.neonPurple.withAlpha(100)
+                              : Colors.white.withAlpha(25),
                         ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isReordering
+                                ? Icons.check_rounded
+                                : Icons.swap_vert_rounded,
+                            color: _isReordering
+                                ? AppColors.neonPurple
+                                : Colors.white60,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _isReordering ? 'Готово' : 'Изменить порядок',
+                            style: TextStyle(
+                              color: _isReordering
+                                  ? AppColors.neonPurple
+                                  : Colors.white60,
+                              fontSize: 12,
+                              fontWeight: _isReordering
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -918,10 +1084,10 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
               onReorder: (oldIndex, newIndex) {
                 ref
                     .read(
-                      playlistTracksNotifierProvider(
-                        widget.playlist.id,
-                      ).notifier,
-                    )
+                  playlistTracksNotifierProvider(
+                    widget.playlist.id,
+                  ).notifier,
+                )
                     .reorder(oldIndex, newIndex);
               },
               itemCount: tracks.length,
@@ -935,10 +1101,10 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   isReordering: _isReordering,
                   onRemove: () => ref
                       .read(
-                        playlistTracksNotifierProvider(
-                          widget.playlist.id,
-                        ).notifier,
-                      )
+                    playlistTracksNotifierProvider(
+                      widget.playlist.id,
+                    ).notifier,
+                  )
                       .remove(tracks[i].id),
                 );
               },
@@ -968,7 +1134,7 @@ class _PlaylistHeroSection extends StatelessWidget {
               _PlaylistCoverCollage(
                 tracks: tracks,
                 diameter: 160,
-                animate: false,
+                animate: true,
                 glowColor: AppColors.neonPurple,
               ),
               const SizedBox(height: 20),
@@ -1165,15 +1331,15 @@ class _ReorderableTrackTile extends ConsumerWidget {
       child: isReordering
           ? content
           : InkWell(
-              onTap: () {
-                final models = allTracks.map((t) => t.toTrackModel()).toList();
-                ref
-                    .read(playerProvider.notifier)
-                    .loadPlaylist(models, initialIndex: index);
-                ref.read(playerProvider.notifier).play();
-              },
-              child: content,
-            ),
+        onTap: () {
+          final models = allTracks.map((t) => t.toTrackModel()).toList();
+          ref
+              .read(playerProvider.notifier)
+              .loadPlaylist(models, initialIndex: index);
+          ref.read(playerProvider.notifier).play();
+        },
+        child: content,
+      ),
     );
   }
 }
@@ -1181,11 +1347,11 @@ class _ReorderableTrackTile extends ConsumerWidget {
 // ── Меню трека внутри плейлиста ───────────────────────────────────────────────
 
 void _showPlaylistTrackOptions(
-  BuildContext context,
-  WidgetRef ref,
-  LibraryTrack track,
-  String playlistId,
-) {
+    BuildContext context,
+    WidgetRef ref,
+    LibraryTrack track,
+    String playlistId,
+    ) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -1214,7 +1380,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
         filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 200),
+            color: Colors.black.withAlpha(200),
             border: Border(
               top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
             ),
@@ -1268,7 +1434,7 @@ class _PlaylistTrackOptionsSheet extends ConsumerWidget {
                     // This updates DB and cache in PlaylistTracksNotifier
                     ref
                         .read(
-                            playlistTracksNotifierProvider(playlistId).notifier)
+                        playlistTracksNotifierProvider(playlistId).notifier)
                         .remove(track.id);
                     // Also invalidate standard cache for cards
                     ref.invalidate(playlistTracksProvider(playlistId));
@@ -1406,68 +1572,68 @@ class _AddTrackToPlaylistSheetState extends ConsumerState<_AddTrackToPlaylistShe
                 Expanded(
                   child: _allTracks == null
                       ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white24,
-                          ),
-                        )
+                    child: CircularProgressIndicator(
+                      color: Colors.white24,
+                    ),
+                  )
                       : _allTracks!.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'Библиотека пуста',
-                                style: TextStyle(color: Colors.white38),
-                              ),
-                            )
-                          : ListView.builder(
-                              itemCount: _allTracks!.length,
-                              itemBuilder: (context, index) {
-                                final track = _allTracks![index];
-                                return ListTile(
-                                  leading: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image(
-                                      image: track.toTrackModel().coverImage,
-                                      width: 40,
-                                      height: 40,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  title: Text(
-                                    track.title,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Text(
-                                    track.artist,
-                                    style: const TextStyle(
-                                      color: Colors.white38,
-                                      fontSize: 12,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(
-                                      Icons.add_circle_outline_rounded,
-                                      color: Colors.white38,
-                                    ),
-                                    onPressed: () {
-                                      ref
-                                          .read(playlistTracksNotifierProvider(
-                                                  widget.playlistId)
-                                              .notifier)
-                                          .add(track.id);
-                                      HapticFeedback.lightImpact();
-                                      // Optional: visually show it's added
-                                    },
-                                  ),
-                                );
-                              },
-                            ),
+                      ? const Center(
+                    child: Text(
+                      'Библиотека пуста',
+                      style: TextStyle(color: Colors.white38),
+                    ),
+                  )
+                      : ListView.builder(
+                    itemCount: _allTracks!.length,
+                    itemBuilder: (context, index) {
+                      final track = _allTracks![index];
+                      return ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image(
+                            image: track.toTrackModel().coverImage,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        title: Text(
+                          track.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          track.artist,
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(
+                            Icons.add_circle_outline_rounded,
+                            color: Colors.white38,
+                          ),
+                          onPressed: () {
+                            ref
+                                .read(playlistTracksNotifierProvider(
+                                widget.playlistId)
+                                .notifier)
+                                .add(track.id);
+                            HapticFeedback.lightImpact();
+                            // Optional: visually show it's added
+                          },
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),

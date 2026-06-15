@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -244,80 +246,95 @@ void _showSortSheet(BuildContext context, WidgetRef ref) {
 
   showModalBottomSheet(
     context: context,
-    backgroundColor: const Color(0xFF13131F),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.5),
     builder: (ctx) {
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 16),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
+      return ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(200),
+              border: Border(
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Сортировка',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 16),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'СОРТИРОВКА',
+                        style: TextStyle(
+                          color: Colors.white38,
+                          fontSize: 13,
+                          letterSpacing: 2,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  _SortOptionTile(
+                    label: 'По дате добавления',
+                    isSelected: currentMode == LibrarySortMode.dateAdded,
+                    accentColor: palette.primary,
+                    onTap: () {
+                      ref.read(librarySortModeProvider.notifier).state =
+                          LibrarySortMode.dateAdded;
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                  _SortOptionTile(
+                    label: 'По названию',
+                    isSelected: currentMode == LibrarySortMode.title,
+                    accentColor: palette.primary,
+                    onTap: () {
+                      ref.read(librarySortModeProvider.notifier).state =
+                          LibrarySortMode.title;
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                  _SortOptionTile(
+                    label: 'По исполнителю',
+                    isSelected: currentMode == LibrarySortMode.artist,
+                    accentColor: palette.primary,
+                    onTap: () {
+                      ref.read(librarySortModeProvider.notifier).state =
+                          LibrarySortMode.artist;
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                  _SortOptionTile(
+                    label: 'По длительности',
+                    isSelected: currentMode == LibrarySortMode.duration,
+                    accentColor: palette.primary,
+                    onTap: () {
+                      ref.read(librarySortModeProvider.notifier).state =
+                          LibrarySortMode.duration;
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
               ),
             ),
-            _SortOptionTile(
-              label: 'По дате добавления',
-              isSelected: currentMode == LibrarySortMode.dateAdded,
-              accentColor: palette.primary,
-              onTap: () {
-                ref.read(librarySortModeProvider.notifier).state =
-                    LibrarySortMode.dateAdded;
-                Navigator.pop(ctx);
-              },
-            ),
-            _SortOptionTile(
-              label: 'По названию',
-              isSelected: currentMode == LibrarySortMode.title,
-              accentColor: palette.primary,
-              onTap: () {
-                ref.read(librarySortModeProvider.notifier).state =
-                    LibrarySortMode.title;
-                Navigator.pop(ctx);
-              },
-            ),
-            _SortOptionTile(
-              label: 'По исполнителю',
-              isSelected: currentMode == LibrarySortMode.artist,
-              accentColor: palette.primary,
-              onTap: () {
-                ref.read(librarySortModeProvider.notifier).state =
-                    LibrarySortMode.artist;
-                Navigator.pop(ctx);
-              },
-            ),
-            _SortOptionTile(
-              label: 'По длительности',
-              isSelected: currentMode == LibrarySortMode.duration,
-              accentColor: palette.primary,
-              onTap: () {
-                ref.read(librarySortModeProvider.notifier).state =
-                    LibrarySortMode.duration;
-                Navigator.pop(ctx);
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
+          ),
         ),
       );
     },
@@ -339,20 +356,30 @@ class _SortOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-      title: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? accentColor : Colors.white70,
-          fontSize: 16,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? accentColor : Colors.white70,
+                  fontSize: 16,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_rounded, color: accentColor, size: 22),
+          ],
         ),
       ),
-      trailing: isSelected
-          ? Icon(Icons.check_rounded, color: accentColor, size: 24)
-          : null,
     );
   }
 }
@@ -424,36 +451,14 @@ class _TrackListState extends ConsumerState<_TrackList> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Кнопка сортировки
-                  GestureDetector(
+                  // Кнопка сортировки — круглая стеклянная с hover-эффектом
+                  _GlassIconButton(
+                    icon: Icons.sort_rounded,
+                    isActive: sortMode != LibrarySortMode.dateAdded,
+                    activeColor: palette.primary,
                     onTap: () => _showSortSheet(context, ref),
-                    child: GlassCard(
-                      borderRadius: 20,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.sort_rounded,
-                            size: 16,
-                            color: sortMode != LibrarySortMode.dateAdded
-                                ? palette.primary
-                                : Colors.white54,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Сортировка',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: sortMode != LibrarySortMode.dateAdded
-                                  ? palette.primary
-                                  : Colors.white54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
+                  const SizedBox(width: 8),
                   // Кнопка импорта
                   GestureDetector(
                     onTap: () => showImporterSheet(context),
@@ -889,6 +894,77 @@ class _FavoriteTile extends ConsumerWidget {
               onPressed: () => showTrackContextMenu(context, ref, track),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Круглая стеклянная кнопка-иконка (с hover-эффектом) ─────────────────────
+
+class _GlassIconButton extends StatefulWidget {
+  const _GlassIconButton({
+    required this.icon,
+    required this.onTap,
+    this.isActive = false,
+    this.activeColor,
+    this.size = 38,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isActive;
+  final Color? activeColor;
+  final double size;
+
+  @override
+  State<_GlassIconButton> createState() => _GlassIconButtonState();
+}
+
+class _GlassIconButtonState extends State<_GlassIconButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = widget.activeColor ?? Colors.white;
+    final iconColor = widget.isActive ? accent : Colors.white70;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          widget.onTap();
+        },
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              width: widget.size,
+              height: widget.size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: widget.isActive
+                    ? accent.withAlpha(_isHovered ? 45 : 30)
+                    : Colors.white.withAlpha(_isHovered ? 26 : 15),
+                border: Border.all(
+                  color: widget.isActive
+                      ? accent.withAlpha(_isHovered ? 130 : 100)
+                      : Colors.white.withAlpha(_isHovered ? 55 : 30),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                widget.icon,
+                color: iconColor,
+                size: widget.size * 0.45,
+              ),
+            ),
+          ),
         ),
       ),
     );

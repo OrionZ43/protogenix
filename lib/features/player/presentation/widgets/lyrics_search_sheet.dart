@@ -144,147 +144,174 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.of(context).viewInsets;
+    final maxHeight = MediaQuery.of(context).size.height * 0.88;
+    final hasContent = _error != null || _results.isNotEmpty || _isSearching;
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
         child: Container(
-          height: MediaQuery.of(context).size.height * 0.88,
+          constraints: BoxConstraints(maxHeight: maxHeight),
           decoration: BoxDecoration(
             color: Colors.black.withAlpha(200),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             border: Border.all(color: Colors.white.withAlpha(30)),
           ),
-          child: Column(
-            children: [
-              // Ручка (Drag handle)
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Ручка (Drag handle)
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Найти текст вручную',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Найти текст вручную',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Введи название и артиста, чтобы найти нужный текст',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        fontSize: 13,
+                      const SizedBox(height: 4),
+                      Text(
+                        'Введи название и артиста, чтобы найти нужный текст',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 13,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    _SearchField(
-                      controller: _titleCtrl,
-                      hint: 'Название песни',
-                      icon: Icons.music_note_rounded,
-                      onSubmitted: (_) => _search(),
-                    ),
-                    const SizedBox(height: 10),
-                    _SearchField(
-                      controller: _artistCtrl,
-                      hint: 'Артист',
-                      icon: Icons.person_rounded,
-                      onSubmitted: (_) => _search(),
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _isSearching ? null : _search,
-                        icon: _isSearching
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
+                      _SearchField(
+                        controller: _titleCtrl,
+                        hint: 'Название песни',
+                        icon: Icons.music_note_rounded,
+                        onSubmitted: (_) => _search(),
+                      ),
+                      const SizedBox(height: 10),
+                      _SearchField(
+                        controller: _artistCtrl,
+                        hint: 'Артист',
+                        icon: Icons.person_rounded,
+                        onSubmitted: (_) => _search(),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSearching ? null : _search,
+                          icon: _isSearching
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.search_rounded),
+                          label: Text(_isSearching ? 'Ищу...' : 'Найти'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF7B5EA7),
+                            foregroundColor: Colors.white,
+                            padding:
+                                const Duration(milliseconds: 300) > Duration.zero
+                                    ? const EdgeInsets.symmetric(vertical: 14)
+                                    : EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Результаты выезжают плавно: пока поиска не было — место не
+                // занимается, шторка остаётся компактной.
+                if (hasContent)
+                  Flexible(
+                    child: _error != null
+                        ? Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+                            child: Center(
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        : _isSearching && _results.isEmpty
+                            ? const Padding(
+                                padding: EdgeInsets.fromLTRB(24, 24, 24, 40),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white24,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
                                 ),
                               )
-                            : const Icon(Icons.search_rounded),
-                        label: Text(_isSearching ? 'Ищу...' : 'Найти'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF7B5EA7),
-                          foregroundColor: Colors.white,
-                          padding:
-                              const Duration(milliseconds: 300) > Duration.zero
-                                  ? const EdgeInsets.symmetric(vertical: 14)
-                                  : EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                            : ListView.separated(
+                                shrinkWrap: true,
+                                padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+                                itemCount: _results.length,
+                                separatorBuilder: (_, __) =>
+                                    Divider(color: Colors.white.withAlpha(12)),
+                                itemBuilder: (context, i) {
+                                  final scored = _results[i];
+                                  return _LyricResultTile(
+                                    scored: scored,
+                                    onTap: () => _apply(scored),
+                                  ).animate().fadeIn(
+                                        duration: 200.ms,
+                                        delay: (i * 40).ms,
+                                      );
+                                },
+                              ),
+                  ),
 
-              const SizedBox(height: 8),
-
-              Expanded(
-                child: _error != null
-                    ? Center(
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : _results.isEmpty && !_isSearching
-                        ? const SizedBox.shrink()
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
-                            itemCount: _results.length,
-                            separatorBuilder: (_, __) =>
-                                Divider(color: Colors.white.withAlpha(12)),
-                            itemBuilder: (context, i) {
-                              final scored = _results[i];
-                              return _LyricResultTile(
-                                scored: scored,
-                                onTap: () => _apply(scored),
-                              ).animate().fadeIn(
-                                    duration: 200.ms,
-                                    delay: (i * 40).ms,
-                                  );
-                            },
-                          ),
-              ),
-
-              SizedBox(height: viewInsets.bottom),
-            ],
+                SizedBox(height: viewInsets.bottom + (hasContent ? 0 : 24)),
+              ],
+            ),
           ),
         ),
       ),
