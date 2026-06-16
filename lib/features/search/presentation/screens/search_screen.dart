@@ -382,8 +382,7 @@ class _PlayButtonState extends ConsumerState<_PlayButton> {
     setState(() => _isLoading = true);
 
     try {
-      // Гарантируем наличие рабочего инстанса до первого воспроизведения
-      await InvidiousProxyService.instance.findWorkingInstance();
+      // InvidiousProxyService использует последовательный перебор автоматически
 
       final tempTrack = TrackModel(
         id: widget.track.id, // YouTube video ID — toAudioSource использует его

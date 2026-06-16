@@ -363,15 +363,11 @@ class ImporterService {
         progress: 0.15,
       ));
 
-      // Гарантируем рабочий инстанс
-      final inst = await InvidiousProxyService.instance.findWorkingInstance();
-      if (inst == null) throw Exception('Invidious недоступен');
-
-      final streamUrl =
-          await InvidiousProxyService.instance.getProxiedStreamUrl(videoId);
-      if (streamUrl == null) {
+      final proxiedStreamUrl = await InvidiousProxyService.instance.getProxiedStreamUrl(videoId);
+      if (proxiedStreamUrl == null) {
         throw Exception('Не удалось получить аудио-поток через Invidious proxy');
       }
+      final streamUrl = proxiedStreamUrl;
 
       final savePath = await _getTrackPath('$videoId.m4a');
 
@@ -442,10 +438,11 @@ class ImporterService {
     ));
 
     // Аудио через Invidious stream URL
-    final streamUrl = await InvidiousProxyService.instance.getProxiedStreamUrl(videoId);
-    if (streamUrl == null) {
+    final proxiedStreamUrl = await InvidiousProxyService.instance.getProxiedStreamUrl(videoId);
+    if (proxiedStreamUrl == null) {
       throw Exception('Не удалось получить аудио-поток через Invidious proxy');
     }
+    final streamUrl = proxiedStreamUrl;
 
     final savePath = await _getTrackPath('$videoId.m4a');
 

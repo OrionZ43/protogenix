@@ -91,8 +91,13 @@ class TrackModel {
       final yt = YoutubeExplode();
       try {
         final manifest = await yt.videos.streamsClient.getManifest(id);
-        final streamInfo = manifest.audioOnly.withHighestBitrate();
-        final url = streamInfo.url.toString();
+
+        // Берем лучший audio/mp4 поток, чтобы избежать проблем с кодеками (например на iOS)
+        final audioStreams = manifest.audioOnly.where((s) => s.container.name == 'mp4').toList();
+        if (audioStreams.isEmpty) throw Exception('No mp4 audio streams found');
+
+        audioStreams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+        final url = audioStreams.first.url.toString();
 
         // 2. Делаем быстрый HEAD-запрос для проверки доступности
         final dio = Dio(BaseOptions(
@@ -130,14 +135,12 @@ class TrackModel {
 
   Future<LockCachingAudioSource> _buildInvidiousSource() async {
     final streamUrlStr = await InvidiousProxyService.instance.getProxiedStreamUrl(id);
-    if (streamUrlStr == null) {
-      throw Exception('Не удалось получить проксированный URL');
-    }
+    final finalUrl = streamUrlStr ?? 'https://invidious.io.lol/latest_version?id=$id&itag=140&local=true';
 
     final cacheFile = await _cacheFile('$id.m4a');
 
     return LockCachingAudioSource(
-      Uri.parse(streamUrlStr),
+      Uri.parse(finalUrl),
       headers: const {
         'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
