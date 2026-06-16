@@ -122,40 +122,45 @@ class InvidiousProxyService {
         final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
 
         if (resp.statusCode == 200) {
-          _setWorkingInstance(inst);
+          try {
+            final meta = jsonDecode(resp.body) as Map<String, dynamic>;
+            _setWorkingInstance(inst);
 
-          final meta = jsonDecode(resp.body) as Map<String, dynamic>;
-          if (meta['adaptiveFormats'] != null) {
-            final List<dynamic> formats = meta['adaptiveFormats'];
+            if (meta['adaptiveFormats'] != null) {
+              final List<dynamic> formats = meta['adaptiveFormats'];
 
-            // Фильтруем только аудио-потоки
-            final audioFormats = formats.where((f) {
-              final type = f['type'] as String? ?? '';
-              final container = f['container'] as String? ?? '';
-              return type.contains('audio/mp4') || container == 'm4a';
-            }).toList();
+              // Фильтруем только аудио-потоки
+              final audioFormats = formats.where((f) {
+                final type = f['type'] as String? ?? '';
+                final container = f['container'] as String? ?? '';
+                return type.contains('audio/mp4') || container == 'm4a';
+              }).toList();
 
-            if (audioFormats.isNotEmpty) {
-              // Сортируем по битрейту (лучшее качество первым)
-              audioFormats.sort((a, b) {
-                final bitA = int.tryParse(a['bitrate']?.toString() ?? '0') ?? 0;
-                final bitB = int.tryParse(b['bitrate']?.toString() ?? '0') ?? 0;
-                return bitB.compareTo(bitA);
-              });
+              if (audioFormats.isNotEmpty) {
+                // Сортируем по битрейту (лучшее качество первым)
+                audioFormats.sort((a, b) {
+                  final bitA = int.tryParse(a['bitrate']?.toString() ?? '0') ?? 0;
+                  final bitB = int.tryParse(b['bitrate']?.toString() ?? '0') ?? 0;
+                  return bitB.compareTo(bitA);
+                });
 
-              final bestFormat = audioFormats.first;
-              final streamUrlStr = bestFormat['url'] as String?;
+                final bestFormat = audioFormats.first;
+                final streamUrlStr = bestFormat['url'] as String?;
 
-              if (streamUrlStr != null && streamUrlStr.isNotEmpty) {
-                final streamUri = Uri.parse(streamUrlStr);
-                // Формируем True Proxy URL
-                return 'https://$inst/videoplayback?${streamUri.query}&local=true';
+                if (streamUrlStr != null && streamUrlStr.isNotEmpty) {
+                  final streamUri = Uri.parse(streamUrlStr);
+                  // Формируем True Proxy URL
+                  return 'https://$inst/videoplayback?${streamUri.query}&local=true';
+                }
               }
             }
-          }
 
-          // Фолбэк, если API не вернул форматов (или ошибка парсинга)
-          return 'https://$inst/latest_version?id=$videoId&itag=140&local=true';
+            // Фолбэк, если API не вернул форматов (или ошибка парсинга)
+            return 'https://$inst/latest_version?id=$videoId&itag=140&local=true';
+          } catch (e) {
+            debugPrint('[Invidious] getProxiedStreamUrl jsonDecode error on $inst: $e');
+            continue;
+          }
         }
       } catch (e) {
         debugPrint('[Invidious] getProxiedStreamUrl (инстанс $inst) ошибка: $e');
@@ -176,14 +181,19 @@ class InvidiousProxyService {
         final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 12));
 
         if (resp.statusCode == 200) {
-          _setWorkingInstance(inst);
-          final List<dynamic> data = jsonDecode(resp.body);
-          return data
-              .where((r) => r['type'] == 'video')
-              .take(20)
-              .map((r) => InvidiousSearchResult.fromJson(r as Map<String, dynamic>))
-              .where((r) => r.videoId.isNotEmpty)
-              .toList();
+          try {
+            final List<dynamic> data = jsonDecode(resp.body);
+            _setWorkingInstance(inst);
+            return data
+                .where((r) => r['type'] == 'video')
+                .take(20)
+                .map((r) => InvidiousSearchResult.fromJson(r as Map<String, dynamic>))
+                .where((r) => r.videoId.isNotEmpty)
+                .toList();
+          } catch (e) {
+            debugPrint('[Invidious] searchVideos jsonDecode error on $inst: $e');
+            continue;
+          }
         }
       } catch (e) {
         debugPrint('[Invidious] searchVideos (инстанс $inst) ошибка: $e');
@@ -201,8 +211,14 @@ class InvidiousProxyService {
         final uri = Uri.parse('https://$inst/api/v1/videos/$videoId');
         final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
         if (resp.statusCode == 200) {
-          _setWorkingInstance(inst);
-          return jsonDecode(resp.body) as Map<String, dynamic>;
+          try {
+            final meta = jsonDecode(resp.body) as Map<String, dynamic>;
+            _setWorkingInstance(inst);
+            return meta;
+          } catch (e) {
+            debugPrint('[Invidious] getVideoInfo jsonDecode error on $inst: $e');
+            continue;
+          }
         }
       } catch (e) {
         debugPrint('[Invidious] getVideoInfo (инстанс $inst) ошибка: $e');
