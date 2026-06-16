@@ -342,10 +342,11 @@ class _SearchResultCard extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 10),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       _PlayButton(track: track, cleanTitle: title),
-                      const SizedBox(width: 8),
                       _ImportButton(track: track),
                     ],
                   ),

@@ -59,7 +59,18 @@ class TrackModel {
       if (isYtVideoId) {
         return _tryDirectOrInvidious();
       }
-      // Прямая ссылка (MP3, FLAC и т.д.) — скачиваем с кэшированием
+      // Прямая ссылка (MP3, FLAC и т.д.)
+      final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+      if (isDesktop) {
+        return AudioSource.uri(
+          Uri.parse(path),
+          headers: const {
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+        );
+      }
+      // Скачиваем с кэшированием на мобилках
       final cacheFile = await _cacheFile('${id.hashCode}.m4a');
       return LockCachingAudioSource(
         Uri.parse(path),
@@ -110,6 +121,17 @@ class TrackModel {
 
         if (response.statusCode != null && response.statusCode! >= 200 && response.statusCode! < 300) {
           // Успешно подключились, используем прямой URL
+          final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+          if (isDesktop) {
+            return AudioSource.uri(
+              Uri.parse(url),
+              headers: const {
+                'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              },
+            );
+          }
+
           final cacheFile = await _cacheFile('$id.m4a');
           return LockCachingAudioSource(
             Uri.parse(url),
@@ -131,11 +153,25 @@ class TrackModel {
     }
   }
 
-  // ── Построение Invidious LockCachingAudioSource ───────────────────────────
+  // ── Построение Invidious AudioSource ──────────────────────────────────────
 
-  Future<LockCachingAudioSource> _buildInvidiousSource() async {
+  Future<AudioSource> _buildInvidiousSource() async {
     final streamUrlStr = await InvidiousProxyService.instance.getProxiedStreamUrl(id);
     final finalUrl = streamUrlStr ?? 'https://invidious.io.lol/latest_version?id=$id&itag=140&local=true';
+
+    final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    if (isDesktop) {
+      return AudioSource.uri(
+        Uri.parse(finalUrl),
+        headers: const {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://www.youtube.com/',
+          'Origin': 'https://www.youtube.com/',
+        },
+      );
+    }
 
     final cacheFile = await _cacheFile('$id.m4a');
 
