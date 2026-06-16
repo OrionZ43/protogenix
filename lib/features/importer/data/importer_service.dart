@@ -1,4 +1,29 @@
+// lib/features/importer/data/importer_service.dart
+//
+// Импорт музыки с автоматическим Invidious-фолбэком.
+//
+// Стратегия фолбэка:
+//  _importYouTube:
+//    1. Пробуем стандартный путь через YoutubeExplode
+//    2. При ЛЮБОЙ ошибке → _importYouTubeViaInvidious
+//
+//  _downloadYouTubeVideo (вызывается из Spotify/Yandex):
+//    1. Пробуем все клиенты youtube_explode (_clientFallbackOrder)
+//    2. Если все провалились → _downloadViaInvidious (уже есть Video-объект
+//       с метаданными, нужен только аудио-поток)
+//
+//  _importSpotify / _importYandexMusic:
+//    1. Поиск через yt.search.search()
+//    2. При сетевой ошибке поиска → InvidiousProxyService.searchVideos()
+//    3. Скачивание через _downloadYouTubeVideo (с встроенным Invidious-фолбэком)
+//       или напрямую через _importYouTubeViaInvidious
+//
+//  Фразы «слом 4-й стены» появляются в progress.message каждый раз,
+//  когда активируется прокси-путь.
+
 import 'dart:io';
+import 'dart:async';
+import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -8,15 +33,11 @@ import '../../library/data/library_database.dart';
 import '../../library/data/playlist_database.dart';
 import '../../library/data/lyrics_service.dart';
 import '../../library/domain/library_track.dart';
+import '../../../core/services/invidious_proxy_service.dart';
 
-enum ImportStatus {
-  idle,
-  fetchingMeta,
-  downloading,
-  fetchingLyrics,
-  done,
-  error
-}
+// ── Модели прогресса ──────────────────────────────────────────────────────────
+
+enum ImportStatus { idle, fetchingMeta, downloading, fetchingLyrics, done, error }
 
 class ImportProgress {
   final ImportStatus status;
@@ -34,6 +55,8 @@ class ImportProgress {
   static const idle = ImportProgress(status: ImportStatus.idle, message: '');
 }
 
+// ── ImporterService ───────────────────────────────────────────────────────────
+
 class ImporterService {
   ImporterService._();
   static final ImporterService instance = ImporterService._();
@@ -41,13 +64,14 @@ class ImporterService {
   final _dio = Dio();
 
   // Порядок клиентов: от наиболее стабильных к запасным.
-  // androidVr и ios дают незащищённые (non-throttled) потоки чаще всего.
   static final _clientFallbackOrder = [
     YoutubeApiClient.androidVr,
     YoutubeApiClient.ios,
     YoutubeApiClient.android,
     YoutubeApiClient.mweb,
   ];
+
+  // ── Точка входа ───────────────────────────────────────────────────────────
 
   Future<void> importFromUrl({
     required String url,
@@ -91,7 +115,7 @@ class ImporterService {
     }
   }
 
-  // ── YouTube ──────────────────────────────────────────────────────────────
+  // ── YouTube ───────────────────────────────────────────────────────────────
 
   Future<void> _importYouTube({
     required String url,
@@ -103,17 +127,18 @@ class ImporterService {
       progress: 0.03,
     ));
 
-    // Создаём ОДИН экземпляр на всю операцию. URL и скачивание — один клиент.
+    bool directSucceeded = false;
     final yt = YoutubeExplode();
 
     try {
-      final video = await yt.videos.get(url);
+      final video =
+          await yt.videos.get(url).timeout(const Duration(seconds: 10));
       final title = _cleanYouTubeTitle(video.title);
 
       onProgress(ImportProgress(
         status: ImportStatus.fetchingMeta,
         message: 'Найдено: $title',
-        progress: 0.1,
+        progress: 0.10,
       ));
 
       await _downloadYouTubeVideo(
@@ -129,22 +154,46 @@ class ImporterService {
         message: '✓ "$title" добавлен!',
         progress: 1.0,
       ));
+      directSucceeded = true;
     } catch (e) {
-      debugPrint('Ошибка скачивания YouTube: $e');
+      debugPrint('[YT] Прямой импорт недоступен ($e) → Invidious');
+    } finally {
+      yt.close();
+    }
+
+    if (directSucceeded) return;
+
+    // ── Фолбэк: Invidious ─────────────────────────────────────────────────
+    final videoId = _extractYouTubeId(url);
+    if (videoId == null) {
       onProgress(const ImportProgress(
         status: ImportStatus.error,
-        message: 'Ошибка скачивания YouTube',
-        error: 'Не удалось загрузить трек с YouTube',
+        message: 'Не удалось извлечь ID видео из URL',
+        error: 'Некорректный YouTube URL',
       ));
-    } finally {
-      // Всегда закрываем — освобождает HTTP-сессию и предотвращает утечки
-      yt.close();
+      return;
+    }
+
+    try {
+      await _importYouTubeViaInvidious(
+        videoId: videoId,
+        titleOverride: null,
+        artistOverride: null,
+        albumName: 'YouTube',
+        onProgress: onProgress,
+      );
+    } catch (e) {
+      debugPrint('[Invidious] Также недоступен: $e');
+      onProgress(ImportProgress(
+        status: ImportStatus.error,
+        message: 'YouTube заблокирован, Invidious тоже недоступен',
+        error: e.toString(),
+      ));
     }
   }
 
-  /// Пытается скачать с конкретным клиентом.
-  /// Бросает [_DownloadThrottledException] если поток завис.
-  /// Бросает [_NoStreamsException] если клиент не дал аудио-потоков.
+  // ── Скачивание через YouTube (с Invidious-фолбэком после всех клиентов) ───
+
   Future<String> _downloadYouTubeVideo({
     required YoutubeExplode yt,
     required Video video,
@@ -154,42 +203,50 @@ class ImporterService {
     String? artistOverride,
   }) async {
     final id = video.id.value;
-
-    // Пробуем клиентов по очереди до первого успешного скачивания
     bool downloaded = false;
     String? savePath;
     Exception? lastError;
 
+    // Перебираем клиентов YouTube
     for (final client in _clientFallbackOrder) {
-      debugPrint('[YT] Пробуем клиент: $client');
+      debugPrint('[YT] Клиент: $client');
       try {
         savePath = await _tryDownloadWithClient(
           yt: yt,
           videoId: id,
           client: client,
-          onProgress: (p, msg) => onProgress(ImportProgress(
+          onProgress: (prog, msg) => onProgress(ImportProgress(
             status: ImportStatus.downloading,
             message: msg,
-            progress: p,
+            progress: prog,
           )),
         );
         downloaded = true;
-        debugPrint('[YT] Успех с клиентом: $client');
+        debugPrint('[YT] Успех: $client');
         break;
       } on _DownloadThrottledException catch (e) {
-        debugPrint('[YT] Клиент $client завис (throttled): $e');
+        debugPrint('[YT] Throttled ($client): $e');
         lastError = e;
       } on _NoStreamsException catch (e) {
-        debugPrint('[YT] Клиент $client не вернул потоки: $e');
+        debugPrint('[YT] No streams ($client): $e');
         lastError = e;
       } catch (e) {
-        debugPrint('[YT] Клиент $client — ошибка: $e');
-        lastError = Exception('Ошибка загрузки через клиент $client');
+        debugPrint('[YT] Ошибка ($client): $e');
+        lastError = Exception('Ошибка клиента $client');
+      }
+    }
+
+    // Если все клиенты провалились — скачиваем через Invidious
+    if (!downloaded) {
+      debugPrint('[YT] Все клиенты исчерпаны → Invidious download');
+      savePath = await _downloadViaInvidious(id, onProgress);
+      if (savePath != null) {
+        downloaded = true;
       }
     }
 
     if (!downloaded || savePath == null) {
-      throw lastError ?? Exception('Все клиенты YouTube исчерпаны');
+      throw lastError ?? Exception('Не удалось загрузить аудио');
     }
 
     onProgress(const ImportProgress(
@@ -231,37 +288,31 @@ class ImporterService {
           b.bitrate.kiloBitsPerSecond.compareTo(a.bitrate.kiloBitsPerSecond));
 
     if (audioStreams.isEmpty) {
-      throw _NoStreamsException('Клиент $client не вернул аудио-потоков');
+      throw _NoStreamsException('$client: нет аудио-потоков');
     }
 
     final streamInfo = audioStreams.first;
-    final ext = streamInfo.container.name; // обычно 'mp4' или 'webm'
+    final ext = streamInfo.container.name;
     final savePath = await _getTrackPath('$videoId.$ext');
     final totalBytes = streamInfo.size.totalBytes;
 
     debugPrint(
-        '[YT] Поток: ${streamInfo.bitrate}, размер: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB');
+        '[YT] Поток: ${streamInfo.bitrate}, '
+        'размер: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB');
 
     final file = File(savePath);
     if (await file.exists()) await file.delete();
     final sink = file.openWrite();
 
     try {
-      // Используем pipe() через внутренний http-клиент библиотеки.
-      // Это единственный способ не получить 403 — URL подписан под этот же экземпляр yt.
       final audioStream = yt.videos.streamsClient.get(streamInfo);
-
       int downloaded = 0;
       int lastLogPercent = -1;
 
-      // Таймаут-детектор: если за N секунд не пришло ни байта — считаем throttled
       const stallTimeout = Duration(seconds: 15);
       await for (final chunk in audioStream.timeout(
         stallTimeout,
-        onTimeout: (sink) {
-          // Закрываем стрим-контроллер, что бросит TimeoutException наверх
-          sink.close();
-        },
+        onTimeout: (sink) => sink.close(),
       )) {
         sink.add(chunk);
         downloaded += chunk.length;
@@ -277,21 +328,17 @@ class ImporterService {
         }
       }
 
-      // Проверяем: скачали хотя бы 95% (мелкие погрешности totalBytes допустимы)
       if (downloaded < totalBytes * 0.95) {
         throw _DownloadThrottledException(
-          'Поток оборвался: $downloaded / $totalBytes байт',
-        );
+            'Поток оборвался: $downloaded / $totalBytes байт');
       }
 
       return savePath;
     } on _DownloadThrottledException {
-      // Удаляем неполный файл перед следующей попыткой
       if (await file.exists()) await file.delete();
       rethrow;
     } catch (e) {
       if (await file.exists()) await file.delete();
-      // Таймаут стрима — это наш throttle-сигнал
       if (e.toString().contains('TimeoutException') ||
           e.toString().contains('timeout')) {
         throw _DownloadThrottledException('Таймаут потока: $e');
@@ -303,15 +350,151 @@ class ImporterService {
     }
   }
 
-  String _cleanYouTubeTitle(String title) {
-    return title
-        .replaceAll(RegExp(r'\(Official.*?\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\[.*?\]'), '')
-        .replaceAll(RegExp(r'\(Lyrics.*?\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\(Audio.*?\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\(HD.*?\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\s{2,}'), ' ')
-        .trim();
+  // ── Скачивание через Invidious (аудио-поток) ──────────────────────────────
+
+  Future<String?> _downloadViaInvidious(
+    String videoId,
+    void Function(ImportProgress) onProgress,
+  ) async {
+    try {
+      onProgress(ImportProgress(
+        status: ImportStatus.downloading,
+        message: InvidiousProxyService.randomPhrase(),
+        progress: 0.15,
+      ));
+
+      // Гарантируем рабочий инстанс
+      final inst = await InvidiousProxyService.instance.findWorkingInstance();
+      if (inst == null) throw Exception('Invidious недоступен');
+
+      final streamUrl =
+          InvidiousProxyService.instance.buildStreamUrl(videoId);
+      final savePath = await _getTrackPath('$videoId.m4a');
+
+      await _dio.download(
+        streamUrl,
+        savePath,
+        options: Options(headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        }),
+        onReceiveProgress: (received, total) {
+          if (total > 0) {
+            final pct = (received / total * 100).round();
+            final mb = (received / 1024 / 1024).toStringAsFixed(1);
+            final totalMb = (total / 1024 / 1024).toStringAsFixed(1);
+            onProgress(ImportProgress(
+              status: ImportStatus.downloading,
+              message: '⚡ Прокси: $pct% ($mb / $totalMb MB)',
+              progress: 0.15 + (received / total) * 0.75,
+            ));
+          } else {
+            onProgress(const ImportProgress(
+              status: ImportStatus.downloading,
+              message: '⚡ Загружается через прокси...',
+              progress: 0.50,
+            ));
+          }
+        },
+      );
+
+      return savePath;
+    } catch (e) {
+      debugPrint('[Invidious] download failed: $e');
+      return null;
+    }
+  }
+
+  // ── Импорт через Invidious (метаданные + аудио + обложка) ────────────────
+
+  Future<void> _importYouTubeViaInvidious({
+    required String videoId,
+    required String? titleOverride,
+    required String? artistOverride,
+    required String albumName,
+    required void Function(ImportProgress) onProgress,
+  }) async {
+    onProgress(ImportProgress(
+      status: ImportStatus.fetchingMeta,
+      message: InvidiousProxyService.randomPhrase(),
+      progress: 0.05,
+    ));
+
+    final meta = await InvidiousProxyService.instance.getVideoInfo(videoId);
+    if (meta == null) {
+      throw Exception('Invidious: не удалось получить метаданные $videoId');
+    }
+
+    final title =
+        titleOverride ?? _cleanYouTubeTitle(meta['title'] as String? ?? 'Unknown');
+    final artist =
+        artistOverride ?? (meta['author'] as String? ?? 'Unknown');
+    final durationSec = meta['lengthSeconds'] as int? ?? 0;
+
+    onProgress(ImportProgress(
+      status: ImportStatus.fetchingMeta,
+      message: '⚡ Подключено через прокси: $title',
+      progress: 0.12,
+    ));
+
+    // Аудио через Invidious stream URL
+    final streamUrl = InvidiousProxyService.instance.buildStreamUrl(videoId);
+    final savePath = await _getTrackPath('$videoId.m4a');
+
+    await _dio.download(
+      streamUrl,
+      savePath,
+      options: Options(headers: {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      }),
+      onReceiveProgress: (received, total) {
+        if (total > 0) {
+          final pct = (received / total * 100).round();
+          final mb = (received / 1024 / 1024).toStringAsFixed(1);
+          final totalMb = (total / 1024 / 1024).toStringAsFixed(1);
+          onProgress(ImportProgress(
+            status: ImportStatus.downloading,
+            message: '⚡ Прокси: $pct% ($mb / $totalMb MB)',
+            progress: 0.15 + (received / total) * 0.75,
+          ));
+        } else {
+          onProgress(const ImportProgress(
+            status: ImportStatus.downloading,
+            message: '⚡ Загружается через прокси...',
+            progress: 0.50,
+          ));
+        }
+      },
+    );
+
+    // Обложка через миниатюры Invidious
+    final thumbnails = meta['videoThumbnails'] as List? ?? [];
+    String? coverUrl;
+    if (thumbnails.isNotEmpty) {
+      coverUrl = (thumbnails.first['url'] as String?)
+          ?.replaceFirst('http://', 'https://');
+    }
+    final coverPath =
+        coverUrl != null ? await _downloadCover(coverUrl, videoId) : null;
+
+    await LibraryDatabase.instance.insertTrack(LibraryTrack(
+      id: videoId,
+      title: title,
+      artist: artist,
+      album: albumName,
+      filePath: savePath,
+      coverPath: coverPath,
+      durationMs: durationSec * 1000,
+      source: 'youtube',
+      addedAt: DateTime.now(),
+    ));
+
+    onProgress(ImportProgress(
+      status: ImportStatus.done,
+      message: '✓ "$title" добавлен через прокси!',
+      progress: 1.0,
+    ));
   }
 
   // ── Spotify ───────────────────────────────────────────────────────────────
@@ -323,7 +506,7 @@ class ImporterService {
     onProgress(const ImportProgress(
       status: ImportStatus.fetchingMeta,
       message: 'Получение данных со Spotify...',
-      progress: 0.1,
+      progress: 0.10,
     ));
 
     try {
@@ -340,12 +523,10 @@ class ImporterService {
       }
 
       final html = response.data.toString();
-
-      final titleRegex = RegExp(r'<meta property="og:title" content="([^"]+)"');
-      final descRegex = RegExp(r'<meta name="description" content="([^"]+)"');
-
-      final titleMatch = titleRegex.firstMatch(html);
-      final descMatch = descRegex.firstMatch(html);
+      final titleMatch =
+          RegExp(r'<meta property="og:title" content="([^"]+)"').firstMatch(html);
+      final descMatch =
+          RegExp(r'<meta name="description" content="([^"]+)"').firstMatch(html);
 
       if (titleMatch == null || descMatch == null) {
         throw Exception('Не удалось извлечь метаданные Spotify');
@@ -353,78 +534,116 @@ class ImporterService {
 
       final pageTitle = titleMatch.group(1)!;
       final pageDesc = descMatch.group(1)!;
-
       String trackTitle = pageTitle;
       String artist = 'Unknown Artist';
 
-      // Если это трек, описание обычно выглядит так: "Listen to [Title] on Spotify. Song · [Artist] · [Year]"
       if (pageDesc.contains('Song ·')) {
         final parts = pageDesc.split('·');
-        if (parts.length >= 2) {
-          artist = parts[1].trim();
-        }
-      } else if (pageDesc.contains('Playlist ·')) {
-        throw Exception(
-            'Поддерживается только импорт одиночных треков Spotify');
-      } else if (pageDesc.contains('Album ·')) {
-        throw Exception(
-            'Поддерживается только импорт одиночных треков Spotify');
+        if (parts.length >= 2) artist = parts[1].trim();
+      } else if (pageDesc.contains('Playlist ·') ||
+          pageDesc.contains('Album ·')) {
+        throw Exception('Поддерживается только импорт одиночных треков Spotify');
       }
 
-      final query = "$artist - $trackTitle";
+      final query = '$artist - $trackTitle';
 
       onProgress(ImportProgress(
         status: ImportStatus.fetchingMeta,
         message: 'Поиск: $query',
-        progress: 0.3,
+        progress: 0.30,
       ));
 
       final yt = YoutubeExplode();
       try {
-        final searchResults = await yt.search.search(query);
-        if (searchResults.isEmpty) {
-          throw Exception('Трек не найден на YouTube');
+        Video? selectedVideo;
+        bool usingInvidious = false;
+        String? invidiousVideoId;
+
+        // ── Поиск на YouTube ────────────────────────────────────────────
+        try {
+          final results = await yt.search
+              .search(query)
+              .timeout(const Duration(seconds: 8));
+
+          if (results.isEmpty) throw Exception('Не найдено на YouTube');
+
+          selectedVideo = results.first;
+          final maxLen = results.length.clamp(0, 10);
+          for (int j = 0; j < maxLen; j++) {
+            final v = results.elementAt(j);
+            if (v.author.toLowerCase().contains('topic') ||
+                v.author.toLowerCase().contains('vevo') ||
+                v.title.toLowerCase().contains('(official audio)')) {
+              selectedVideo = v;
+              break;
+            }
+          }
+        } catch (e) {
+          debugPrint('[Spotify] YouTube Search недоступен → Invidious: $e');
+          usingInvidious = true;
+          onProgress(ImportProgress(
+            status: ImportStatus.fetchingMeta,
+            message: InvidiousProxyService.randomPhrase(),
+            progress: 0.35,
+          ));
+          final invRes =
+              await InvidiousProxyService.instance.searchVideos(query);
+          if (invRes.isEmpty) throw Exception('Трек не найден: $query');
+          invidiousVideoId = invRes.first.videoId;
         }
 
-        var video = searchResults.first;
-        final maxResults =
-            searchResults.length > 10 ? 10 : searchResults.length;
-        for (int j = 0; j < maxResults; j++) {
-          final v = searchResults.elementAt(j);
-          final authorLow = v.author.toLowerCase();
-          final titleLow = v.title.toLowerCase();
-
-          if (authorLow.contains('topic') ||
-              authorLow.contains('vevo') ||
-              titleLow.contains('(official audio)')) {
-            video = v;
-            debugPrint(
-                '[Spotify] Выбрано приоритетное аудио: ${v.title} (${v.author})');
-            break;
+        // ── Скачивание ──────────────────────────────────────────────────
+        if (usingInvidious) {
+          await _importYouTubeViaInvidious(
+            videoId: invidiousVideoId!,
+            titleOverride: trackTitle,
+            artistOverride: artist,
+            albumName: 'Spotify Import',
+            onProgress: (p) => onProgress(ImportProgress(
+              status: p.status,
+              message: p.message,
+              progress: 0.30 + p.progress * 0.70,
+            )),
+          );
+        } else {
+          try {
+            await _downloadYouTubeVideo(
+              yt: yt,
+              video: selectedVideo!,
+              cleanTitle: trackTitle,
+              albumName: 'Spotify Import',
+              artistOverride: artist,
+              onProgress: (p) => onProgress(ImportProgress(
+                status: p.status,
+                message: p.message,
+                progress: 0.30 + p.progress * 0.70,
+              )),
+            );
+          } catch (e) {
+            // YouTube download провалился — пробуем Invidious с уже известным ID
+            debugPrint('[Spotify] YouTube download failed → Invidious: $e');
+            await _importYouTubeViaInvidious(
+              videoId: selectedVideo!.id.value,
+              titleOverride: trackTitle,
+              artistOverride: artist,
+              albumName: 'Spotify Import',
+              onProgress: (p) => onProgress(ImportProgress(
+                status: p.status,
+                message: p.message,
+                progress: 0.30 + p.progress * 0.70,
+              )),
+            );
           }
         }
-
-        await _downloadYouTubeVideo(
-          yt: yt,
-          video: video,
-          cleanTitle: trackTitle,
-          albumName: 'Spotify Import',
-          artistOverride: artist, // use Spotify artist!
-          onProgress: (p) => onProgress(ImportProgress(
-            status: p.status,
-            message: p.message,
-            progress: 0.3 + (p.progress * 0.7),
-          )),
-        );
       } finally {
         yt.close();
       }
     } catch (e) {
       debugPrint('Ошибка импорта Spotify: $e');
-      onProgress(const ImportProgress(
+      onProgress(ImportProgress(
         status: ImportStatus.error,
         message: 'Ошибка импорта Spotify',
-        error: 'Произошла ошибка при обработке Spotify-ссылки',
+        error: e.toString(),
       ));
     }
   }
@@ -446,15 +665,14 @@ class ImporterService {
       List<dynamic> tracksJson = [];
       String playlistName = 'Yandex Playlist';
 
-      // Setup headers to pretend we are a browser
       final headers = {
         'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
       };
 
       if (url.contains('/album/')) {
-        // Extract album id
         final pathSegments = uri.pathSegments;
         final albumIndex = pathSegments.indexOf('album');
         if (albumIndex != -1 && albumIndex + 1 < pathSegments.length) {
@@ -463,40 +681,27 @@ class ImporterService {
             'https://music.yandex.ru/handlers/album.jsx?album=$albumId',
             options: Options(headers: headers),
           );
-
           if (response.statusCode == 200) {
             final data = response.data;
             playlistName = data['title'] ?? 'Yandex Album';
             if (data['volumes'] != null) {
-              for (var volume in data['volumes']) {
-                tracksJson.addAll(volume);
-              }
+              for (var volume in data['volumes']) tracksJson.addAll(volume);
             }
           } else {
-            throw Exception(
-                'Не удалось загрузить альбом (Код: ${response.statusCode})');
+            throw Exception('Ошибка альбома (${response.statusCode})');
           }
-        } else {
-          throw Exception('Неверный URL альбома');
         }
       } else if (url.contains('/playlists/')) {
-        // Extract owner and kind
         final pathSegments = uri.pathSegments;
         final usersIndex = pathSegments.indexOf('users');
         final playlistsIndex = pathSegments.indexOf('playlists');
-
-        if (usersIndex != -1 &&
-            playlistsIndex != -1 &&
-            usersIndex + 1 < pathSegments.length &&
-            playlistsIndex + 1 < pathSegments.length) {
+        if (usersIndex != -1 && playlistsIndex != -1) {
           final owner = pathSegments[usersIndex + 1];
           final kind = pathSegments[playlistsIndex + 1];
-
           final response = await _dio.get(
             'https://music.yandex.ru/handlers/playlist.jsx?owner=$owner&kinds=$kind',
             options: Options(headers: headers),
           );
-
           if (response.statusCode == 200) {
             final playlist = response.data['playlist'];
             if (playlist != null) {
@@ -506,119 +711,159 @@ class ImporterService {
               throw Exception('Плейлист не найден');
             }
           } else {
-            throw Exception(
-                'Не удалось загрузить плейлист (Код: ${response.statusCode})');
+            throw Exception('Ошибка плейлиста (${response.statusCode})');
           }
-        } else {
-          throw Exception('Неверный URL плейлиста');
         }
       }
 
-      if (tracksJson.isEmpty) {
-        throw Exception('В плейлисте/альбоме нет треков');
-      }
+      if (tracksJson.isEmpty) throw Exception('В плейлисте нет треков');
 
-      // Parse metadata off main thread via microtask
       await Future.microtask(() {});
 
       final parsedTracks = <Map<String, String>>[];
       for (var track in tracksJson) {
         if (track['available'] == false) continue;
-
         final title = track['title']?.toString() ?? 'Unknown Title';
         final artistsList = track['artists'] as List?;
         final artist = (artistsList != null && artistsList.isNotEmpty)
             ? artistsList.map((a) => a['name']).join(', ')
             : 'Unknown Artist';
-
-        // Use default cover from first track if available? We just leave it empty for now, YouTube will provide a cover
-        parsedTracks.add({
-          'title': title,
-          'artist': artist,
-        });
+        parsedTracks.add({'title': title, 'artist': artist});
       }
 
       if (parsedTracks.isEmpty) {
-        throw Exception('Нет доступных треков для скачивания');
+        throw Exception('Нет доступных треков');
       }
-
-      // Download each track using YouTube fallback
-      final yt = YoutubeExplode();
-      final downloadedTrackIds = <String>[];
-      int i = 0;
 
       onProgress(ImportProgress(
         status: ImportStatus.done,
         message: 'Создание плейлиста "$playlistName"...',
         progress: 0.05,
       ));
-      final playlist =
-          await PlaylistDatabase.instance.createPlaylist(playlistName);
+      final playlist = await PlaylistDatabase.instance.createPlaylist(playlistName);
+
+      final yt = YoutubeExplode();
+      final downloadedIds = <String>[];
+      int i = 0;
+
+      // ytBlocked: после первой ошибки YouTube Search — сразу идём в Invidious
+      bool ytBlocked = false;
 
       try {
         for (final track in parsedTracks) {
           i++;
           final query = "${track['artist']} - ${track['title']}";
+          final progressBase = (i - 1) / parsedTracks.length;
+          final progressStep = 1 / parsedTracks.length;
 
           onProgress(ImportProgress(
             status: ImportStatus.fetchingMeta,
             message: 'Поиск: $query ($i из ${parsedTracks.length})',
-            progress: i / parsedTracks.length,
+            progress: progressBase,
           ));
 
           try {
-            final searchResults = await yt.search.search(query);
-            if (searchResults.isEmpty) {
-              debugPrint('Не найдено на YouTube: $query');
-              continue;
-            }
+            Video? selectedVideo;
+            bool useInvidious = ytBlocked;
+            String? invidiousId;
 
-            var video = searchResults.first;
+            if (!ytBlocked) {
+              try {
+                final results = await yt.search
+                    .search(query)
+                    .timeout(const Duration(seconds: 6));
 
-            // Smart YouTube Search (Topic & Audio Priority)
-            final maxResults =
-                searchResults.length > 10 ? 10 : searchResults.length;
-            for (int j = 0; j < maxResults; j++) {
-              final v = searchResults.elementAt(j);
-              final authorLow = v.author.toLowerCase();
-              final titleLow = v.title.toLowerCase();
+                if (results.isEmpty) throw Exception('Не найдено');
 
-              if (authorLow.contains('topic') ||
-                  authorLow.contains('vevo') ||
-                  titleLow.contains('(official audio)')) {
-                video = v;
-                debugPrint(
-                    'Выбрано приоритетное аудио: ${v.title} (${v.author})');
-                break;
+                selectedVideo = results.first;
+                final maxLen = results.length.clamp(0, 10);
+                for (int j = 0; j < maxLen; j++) {
+                  final v = results.elementAt(j);
+                  if (v.author.toLowerCase().contains('topic') ||
+                      v.author.toLowerCase().contains('vevo') ||
+                      v.title.toLowerCase().contains('(official audio)')) {
+                    selectedVideo = v;
+                    break;
+                  }
+                }
+              } catch (e) {
+                debugPrint('[Yandex] YouTube Search недоступен → Invidious: $e');
+                ytBlocked = true;
+                useInvidious = true;
+                onProgress(ImportProgress(
+                  status: ImportStatus.fetchingMeta,
+                  message: InvidiousProxyService.randomPhrase(),
+                  progress: progressBase + progressStep * 0.1,
+                ));
               }
             }
 
-            // Re-use standard YouTube download flow
-            final trackId = await _downloadYouTubeVideo(
-              yt: yt,
-              video: video,
-              cleanTitle: track['title'] ?? video.title, // use Yandex title!
-              albumName: playlistName,
-              artistOverride: track['artist'], // use Yandex artist!
-              onProgress: (p) {
-                // Wrapper progress to show playlist context
-                onProgress(ImportProgress(
+            if (useInvidious) {
+              final invRes =
+                  await InvidiousProxyService.instance.searchVideos(query);
+              if (invRes.isEmpty) {
+                debugPrint('[Yandex] Invidious: не найдено "$query"');
+                continue;
+              }
+              invidiousId = invRes.first.videoId;
+            }
+
+            String trackId;
+            if (useInvidious && invidiousId != null) {
+              await _importYouTubeViaInvidious(
+                videoId: invidiousId,
+                titleOverride: track['title'],
+                artistOverride: track['artist'],
+                albumName: playlistName,
+                onProgress: (p) => onProgress(ImportProgress(
                   status: p.status,
                   message: '$i/${parsedTracks.length}: ${p.message}',
-                  progress: (i - 1) / parsedTracks.length +
-                      (p.progress * (1 / parsedTracks.length)),
-                ));
-              },
-            );
+                  progress: progressBase + progressStep * p.progress,
+                )),
+              );
+              trackId = invidiousId;
+            } else {
+              try {
+                trackId = await _downloadYouTubeVideo(
+                  yt: yt,
+                  video: selectedVideo!,
+                  cleanTitle: track['title'] ?? selectedVideo.title,
+                  albumName: playlistName,
+                  artistOverride: track['artist'],
+                  onProgress: (p) => onProgress(ImportProgress(
+                    status: p.status,
+                    message: '$i/${parsedTracks.length}: ${p.message}',
+                    progress:
+                        progressBase + progressStep * p.progress,
+                  )),
+                );
+              } catch (e) {
+                // YouTube download провалился — пробуем Invidious
+                debugPrint('[Yandex] YT download failed → Invidious: $e');
+                final vid = selectedVideo!.id.value;
+                await _importYouTubeViaInvidious(
+                  videoId: vid,
+                  titleOverride: track['title'],
+                  artistOverride: track['artist'],
+                  albumName: playlistName,
+                  onProgress: (p) => onProgress(ImportProgress(
+                    status: p.status,
+                    message: '$i/${parsedTracks.length}: ${p.message}',
+                    progress:
+                        progressBase + progressStep * p.progress,
+                  )),
+                );
+                trackId = vid;
+              }
+            }
 
-            downloadedTrackIds.add(trackId);
+            downloadedIds.add(trackId);
             await PlaylistDatabase.instance.addTrackToPlaylist(
               playlistId: playlist.id,
               trackId: trackId,
             );
           } catch (e) {
-            debugPrint('Ошибка загрузки $query: $e');
-            // Continue to next track, but optionally notify? No, just continue to not break the whole playlist.
+            debugPrint('[Yandex] Пропуск "$query": $e');
           }
         }
       } finally {
@@ -627,16 +872,16 @@ class ImporterService {
 
       onProgress(ImportProgress(
         status: ImportStatus.done,
-        message:
-            '✓ Импортировано ${downloadedTrackIds.length} из ${parsedTracks.length} треков ("$playlistName")',
+        message: '✓ Импортировано ${downloadedIds.length} из '
+            '${parsedTracks.length} треков ("$playlistName")',
         progress: 1.0,
       ));
     } catch (e) {
-      debugPrint('Ошибка парсинга Яндекс.Музыки: $e');
-      onProgress(const ImportProgress(
+      debugPrint('Ошибка Яндекс.Музыки: $e');
+      onProgress(ImportProgress(
         status: ImportStatus.error,
-        message: 'Ошибка парсинга Яндекс.Музыки',
-        error: 'Не удалось получить данные с Яндекс.Музыки',
+        message: 'Ошибка импорта Яндекс.Музыки',
+        error: e.toString(),
       ));
     }
   }
@@ -659,7 +904,7 @@ class ImporterService {
     onProgress(const ImportProgress(
       status: ImportStatus.downloading,
       message: 'Скачиваем файл...',
-      progress: 0.1,
+      progress: 0.10,
     ));
 
     await _dio.download(
@@ -667,13 +912,13 @@ class ImporterService {
       savePath,
       onReceiveProgress: (received, total) {
         if (total > 0) {
-          final receivedMB = (received / 1024 / 1024).toStringAsFixed(1);
-          final totalMB = (total / 1024 / 1024).toStringAsFixed(1);
-          final percent = (received / total * 100).round();
+          final pct = (received / total * 100).round();
+          final mb = (received / 1024 / 1024).toStringAsFixed(1);
+          final totalMb = (total / 1024 / 1024).toStringAsFixed(1);
           onProgress(ImportProgress(
             status: ImportStatus.downloading,
-            message: '⬇ $receivedMB / $totalMB MB ($percent%)',
-            progress: 0.1 + (received / total) * 0.75,
+            message: '⬇ $mb / $totalMb MB ($pct%)',
+            progress: 0.10 + (received / total) * 0.75,
           ));
         }
       },
@@ -730,7 +975,7 @@ class ImporterService {
     ));
   }
 
-  // ── Local Files ───────────────────────────────────────────────────────────
+  // ── Локальные файлы ───────────────────────────────────────────────────────
 
   Future<void> importLocalFiles({
     required List<String> paths,
@@ -746,7 +991,6 @@ class ImporterService {
 
       final fileName = p.basename(path);
       final title = p.basenameWithoutExtension(path);
-      // Create a clean alphanumeric id for the DB
       final id = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
 
       onProgress(ImportProgress(
@@ -757,18 +1001,13 @@ class ImporterService {
 
       try {
         final savePath = await _getTrackPath(fileName);
+        if (file.path != savePath) await file.copy(savePath);
 
-        // Only copy if it's not already in the music directory
-        if (file.path != savePath) {
-          await file.copy(savePath);
-        }
-
-        // Search for existing LRC if available in the same source folder
         String? lrcPath;
         final srcLrc = File(path.replaceAll(p.extension(path), '.lrc'));
         if (await srcLrc.exists()) {
-          final lrcContent = await srcLrc.readAsString();
-          lrcPath = await LyricsService.instance.saveLrc(lrcContent, id);
+          final content = await srcLrc.readAsString();
+          lrcPath = await LyricsService.instance.saveLrc(content, id);
         }
 
         await LibraryDatabase.instance.insertTrack(LibraryTrack(
@@ -800,21 +1039,47 @@ class ImporterService {
 
   bool _isYouTube(String url) =>
       url.contains('youtube.com') || url.contains('youtu.be');
-
   bool _isSoundCloud(String url) => url.contains('soundcloud.com');
-
   bool _isSpotify(String url) => url.contains('open.spotify.com');
-
   bool _isYandexMusic(String url) =>
       url.contains('music.yandex.ru') &&
       (url.contains('/playlists/') || url.contains('/album/'));
-
   bool _isDirectAudio(String url) =>
       url.endsWith('.mp3') ||
       url.endsWith('.flac') ||
       url.endsWith('.m4a') ||
       url.endsWith('.ogg') ||
       url.endsWith('.wav');
+
+  /// Извлекает YouTube video ID из URL любого формата.
+  String? _extractYouTubeId(String url) {
+    try {
+      final uri = Uri.parse(url);
+      // youtube.com/watch?v=ID
+      final v = uri.queryParameters['v'];
+      if (v != null && v.length == 11) return v;
+      // youtu.be/ID или youtube.com/shorts/ID
+      if (uri.pathSegments.isNotEmpty) {
+        final seg = uri.pathSegments.last;
+        if (seg.length == 11 &&
+            RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(seg)) {
+          return seg;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String _cleanYouTubeTitle(String title) {
+    return title
+        .replaceAll(RegExp(r'\(Official.*?\)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\[.*?\]'), '')
+        .replaceAll(RegExp(r'\(Lyrics.*?\)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\(Audio.*?\)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\(HD.*?\)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s{2,}'), ' ')
+        .trim();
+  }
 
   Future<String> _getTrackPath(String fileName) async {
     final safeFileName =
@@ -827,12 +1092,12 @@ class ImporterService {
 
   Future<String?> _downloadCover(String url, String trackId) async {
     try {
-      final safeTrackId =
+      final safeId =
           p.basename(trackId).replaceAll(RegExp(r'[^a-zA-Z0-9\.\-\_]'), '_');
       final dir = await getApplicationDocumentsDirectory();
       final coversDir = Directory(p.join(dir.path, 'covers'));
       await coversDir.create(recursive: true);
-      final path = p.join(coversDir.path, '$safeTrackId.jpg');
+      final path = p.join(coversDir.path, '$safeId.jpg');
       await _dio.download(url, path);
       return path;
     } catch (e) {
@@ -842,7 +1107,7 @@ class ImporterService {
   }
 }
 
-// ── Служебные исключения ─────────────────────────────────────────────────────
+// ── Служебные исключения ──────────────────────────────────────────────────────
 
 class _DownloadThrottledException implements Exception {
   final String message;

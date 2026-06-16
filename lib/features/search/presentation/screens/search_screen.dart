@@ -1,6 +1,17 @@
+// lib/features/search/presentation/screens/search_screen.dart
+//
+// Экран поиска с Invidious-фолбэком и «сломом 4-й стены».
+//
+// Изменения по сравнению с оригиналом:
+//  • Использует SearchTrack вместо Video из youtube_explode_dart
+//  • _PlayButton создаёт TrackModel с filePath: null — toAudioSource()
+//    автоматически строит Invidious-прокси URL без 403
+//  • _ProxyBanner появляется, если result.usingProxy == true
+//  • _LoadingState иногда показывает фразу «слом 4-й стены»
+
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
@@ -9,6 +20,27 @@ import '../../../player/domain/track_model.dart';
 import '../../../importer/data/importer_service.dart';
 import '../../../library/presentation/library_provider.dart';
 import '../providers/search_provider.dart';
+import '../../../../../core/services/invidious_proxy_service.dart';
+
+// ── Утилита очистки заголовка ─────────────────────────────────────────────────
+
+String _cleanTitle(String title) {
+  final patterns = [
+    r'\(Official.*?\)',
+    r'\[Official.*?\]',
+    r'\(Lyrics.*?\)',
+    r'\(Audio.*?\)',
+    r'\(.*?Video.*?\)',
+    r'\(.*?HQ.*?\)',
+  ];
+  var cleaned = title;
+  for (final pattern in patterns) {
+    cleaned = cleaned.replaceAll(RegExp(pattern, caseSensitive: false), '');
+  }
+  return cleaned.trim();
+}
+
+// ── SearchScreen ──────────────────────────────────────────────────────────────
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -46,6 +78,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
+// ── Header ────────────────────────────────────────────────────────────────────
+
 class _SearchHeader extends ConsumerWidget {
   final TextEditingController controller;
   const _SearchHeader({required this.controller});
@@ -64,13 +98,15 @@ class _SearchHeader extends ConsumerWidget {
           cursorColor: Colors.white,
           decoration: InputDecoration(
             hintText: 'Исполнитель, трек, альбом...',
-            hintStyle: TextStyle(color: Colors.white.withAlpha(102)), // ~0.4
-            prefixIcon: Icon(Icons.search_rounded, color: Colors.white.withAlpha(153)), // ~0.6
+            hintStyle: TextStyle(color: Colors.white.withAlpha(102)),
+            prefixIcon:
+                Icon(Icons.search_rounded, color: Colors.white.withAlpha(153)),
             suffixIcon: ValueListenableBuilder(
               valueListenable: controller,
               builder: (_, value, __) => value.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.clear_rounded, color: Colors.white.withAlpha(153)),
+                      icon: Icon(Icons.clear_rounded,
+                          color: Colors.white.withAlpha(153)),
                       onPressed: () {
                         controller.clear();
                         ref.read(searchProvider.notifier).search('');
@@ -79,41 +115,146 @@ class _SearchHeader extends ConsumerWidget {
                   : const SizedBox.shrink(),
             ),
             border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
-          onChanged: (value) => ref.read(searchProvider.notifier).search(value),
+          onChanged: (value) =>
+              ref.read(searchProvider.notifier).search(value),
         ),
       ),
     );
   }
 }
 
+// ── Body ──────────────────────────────────────────────────────────────────────
+
 class _SearchBody extends StatelessWidget {
-  final AsyncValue<List<Video>> state;
+  final AsyncValue<SearchResult> state;
   const _SearchBody({required this.state});
 
   @override
   Widget build(BuildContext context) {
     return state.when(
-      data: (videos) {
-        if (videos.isEmpty) {
-          return const _EmptyState();
-        }
-        return ListView.builder(
-          itemCount: videos.length,
-          itemBuilder: (context, index) => _SearchResultCard(video: videos[index]),
+      data: (result) {
+        if (result.isEmpty) return const _EmptyState();
+        return Column(
+          children: [
+            if (result.usingProxy) const _ProxyBanner(),
+            Expanded(
+              child: ListView.builder(
+                itemCount: result.tracks.length,
+                itemBuilder: (context, index) =>
+                    _SearchResultCard(track: result.tracks[index]),
+              ),
+            ),
+          ],
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Center(
-        child: Text(
-          'Ошибка поиска: $error',
-          style: TextStyle(color: Colors.white.withAlpha(153)),
+      loading: () => const _LoadingState(),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            'Ошибка поиска: $error',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withAlpha(153)),
+          ),
         ),
       ),
     );
   }
 }
+
+// ── Прокси-баннер ─────────────────────────────────────────────────────────────
+
+class _ProxyBanner extends StatelessWidget {
+  const _ProxyBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.deepPurple.withAlpha(55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.deepPurpleAccent.withAlpha(90)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.vpn_key_rounded,
+              color: Colors.deepPurpleAccent, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '⚡ Активирован обходной маршрут через Invidious',
+              style: TextStyle(
+                color: Colors.deepPurpleAccent.withAlpha(220),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Загрузка с фразами «слом 4-й стены» ──────────────────────────────────────
+
+class _LoadingState extends StatefulWidget {
+  const _LoadingState();
+
+  @override
+  State<_LoadingState> createState() => _LoadingStateState();
+}
+
+class _LoadingStateState extends State<_LoadingState> {
+  late final String? _phrase;
+
+  @override
+  void initState() {
+    super.initState();
+    // Показываем фразу с вероятностью ~40%
+    final rnd = Random();
+    _phrase = rnd.nextInt(5) < 2
+        ? kProxyBypassPhrases[rnd.nextInt(kProxyBypassPhrases.length)]
+        : null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation(Colors.white54),
+            strokeWidth: 2,
+          ),
+          if (_phrase != null) ...[
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                _phrase!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withAlpha(115),
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Empty State ───────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -124,11 +265,13 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.search_rounded, size: 64, color: Colors.white.withAlpha(51)),
+          Icon(Icons.search_rounded,
+              size: 64, color: Colors.white.withAlpha(51)),
           const SizedBox(height: 16),
           Text(
             'Введи запрос для поиска',
-            style: TextStyle(color: Colors.white.withAlpha(153), fontSize: 16),
+            style:
+                TextStyle(color: Colors.white.withAlpha(153), fontSize: 16),
           ),
         ],
       ),
@@ -136,31 +279,15 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-String _cleanTitle(String title) {
-  final patterns = [
-    r'\(Official.*?\)',
-    r'\[Official.*?\]',
-    r'\(Lyrics.*?\)',
-    r'\(Audio.*?\)',
-    r'\(.*?Video.*?\)',
-    r'\(.*?HQ.*?\)'
-  ];
-  var cleaned = title;
-  for (final pattern in patterns) {
-    cleaned = cleaned.replaceAll(RegExp(pattern, caseSensitive: false), '');
-  }
-  return cleaned.trim();
-}
+// ── Search Result Card ────────────────────────────────────────────────────────
 
 class _SearchResultCard extends ConsumerWidget {
-  final Video video;
-  const _SearchResultCard({required this.video});
+  final SearchTrack track;
+  const _SearchResultCard({required this.track});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final title = _cleanTitle(video.title);
-    final author = video.author;
-    final thumbnailUrl = video.thumbnails.lowResUrl;
+    final title = _cleanTitle(track.title);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -171,10 +298,11 @@ class _SearchResultCard extends ConsumerWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Обложка
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Image.network(
-                thumbnailUrl,
+                track.thumbnailUrl,
                 width: 64,
                 height: 64,
                 fit: BoxFit.cover,
@@ -185,28 +313,40 @@ class _SearchResultCard extends ConsumerWidget {
                     color: Colors.white.withAlpha(26),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.music_note_rounded, color: Colors.white.withAlpha(77)),
+                  child: Icon(Icons.music_note_rounded,
+                      color: Colors.white.withAlpha(77)),
                 ),
               ),
             ),
             const SizedBox(width: 12),
+            // Инфо + кнопки
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
-                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 4),
-                  Text(author,
-                      style: TextStyle(color: Colors.white.withAlpha(140), fontSize: 12),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    track.artist,
+                    style: TextStyle(
+                        color: Colors.white.withAlpha(140), fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      _PlayButton(video: video, title: title),
+                      _PlayButton(track: track, cleanTitle: title),
                       const SizedBox(width: 8),
-                      _ImportButton(video: video),
+                      _ImportButton(track: track),
                     ],
                   ),
                 ],
@@ -219,10 +359,16 @@ class _SearchResultCard extends ConsumerWidget {
   }
 }
 
+// ── Play Button ───────────────────────────────────────────────────────────────
+//
+// Создаёт TrackModel с filePath: null.
+// toAudioSource() обнаруживает YouTube video ID в поле id и строит
+// Invidious-прокси URL — без 403, без googlevideo.com.
+
 class _PlayButton extends ConsumerStatefulWidget {
-  final Video video;
-  final String title;
-  const _PlayButton({required this.video, required this.title});
+  final SearchTrack track;
+  final String cleanTitle;
+  const _PlayButton({required this.track, required this.cleanTitle});
 
   @override
   ConsumerState<_PlayButton> createState() => _PlayButtonState();
@@ -235,49 +381,40 @@ class _PlayButtonState extends ConsumerState<_PlayButton> {
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
-    final yt = YoutubeExplode();
     try {
-      final manifest = await yt.videos.streamsClient.getManifest(widget.video.id);
-
-      final audioStreams = manifest.audioOnly
-          .where((s) => s.codec.mimeType.contains('audio/mp4'))
-          .toList();
-
-      if (audioStreams.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Не удалось получить аудио-поток')),
-          );
-        }
-        return;
-      }
-
-      final bestStream = audioStreams.reduce((a, b) => a.bitrate.bitsPerSecond > b.bitrate.bitsPerSecond ? a : b);
+      // Гарантируем наличие рабочего инстанса до первого воспроизведения
+      await InvidiousProxyService.instance.findWorkingInstance();
 
       final tempTrack = TrackModel(
-        id: widget.video.id.value,
-        title: widget.title,
-        artist: widget.video.author,
+        id: widget.track.id, // YouTube video ID — toAudioSource использует его
+        title: widget.cleanTitle,
+        artist: widget.track.artist,
         album: 'YouTube',
-        duration: widget.video.duration ?? Duration.zero,
-        coverImage: NetworkImage(widget.video.thumbnails.highResUrl),
-        filePath: bestStream.url.toString(),
+        duration: widget.track.duration,
+        coverImage: NetworkImage(widget.track.highResThumbnailUrl),
+        filePath: null, // toAudioSource автоматически применит Invidious-прокси
       );
 
-      await ref.read(playerProvider.notifier).loadPlaylist([tempTrack], initialIndex: 0);
+      await ref
+          .read(playerProvider.notifier)
+          .loadPlaylist([tempTrack], initialIndex: 0);
       await ref.read(playerProvider.notifier).play();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Воспроизводится: ${widget.title}'), duration: const Duration(seconds: 2)),
+          SnackBar(
+            content: Text('▶ ${widget.cleanTitle}'),
+            duration: const Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка воспроизведения: $e')),
+        );
       }
     } finally {
-      yt.close();
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -293,9 +430,11 @@ class _PlayButtonState extends ConsumerState<_PlayButton> {
   }
 }
 
+// ── Import Button ─────────────────────────────────────────────────────────────
+
 class _ImportButton extends ConsumerStatefulWidget {
-  final Video video;
-  const _ImportButton({required this.video});
+  final SearchTrack track;
+  const _ImportButton({required this.track});
 
   @override
   ConsumerState<_ImportButton> createState() => _ImportButtonState();
@@ -309,7 +448,7 @@ class _ImportButtonState extends ConsumerState<_ImportButton> {
     setState(() => _isLoading = true);
 
     try {
-      final url = 'https://www.youtube.com/watch?v=${widget.video.id.value}';
+      final url = 'https://www.youtube.com/watch?v=${widget.track.id}';
 
       await ImporterService.instance.importFromUrl(
         url: url,
@@ -343,6 +482,8 @@ class _ImportButtonState extends ConsumerState<_ImportButton> {
   }
 }
 
+// ── Glass Action Button ───────────────────────────────────────────────────────
+
 class _GlassActionButton extends StatelessWidget {
   final VoidCallback onPressed;
   final bool isLoading;
@@ -361,7 +502,7 @@ class _GlassActionButton extends StatelessWidget {
     return GlassCard(
       borderRadius: 8,
       padding: EdgeInsets.zero,
-      opacity: 0.1,
+      opacity: 0.10,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -374,16 +515,25 @@ class _GlassActionButton extends StatelessWidget {
               children: [
                 if (isLoading)
                   SizedBox(
-                    width: 14, height: 14,
+                    width: 14,
+                    height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.white.withAlpha(179)),
+                      valueColor:
+                          AlwaysStoppedAnimation(Colors.white.withAlpha(179)),
                     ),
                   )
                 else
                   Icon(icon, size: 16, color: Colors.white.withAlpha(217)),
                 const SizedBox(width: 6),
-                Text(label, style: TextStyle(color: Colors.white.withAlpha(217), fontSize: 12, fontWeight: FontWeight.w500)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(217),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),
