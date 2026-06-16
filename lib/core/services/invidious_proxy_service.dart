@@ -90,13 +90,51 @@ class InvidiousProxyService {
 
   String? get workingInstance => _workingInstance;
 
-  // ── Построение URL стрима ─────────────────────────────────────────────────
+  // ── Получение проксированного URL стрима (True Proxy) ────────────────────
 
-  /// Возвращает URL аудио-потока через Invidious для [videoId].
-  /// itag=140 — AAC 128kbps, работает без IP-лока и googlevideo-подписи.
-  String buildStreamUrl(String videoId) {
-    final inst = _workingInstance ?? kInvidiousInstances.first;
-    return 'https://$inst/latest_version?id=$videoId&itag=140&local=true';
+  /// Получает прямую проксированную ссылку через API инстанса Invidious.
+  /// Принудительно пропускает весь трафик через инстанс, обходя googlevideo.com.
+  Future<String?> getProxiedStreamUrl(String videoId) async {
+    final inst = await findWorkingInstance();
+    if (inst == null) return null;
+
+    try {
+      final meta = await getVideoInfo(videoId);
+      if (meta != null && meta['adaptiveFormats'] != null) {
+        final List<dynamic> formats = meta['adaptiveFormats'];
+
+        // Фильтруем только аудио-потоки
+        final audioFormats = formats.where((f) {
+          final type = f['type'] as String? ?? '';
+          final container = f['container'] as String? ?? '';
+          return type.contains('audio/mp4') || container == 'm4a';
+        }).toList();
+
+        if (audioFormats.isNotEmpty) {
+          // Сортируем по битрейту (лучшее качество первым)
+          audioFormats.sort((a, b) {
+            final bitA = int.tryParse(a['bitrate']?.toString() ?? '0') ?? 0;
+            final bitB = int.tryParse(b['bitrate']?.toString() ?? '0') ?? 0;
+            return bitB.compareTo(bitA);
+          });
+
+          final bestFormat = audioFormats.first;
+          final streamUrlStr = bestFormat['url'] as String?;
+
+          if (streamUrlStr != null && streamUrlStr.isNotEmpty) {
+            final uri = Uri.parse(streamUrlStr);
+            // Формируем True Proxy URL
+            return 'https://$inst/videoplayback?${uri.query}&local=true';
+          }
+        }
+      }
+
+      // Фолбэк, если API не вернул форматов (или ошибка парсинга)
+      return 'https://$inst/latest_version?id=$videoId&itag=140&local=true';
+    } catch (e) {
+      debugPrint('[Invidious] Ошибка getProxiedStreamUrl: $e');
+      return 'https://$inst/latest_version?id=$videoId&itag=140&local=true';
+    }
   }
 
   // ── Поиск рабочего инстанса ───────────────────────────────────────────────
