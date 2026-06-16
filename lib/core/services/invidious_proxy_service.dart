@@ -18,10 +18,10 @@ import 'package:http/http.dart' as http;
 // ── Публичные инстансы Invidious ──────────────────────────────────────────────
 
 const List<String> kInvidiousInstances = [
+  'invidious.io.lol',
+  'invidious.no-logs.com',
+  'inv.tux.pizza',
   'yewtu.be',
-  'invidious.privacydev.net',
-  'inv.nadeko.net',
-  'invidious.fdn.fr',
 ];
 
 // ── Фразы «слом 4-й стены» при активации прокси ──────────────────────────────
@@ -90,125 +90,123 @@ class InvidiousProxyService {
 
   String? get workingInstance => _workingInstance;
 
+  // Заголовки для обхода защиты (Cloudflare/Timeouts)
+  static const _headers = {
+    'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  };
+
+  /// Формирует список инстансов для перебора: сначала кэшированный рабочий, затем остальные.
+  List<String> get _instancesToTry {
+    if (_workingInstance != null && _lastCheck != null) {
+      if (DateTime.now().difference(_lastCheck!) < _cacheDuration) {
+        return [_workingInstance!] + kInvidiousInstances.where((i) => i != _workingInstance).toList();
+      }
+    }
+    return kInvidiousInstances;
+  }
+
+  void _setWorkingInstance(String inst) {
+    _workingInstance = inst;
+    _lastCheck = DateTime.now();
+  }
+
   // ── Получение проксированного URL стрима (True Proxy) ────────────────────
 
   /// Получает прямую проксированную ссылку через API инстанса Invidious.
   /// Принудительно пропускает весь трафик через инстанс, обходя googlevideo.com.
   Future<String?> getProxiedStreamUrl(String videoId) async {
-    final inst = await findWorkingInstance();
-    if (inst == null) return null;
+    for (final inst in _instancesToTry) {
+      try {
+        final uri = Uri.parse('https://$inst/api/v1/videos/$videoId');
+        final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
 
-    try {
-      final meta = await getVideoInfo(videoId);
-      if (meta != null && meta['adaptiveFormats'] != null) {
-        final List<dynamic> formats = meta['adaptiveFormats'];
+        if (resp.statusCode == 200) {
+          _setWorkingInstance(inst);
 
-        // Фильтруем только аудио-потоки
-        final audioFormats = formats.where((f) {
-          final type = f['type'] as String? ?? '';
-          final container = f['container'] as String? ?? '';
-          return type.contains('audio/mp4') || container == 'm4a';
-        }).toList();
+          final meta = jsonDecode(resp.body) as Map<String, dynamic>;
+          if (meta['adaptiveFormats'] != null) {
+            final List<dynamic> formats = meta['adaptiveFormats'];
 
-        if (audioFormats.isNotEmpty) {
-          // Сортируем по битрейту (лучшее качество первым)
-          audioFormats.sort((a, b) {
-            final bitA = int.tryParse(a['bitrate']?.toString() ?? '0') ?? 0;
-            final bitB = int.tryParse(b['bitrate']?.toString() ?? '0') ?? 0;
-            return bitB.compareTo(bitA);
-          });
+            // Фильтруем только аудио-потоки
+            final audioFormats = formats.where((f) {
+              final type = f['type'] as String? ?? '';
+              final container = f['container'] as String? ?? '';
+              return type.contains('audio/mp4') || container == 'm4a';
+            }).toList();
 
-          final bestFormat = audioFormats.first;
-          final streamUrlStr = bestFormat['url'] as String?;
+            if (audioFormats.isNotEmpty) {
+              // Сортируем по битрейту (лучшее качество первым)
+              audioFormats.sort((a, b) {
+                final bitA = int.tryParse(a['bitrate']?.toString() ?? '0') ?? 0;
+                final bitB = int.tryParse(b['bitrate']?.toString() ?? '0') ?? 0;
+                return bitB.compareTo(bitA);
+              });
 
-          if (streamUrlStr != null && streamUrlStr.isNotEmpty) {
-            final uri = Uri.parse(streamUrlStr);
-            // Формируем True Proxy URL
-            return 'https://$inst/videoplayback?${uri.query}&local=true';
+              final bestFormat = audioFormats.first;
+              final streamUrlStr = bestFormat['url'] as String?;
+
+              if (streamUrlStr != null && streamUrlStr.isNotEmpty) {
+                final streamUri = Uri.parse(streamUrlStr);
+                // Формируем True Proxy URL
+                return 'https://$inst/videoplayback?${streamUri.query}&local=true';
+              }
+            }
           }
+
+          // Фолбэк, если API не вернул форматов (или ошибка парсинга)
+          return 'https://$inst/latest_version?id=$videoId&itag=140&local=true';
         }
-      }
-
-      // Фолбэк, если API не вернул форматов (или ошибка парсинга)
-      return 'https://$inst/latest_version?id=$videoId&itag=140&local=true';
-    } catch (e) {
-      debugPrint('[Invidious] Ошибка getProxiedStreamUrl: $e');
-      return 'https://$inst/latest_version?id=$videoId&itag=140&local=true';
-    }
-  }
-
-  // ── Поиск рабочего инстанса ───────────────────────────────────────────────
-
-  /// Находит первый доступный инстанс и кэширует его.
-  Future<String?> findWorkingInstance() async {
-    if (_workingInstance != null && _lastCheck != null) {
-      if (DateTime.now().difference(_lastCheck!) < _cacheDuration) {
-        return _workingInstance;
+      } catch (e) {
+        debugPrint('[Invidious] getProxiedStreamUrl (инстанс $inst) ошибка: $e');
       }
     }
 
-    for (final inst in kInvidiousInstances) {
-      if (await _ping(inst)) {
-        _workingInstance = inst;
-        _lastCheck = DateTime.now();
-        debugPrint('[Invidious] Рабочий инстанс: $inst');
-        return inst;
-      }
-    }
-
-    debugPrint('[Invidious] Все инстансы недоступны');
-    _workingInstance = null;
+    debugPrint('[Invidious] Все инстансы недоступны для getProxiedStreamUrl');
     return null;
-  }
-
-  Future<bool> _ping(String instance) async {
-    try {
-      final uri = Uri.parse(
-          'https://$instance/api/v1/search?q=test&type=video');
-      final resp = await http.get(uri).timeout(const Duration(seconds: 5));
-      return resp.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
   }
 
   // ── Поиск видео ───────────────────────────────────────────────────────────
 
   Future<List<InvidiousSearchResult>> searchVideos(String query) async {
-    final inst = await findWorkingInstance();
-    if (inst == null) throw Exception('Нет доступных Invidious инстансов');
+    for (final inst in _instancesToTry) {
+      try {
+        final uri = Uri.parse(
+            'https://$inst/api/v1/search?q=${Uri.encodeComponent(query)}&type=video');
+        final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 12));
 
-    final uri = Uri.parse(
-        'https://$inst/api/v1/search?q=${Uri.encodeComponent(query)}&type=video');
-    final resp = await http.get(uri).timeout(const Duration(seconds: 12));
-
-    if (resp.statusCode != 200) {
-      throw Exception('Invidious вернул ${resp.statusCode}');
+        if (resp.statusCode == 200) {
+          _setWorkingInstance(inst);
+          final List<dynamic> data = jsonDecode(resp.body);
+          return data
+              .where((r) => r['type'] == 'video')
+              .take(20)
+              .map((r) => InvidiousSearchResult.fromJson(r as Map<String, dynamic>))
+              .where((r) => r.videoId.isNotEmpty)
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('[Invidious] searchVideos (инстанс $inst) ошибка: $e');
+      }
     }
 
-    final List<dynamic> data = jsonDecode(resp.body);
-    return data
-        .where((r) => r['type'] == 'video')
-        .take(20)
-        .map((r) => InvidiousSearchResult.fromJson(r as Map<String, dynamic>))
-        .where((r) => r.videoId.isNotEmpty)
-        .toList();
+    throw Exception('Нет доступных Invidious инстансов для поиска');
   }
 
   // ── Метаданные видео ──────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> getVideoInfo(String videoId) async {
-    final inst = await findWorkingInstance();
-    if (inst == null) return null;
-
-    try {
-      final uri = Uri.parse('https://$inst/api/v1/videos/$videoId');
-      final resp = await http.get(uri).timeout(const Duration(seconds: 10));
-      if (resp.statusCode == 200) {
-        return jsonDecode(resp.body) as Map<String, dynamic>;
+    for (final inst in _instancesToTry) {
+      try {
+        final uri = Uri.parse('https://$inst/api/v1/videos/$videoId');
+        final resp = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
+        if (resp.statusCode == 200) {
+          _setWorkingInstance(inst);
+          return jsonDecode(resp.body) as Map<String, dynamic>;
+        }
+      } catch (e) {
+        debugPrint('[Invidious] getVideoInfo (инстанс $inst) ошибка: $e');
       }
-    } catch (e) {
-      debugPrint('[Invidious] getVideoInfo($videoId): $e');
     }
     return null;
   }
