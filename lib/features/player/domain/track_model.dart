@@ -13,9 +13,12 @@
 // Для прямых audio-ссылок (MP3 и т.п.) поведение не изменилось.
 
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:dio/dio.dart';
 import '../../../core/services/invidious_proxy_service.dart';
 
 // YouTube video ID — ровно 11 символов из A-Za-z0-9_-
@@ -54,9 +57,7 @@ class TrackModel {
     if (path != null &&
         (path.startsWith('http://') || path.startsWith('https://'))) {
       if (isYtVideoId) {
-        // YouTube-трек: прокидываем через Invidious, чтобы избежать 403 и IP-локов.
-        // НЕ используем googlevideo.com URL из youtube_explode напрямую.
-        return _buildInvidiousSource();
+        return _tryDirectOrInvidious();
       }
       // Прямая ссылка (MP3, FLAC и т.д.) — скачиваем с кэшированием
       final cacheFile = await _cacheFile('${id.hashCode}.m4a');
@@ -75,30 +76,74 @@ class TrackModel {
       return AudioSource.file(path);
     }
 
-    // ── YouTube-трек без локального файла: стрим через Invidious ─────────
-    // (например, временный трек из поиска, созданный с filePath: null)
+    // ── YouTube-трек без локального файла ────────────────────────────────
     if (isYtVideoId) {
-      return _buildInvidiousSource();
+      return _tryDirectOrInvidious();
     }
 
     // ── Тишина-заглушка (нет ни файла, ни YouTube ID) ────────────────────
     return AudioSource.asset('assets/mock/silence.mp3');
   }
 
+  Future<AudioSource> _tryDirectOrInvidious() async {
+    try {
+      // 1. Пробуем получить прямой стрим через youtube_explode_dart
+      final yt = YoutubeExplode();
+      try {
+        final manifest = await yt.videos.streamsClient.getManifest(id);
+        final streamInfo = manifest.audioOnly.withHighestBitrate();
+        final url = streamInfo.url.toString();
+
+        // 2. Делаем быстрый HEAD-запрос для проверки доступности
+        final dio = Dio(BaseOptions(
+          connectTimeout: const Duration(milliseconds: 2000),
+          receiveTimeout: const Duration(milliseconds: 2000),
+          sendTimeout: const Duration(milliseconds: 2000),
+        ));
+
+        final response = await dio.head(url);
+
+        if (response.statusCode != null && response.statusCode! >= 200 && response.statusCode! < 300) {
+          // Успешно подключились, используем прямой URL
+          final cacheFile = await _cacheFile('$id.m4a');
+          return LockCachingAudioSource(
+            Uri.parse(url),
+            headers: const {
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+            cacheFile: cacheFile,
+          );
+        } else {
+          throw Exception('Status code: ${response.statusCode}');
+        }
+      } finally {
+        yt.close();
+      }
+    } catch (e) {
+      debugPrint('[TrackModel] Ошибка прямого подключения ($e). Включаем обход блокировки через Invidious...');
+      return _buildInvidiousSource();
+    }
+  }
+
   // ── Построение Invidious LockCachingAudioSource ───────────────────────────
 
   Future<LockCachingAudioSource> _buildInvidiousSource() async {
-    // Убеждаемся, что рабочий инстанс найден (кэшируется на 30 мин)
-    await InvidiousProxyService.instance.findWorkingInstance();
-    final streamUrl = InvidiousProxyService.instance.buildStreamUrl(id);
+    final streamUrlStr = await InvidiousProxyService.instance.getProxiedStreamUrl(id);
+    if (streamUrlStr == null) {
+      throw Exception('Не удалось получить проксированный URL');
+    }
+
     final cacheFile = await _cacheFile('$id.m4a');
 
     return LockCachingAudioSource(
-      Uri.parse(streamUrl),
+      Uri.parse(streamUrlStr),
       headers: const {
         'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
             '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.youtube.com/',
+        'Origin': 'https://www.youtube.com/',
       },
       cacheFile: cacheFile,
     );
