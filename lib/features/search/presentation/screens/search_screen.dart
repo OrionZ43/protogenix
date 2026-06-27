@@ -15,8 +15,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
-import '../../../player/presentation/providers/player_provider.dart';
-import '../../../player/domain/track_model.dart';
 import '../../../importer/data/importer_service.dart';
 import '../../../library/presentation/library_provider.dart';
 import '../providers/search_provider.dart';
@@ -238,7 +236,7 @@ class _LoadingStateState extends State<_LoadingState> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Text(
-                _phrase!,
+                _phrase,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withAlpha(115),
@@ -342,90 +340,13 @@ class _SearchResultCard extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _PlayButton(track: track, cleanTitle: title),
-                      _ImportButton(track: track),
-                    ],
-                  ),
+                  _ImportButton(track: track),
                 ],
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Play Button ───────────────────────────────────────────────────────────────
-//
-// Создаёт TrackModel с filePath: null.
-// toAudioSource() обнаруживает YouTube video ID в поле id и строит
-// Invidious-прокси URL — без 403, без googlevideo.com.
-
-class _PlayButton extends ConsumerStatefulWidget {
-  final SearchTrack track;
-  final String cleanTitle;
-  const _PlayButton({required this.track, required this.cleanTitle});
-
-  @override
-  ConsumerState<_PlayButton> createState() => _PlayButtonState();
-}
-
-class _PlayButtonState extends ConsumerState<_PlayButton> {
-  bool _isLoading = false;
-
-  Future<void> _onPlay() async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
-
-    try {
-      // InvidiousProxyService использует последовательный перебор автоматически
-
-      final tempTrack = TrackModel(
-        id: widget.track.id, // YouTube video ID — toAudioSource использует его
-        title: widget.cleanTitle,
-        artist: widget.track.artist,
-        album: 'YouTube',
-        duration: widget.track.duration,
-        coverImage: NetworkImage(widget.track.highResThumbnailUrl),
-        filePath: null, // toAudioSource автоматически применит Invidious-прокси
-      );
-
-      await ref
-          .read(playerProvider.notifier)
-          .loadPlaylist([tempTrack], initialIndex: 0);
-      await ref.read(playerProvider.notifier).play();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('▶ ${widget.cleanTitle}'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка воспроизведения: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _GlassActionButton(
-      onPressed: _onPlay,
-      isLoading: _isLoading,
-      icon: Icons.play_arrow_rounded,
-      label: 'Слушать',
     );
   }
 }
