@@ -9,7 +9,6 @@
 //  • _ProxyBanner появляется, если result.usingProxy == true
 //  • _LoadingState иногда показывает фразу «слом 4-й стены»
 
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,7 +17,6 @@ import '../../../player/presentation/widgets/protogenix_background.dart';
 import '../../../importer/data/importer_service.dart';
 import '../../../library/presentation/library_provider.dart';
 import '../providers/search_provider.dart';
-import '../../../../../core/services/invidious_proxy_service.dart';
 
 // ── Утилита очистки заголовка ─────────────────────────────────────────────────
 
@@ -201,52 +199,15 @@ class _ProxyBanner extends StatelessWidget {
 
 // ── Загрузка с фразами «слом 4-й стены» ──────────────────────────────────────
 
-class _LoadingState extends StatefulWidget {
+class _LoadingState extends StatelessWidget {
   const _LoadingState();
 
   @override
-  State<_LoadingState> createState() => _LoadingStateState();
-}
-
-class _LoadingStateState extends State<_LoadingState> {
-  late final String? _phrase;
-
-  @override
-  void initState() {
-    super.initState();
-    // Показываем фразу с вероятностью ~40%
-    final rnd = Random();
-    _phrase = rnd.nextInt(5) < 2
-        ? kProxyBypassPhrases[rnd.nextInt(kProxyBypassPhrases.length)]
-        : null;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(Colors.white54),
-            strokeWidth: 2,
-          ),
-          if (_phrase != null) ...[
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                _phrase,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withAlpha(115),
-                  fontSize: 13,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          ],
-        ],
+    return const Center(
+      child: CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation(Colors.white54),
+        strokeWidth: 2,
       ),
     );
   }
