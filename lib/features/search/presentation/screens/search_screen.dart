@@ -133,17 +133,10 @@ class _SearchBody extends StatelessWidget {
     return state.when(
       data: (result) {
         if (result.isEmpty) return const _EmptyState();
-        return Column(
-          children: [
-            if (result.usingProxy) const _ProxyBanner(),
-            Expanded(
-              child: ListView.builder(
-                itemCount: result.tracks.length,
-                itemBuilder: (context, index) =>
-                    _SearchResultCard(track: result.tracks[index]),
-              ),
-            ),
-          ],
+        return ListView.builder(
+          itemCount: result.tracks.length,
+          itemBuilder: (context, index) =>
+              _SearchResultCard(track: result.tracks[index]),
         );
       },
       loading: () => const _LoadingState(),
@@ -161,43 +154,7 @@ class _SearchBody extends StatelessWidget {
   }
 }
 
-// ── Прокси-баннер ─────────────────────────────────────────────────────────────
-
-class _ProxyBanner extends StatelessWidget {
-  const _ProxyBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.deepPurple.withAlpha(55),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.deepPurpleAccent.withAlpha(90)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.vpn_key_rounded,
-              color: Colors.deepPurpleAccent, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '⚡ Активирован обходной маршрут через Invidious',
-              style: TextStyle(
-                color: Colors.deepPurpleAccent.withAlpha(220),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Загрузка с фразами «слом 4-й стены» ──────────────────────────────────────
+// ── Загрузка ─────────────────────────────────────────────────────────────────
 
 class _LoadingState extends StatelessWidget {
   const _LoadingState();

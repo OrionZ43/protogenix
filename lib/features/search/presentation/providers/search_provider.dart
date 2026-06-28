@@ -1,26 +1,19 @@
 // lib/features/search/presentation/providers/search_provider.dart
 //
-// Поиск музыки с автоматическим фолбэком на Invidious.
+// Поиск музыки.
 //
 // Архитектура:
-//  1. Пробуем YouTube через youtube_explode_dart (таймаут 8 сек)
-//  2. При любой сетевой ошибке (SocketException, HandshakeException,
-//     HttpException, TimeoutException или иной) — переключаемся на
-//     поиск через Invidious API /api/v1/search
-//  3. SearchResult.usingProxy == true сигнализирует UI включить баннер
-//     и показать фразы «слом 4-й стены»
+//  Пробуем YouTube через youtube_explode_dart. При сетевой ошибке пробрасываем её.
 
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import '../../../../../core/services/invidious_proxy_service.dart';
 
 // ── Чистая модель результата поиска ──────────────────────────────────────────
 //
 // Не зависит от youtube_explode_dart.Video — позволяет использовать
-// разные источники (YouTube, Invidious) без изменений UI.
+// разные источники (YouTube) без изменений UI.
 
 class SearchTrack {
   final String id;
@@ -44,11 +37,9 @@ class SearchTrack {
 
 class SearchResult {
   final List<SearchTrack> tracks;
-  final bool usingProxy;
 
   const SearchResult({
     this.tracks = const [],
-    this.usingProxy = false,
   });
 
   bool get isEmpty => tracks.isEmpty;
@@ -99,39 +90,13 @@ class SearchNotifier extends AsyncNotifier<SearchResult> {
           .toList();
 
       debugPrint('[Search] YouTube: ${tracks.length} результатов');
-      return SearchResult(tracks: tracks, usingProxy: false);
-    } on SocketException catch (e) {
-      debugPrint('[Search] SocketException — переходим на Invidious: $e');
-    } on HandshakeException catch (e) {
-      debugPrint('[Search] HandshakeException — переходим на Invidious: $e');
-    } on HttpException catch (e) {
-      debugPrint('[Search] HttpException — переходим на Invidious: $e');
-    } on TimeoutException catch (e) {
-      debugPrint('[Search] Таймаут — переходим на Invidious: $e');
+      return SearchResult(tracks: tracks);
     } catch (e) {
-      debugPrint('[Search] Ошибка YouTube — переходим на Invidious: $e');
+      debugPrint('[Search] Ошибка YouTube: $e');
+      rethrow;
     } finally {
       yt.close();
     }
-
-    // ── 2. Фолбэк на Invidious ────────────────────────────────────────────
-    debugPrint('[Search] Используем Invidious...');
-    final invResults =
-        await InvidiousProxyService.instance.searchVideos(query);
-
-    final tracks = invResults
-        .map((r) => SearchTrack(
-              id: r.videoId,
-              title: r.title,
-              artist: r.author,
-              thumbnailUrl: r.thumbnailUrl,
-              highResThumbnailUrl: r.highResThumbnailUrl,
-              duration: r.duration,
-            ))
-        .toList();
-
-    debugPrint('[Search] Invidious: ${tracks.length} результатов');
-    return SearchResult(tracks: tracks, usingProxy: true);
   }
 }
 

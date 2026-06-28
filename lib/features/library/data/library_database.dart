@@ -17,7 +17,7 @@ class LibraryDatabase {
     final dbPath = await getDatabasesPath();
     return openDatabase(
       join(dbPath, 'protogenix.db'),
-      version: 1,
+      version: 2,
       onCreate: (db, version) {
         return db.execute('''
           CREATE TABLE tracks (
@@ -30,9 +30,15 @@ class LibraryDatabase {
             lrcPath    TEXT,
             durationMs INTEGER NOT NULL,
             source     TEXT NOT NULL,
-            addedAt    INTEGER NOT NULL
+            addedAt    INTEGER NOT NULL,
+            audioQuality TEXT
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE tracks ADD COLUMN audioQuality TEXT');
+        }
       },
     );
   }
