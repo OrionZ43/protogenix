@@ -37,7 +37,14 @@ import '../../../core/services/invidious_proxy_service.dart';
 
 // ── Модели прогресса ──────────────────────────────────────────────────────────
 
-enum ImportStatus { idle, fetchingMeta, downloading, fetchingLyrics, done, error }
+enum ImportStatus {
+  idle,
+  fetchingMeta,
+  downloading,
+  fetchingLyrics,
+  done,
+  error
+}
 
 class ImportProgress {
   final ImportStatus status;
@@ -296,8 +303,7 @@ class ImporterService {
     final savePath = await _getTrackPath('$videoId.$ext');
     final totalBytes = streamInfo.size.totalBytes;
 
-    debugPrint(
-        '[YT] Поток: ${streamInfo.bitrate}, '
+    debugPrint('[YT] Поток: ${streamInfo.bitrate}, '
         'размер: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB');
 
     final file = File(savePath);
@@ -363,9 +369,11 @@ class ImporterService {
         progress: 0.15,
       ));
 
-      final proxiedStreamUrl = await InvidiousProxyService.instance.getProxiedStreamUrl(videoId);
+      final proxiedStreamUrl =
+          await InvidiousProxyService.instance.getProxiedStreamUrl(videoId);
       if (proxiedStreamUrl == null) {
-        throw Exception('Не удалось получить аудио-поток через Invidious proxy');
+        throw Exception(
+            'Не удалось получить аудио-поток через Invidious proxy');
       }
       final streamUrl = proxiedStreamUrl;
 
@@ -425,10 +433,9 @@ class ImporterService {
       throw Exception('Invidious: не удалось получить метаданные $videoId');
     }
 
-    final title =
-        titleOverride ?? _cleanYouTubeTitle(meta['title'] as String? ?? 'Unknown');
-    final artist =
-        artistOverride ?? (meta['author'] as String? ?? 'Unknown');
+    final title = titleOverride ??
+        _cleanYouTubeTitle(meta['title'] as String? ?? 'Unknown');
+    final artist = artistOverride ?? (meta['author'] as String? ?? 'Unknown');
     final durationSec = meta['lengthSeconds'] as int? ?? 0;
 
     onProgress(ImportProgress(
@@ -438,7 +445,8 @@ class ImporterService {
     ));
 
     // Аудио через Invidious stream URL
-    final proxiedStreamUrl = await InvidiousProxyService.instance.getProxiedStreamUrl(videoId);
+    final proxiedStreamUrl =
+        await InvidiousProxyService.instance.getProxiedStreamUrl(videoId);
     if (proxiedStreamUrl == null) {
       throw Exception('Не удалось получить аудио-поток через Invidious proxy');
     }
@@ -528,10 +536,10 @@ class ImporterService {
       }
 
       final html = response.data.toString();
-      final titleMatch =
-          RegExp(r'<meta property="og:title" content="([^"]+)"').firstMatch(html);
-      final descMatch =
-          RegExp(r'<meta name="description" content="([^"]+)"').firstMatch(html);
+      final titleMatch = RegExp(r'<meta property="og:title" content="([^"]+)"')
+          .firstMatch(html);
+      final descMatch = RegExp(r'<meta name="description" content="([^"]+)"')
+          .firstMatch(html);
 
       if (titleMatch == null || descMatch == null) {
         throw Exception('Не удалось извлечь метаданные Spotify');
@@ -547,7 +555,8 @@ class ImporterService {
         if (parts.length >= 2) artist = parts[1].trim();
       } else if (pageDesc.contains('Playlist ·') ||
           pageDesc.contains('Album ·')) {
-        throw Exception('Поддерживается только импорт одиночных треков Spotify');
+        throw Exception(
+            'Поддерживается только импорт одиночных треков Spotify');
       }
 
       final query = '$artist - $trackTitle';
@@ -566,9 +575,8 @@ class ImporterService {
 
         // ── Поиск на YouTube ────────────────────────────────────────────
         try {
-          final results = await yt.search
-              .search(query)
-              .timeout(const Duration(seconds: 8));
+          final results =
+              await yt.search.search(query).timeout(const Duration(seconds: 8));
 
           if (results.isEmpty) throw Exception('Не найдено на YouTube');
 
@@ -673,7 +681,7 @@ class ImporterService {
       final headers = {
         'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-            '(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                '(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
       };
 
@@ -745,7 +753,8 @@ class ImporterService {
         message: 'Создание плейлиста "$playlistName"...',
         progress: 0.05,
       ));
-      final playlist = await PlaylistDatabase.instance.createPlaylist(playlistName);
+      final playlist =
+          await PlaylistDatabase.instance.createPlaylist(playlistName);
 
       final yt = YoutubeExplode();
       final downloadedIds = <String>[];
@@ -792,7 +801,8 @@ class ImporterService {
                   }
                 }
               } catch (e) {
-                debugPrint('[Yandex] YouTube Search недоступен → Invidious: $e');
+                debugPrint(
+                    '[Yandex] YouTube Search недоступен → Invidious: $e');
                 ytBlocked = true;
                 useInvidious = true;
                 onProgress(ImportProgress(
@@ -838,8 +848,7 @@ class ImporterService {
                   onProgress: (p) => onProgress(ImportProgress(
                     status: p.status,
                     message: '$i/${parsedTracks.length}: ${p.message}',
-                    progress:
-                        progressBase + progressStep * p.progress,
+                    progress: progressBase + progressStep * p.progress,
                   )),
                 );
               } catch (e) {
@@ -854,8 +863,7 @@ class ImporterService {
                   onProgress: (p) => onProgress(ImportProgress(
                     status: p.status,
                     message: '$i/${parsedTracks.length}: ${p.message}',
-                    progress:
-                        progressBase + progressStep * p.progress,
+                    progress: progressBase + progressStep * p.progress,
                   )),
                 );
                 trackId = vid;
@@ -1066,8 +1074,7 @@ class ImporterService {
       // youtu.be/ID или youtube.com/shorts/ID
       if (uri.pathSegments.isNotEmpty) {
         final seg = uri.pathSegments.last;
-        if (seg.length == 11 &&
-            RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(seg)) {
+        if (seg.length == 11 && RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(seg)) {
           return seg;
         }
       }
