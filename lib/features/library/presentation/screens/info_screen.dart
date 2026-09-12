@@ -19,6 +19,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/services/app_paths.dart';
+import '../../../../core/widgets/app_license_page.dart';
 import '../../../../core/widgets/chip_button.dart';
 import '../../../../core/widgets/neon_logo.dart';
 import '../../../../core/widgets/z43_branding.dart';
@@ -788,16 +789,7 @@ class _CreditsCard extends ConsumerWidget {
           icon: Icons.description_outlined,
           onTap: () {
             final version = ref.read(_packageInfoProvider).valueOrNull?.version;
-            showLicensePage(
-              context: context,
-              applicationName: 'Protogenix',
-              applicationVersion: version == null ? null : 'v$version',
-              applicationIcon: const Padding(
-                padding: EdgeInsets.all(12),
-                child: NeonLogo(size: 64),
-              ),
-              applicationLegalese: 'Z43 Studios',
-            );
+            showAppLicenses(context, version: version);
           },
         ),
       ],
