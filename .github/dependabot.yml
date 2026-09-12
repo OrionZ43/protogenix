@@ -21,6 +21,20 @@ updates:
       # youtube_explode_dart — за её мажорами следить самому)
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # Правило выше обновления pub в группе не остановило: первый же PR
+      # (2026-09-12) принёс riverpod 3 и just_audio 0.10. К тому же у пакетов
+      # 0.x ломающий переход 0.9 → 0.10 Dependabot считает минорным. Переходы,
+      # которые требуют переделки кода, закрыты явно — это отдельные задачи.
+      - dependency-name: "just_audio"
+        versions: [">=0.10.0"]
+      - dependency-name: "audio_session"
+        versions: [">=0.2.0"]
+      - dependency-name: "flutter_riverpod"
+        versions: [">=3.0.0"]
+      # Кодогенерация не используется (dependencies.md) — не обновлять
+      - dependency-name: "riverpod_annotation"
+      - dependency-name: "riverpod_generator"
+      - dependency-name: "build_runner"
     groups:
       # От youtube_explode_dart зависит скачивание — отдельный PR, чтобы его
       # можно было проверить и слить быстро, не дожидаясь остальных
@@ -29,6 +43,9 @@ updates:
       other:
         patterns: ["*"]
         exclude-patterns: ["youtube_explode_dart"]
+        # Только минорные версии и патчи: крупное, если просочится, придёт
+        # отдельным PR и не заблокирует безобидные обновления
+        update-types: ["minor", "patch"]
 
   # Версии самих GitHub Actions в ci.yml
   - package-ecosystem: "github-actions"
