@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'beautiful_lyrics_view.dart';
 import 'lyrics_search_sheet.dart';
 import '../../../importer/presentation/importer_sheet.dart';
 import 'sleep_timer_sheet.dart';
+import 'eq_sheet.dart';
 
 class PlayerMainControls extends ConsumerWidget {
   const PlayerMainControls({
@@ -105,27 +107,37 @@ class _TopBar extends StatelessWidget {
               ),
             ),
 
-            // Справа: Лирика
-            if (compact)
-              Positioned(
-                right: 16,
-                child: Row(
-                  children: [
-                    if (track != null)
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _showLyricsSheet(context, track!);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Icon(Icons.lyrics_outlined,
-                              color: Colors.white54, size: 22),
-                        ),
+            // Справа: эквалайзер (только Android) и текст
+            Positioned(
+              right: 16,
+              child: Row(
+                children: [
+                  if (Platform.isAndroid)
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        showEqSheet(context);
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: _EqIcon(),
                       ),
-                  ],
-                ),
+                    ),
+                  if (compact && track != null)
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _showLyricsSheet(context, track!);
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(Icons.lyrics_outlined,
+                            color: Colors.white54, size: 22),
+                      ),
+                    ),
+                ],
               ),
+            ),
           ],
         ),
       ),
@@ -202,6 +214,19 @@ class _TopBar extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Иконка эквалайзера: окрашена в цвет обложки, когда он включён.
+class _EqIcon extends ConsumerWidget {
+  const _EqIcon();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(playerProvider.select((s) => s.eqEnabled));
+    final accent = ref.watch(paletteProvider.select((p) => p.primary));
+    return Icon(Icons.tune_rounded,
+        color: enabled ? accent : Colors.white54, size: 22);
   }
 }
 

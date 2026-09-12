@@ -8,11 +8,16 @@
 // v3.3 — автопоиск берёт только «ту же песню» (lyrics_matcher.dart) и
 //   передаёт длительность трека; тайминги slowed/sped up растягиваются,
 //   тайминги от другой версии трека не показываются (lyrics_timing.dart).
+// v3.4 — пока приложение свёрнуто (app_visibility.dart), текст не ищется и
+//   активная строка не считается: догоняем, когда вернётся на экран.
+//   Вибрация на смене строки — только в самом виде текста
+//   (beautiful_lyrics_view.dart): раньше провайдер вибрировал и со свёрнутым
+//   плеером, и со свёрнутым приложением.
 
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/services/app_visibility.dart';
 import '../../domain/advanced_lrc_parser.dart';
 import '../../domain/lyrics_timing.dart';
 import '../../domain/track_model.dart';
@@ -83,10 +88,21 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
   // Если трек снова сменился пока загружается — токен устарел, результат игнорируется.
   Object? _currentLoadToken;
 
+  // Трек, чей текст ждёт возвращения приложения на экран
+  TrackModel? _deferredTrack;
+
   // Дебаунс: ждём 400мс тишины перед реальным запросом
   static const _kDebounceDuration = Duration(milliseconds: 400);
 
   void _init() {
+    _ref.listen<bool>(appVisibleProvider, (_, visible) {
+      final track = _deferredTrack;
+      final token = _currentLoadToken;
+      if (!visible || track == null || token == null) return;
+      _deferredTrack = null;
+      _doLoad(track, token);
+    });
+
     _ref.listen(playerProvider, (previous, next) {
       final prevId = previous?.currentTrack?.id;
       final nextId = next.currentTrack?.id;
@@ -115,6 +131,7 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
     // Показываем loading сразу, но запрос не делаем
     state = const KaraokeState(isLoaded: false);
     _lastLineIndex = -1;
+    _deferredTrack = null;
 
     // Создаём новый токен — старый in-flight запрос его не получит
     final token = Object();
@@ -124,12 +141,19 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
       // Если за 400мс трек снова поменялся — наш токен уже устарел
       if (_currentLoadToken != token) return;
       if (!mounted) return;
+      // Свёрнутому приложению текст не нужен: до 30 запросов в сеть на
+      // каждый трек. Загрузим, когда приложение вернётся на экран.
+      if (!_ref.read(appVisibleProvider)) {
+        _deferredTrack = track;
+        return;
+      }
       _doLoad(track, token);
     });
   }
 
   void _cancelLoad() {
     _currentLoadToken = null;
+    _deferredTrack = null;
   }
 
   // ── Реальная загрузка ─────────────────────────────────────────────────────
@@ -255,6 +279,9 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
   void _updateCurrentLine(Duration position) {
     if (!state.isLoaded || state.lines.isEmpty) return;
     if (state.format == LyricsFormat.plain) return;
+    // Позиция приходит несколько раз в секунду; свёрнутому приложению
+    // активная строка не нужна — пересчитаем по возвращении на экран.
+    if (!_ref.read(appVisibleProvider)) return;
 
     final index = AdvancedLrcParser.currentLineIndexFromDuration(
       state.lines,
@@ -263,18 +290,6 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
 
     if (index == _lastLineIndex) return;
     _lastLineIndex = index;
-
-    if (index >= 0) {
-      // Для фоновых строк отключаем или делаем слабее хаптик (чтобы не перегружать)
-      final line = state.lines[index];
-      final isLineBg = line.words.isNotEmpty &&
-          line.words.first.syllables.isNotEmpty &&
-          line.words.first.syllables.first.isBackground;
-      if (!isLineBg) {
-        HapticFeedback.selectionClick();
-      }
-    }
-
     state = state.copyWith(currentIndex: index);
   }
 

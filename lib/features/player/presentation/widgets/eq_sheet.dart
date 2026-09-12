@@ -4,20 +4,21 @@
 // Поддерживается только на Android (AndroidEqualizer из just_audio).
 //
 // Использование:
-//   showEqSheet(context, ref);
+//   showEqSheet(context);
+// Кнопка — в верхней панели плеера (player_main_controls.dart), только на
+// Android. Подключение к звуку и сохранение настроек — PlayerNotifier.
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
-import '../../data/audio_handler.dart';
 import '../../domain/player_state.dart'; // <-- ИСПРАВЛЕНИЕ: Добавлен импорт
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
 
 /// Открывает EQ BottomSheet.
-void showEqSheet(BuildContext context, WidgetRef ref) {
+void showEqSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -39,24 +40,22 @@ class _EqSheet extends ConsumerStatefulWidget {
 class _EqSheetState extends ConsumerState<_EqSheet> {
   AndroidEqualizerParameters? _params;
   String? _loadError;
+  late final bool _unsupported;
 
   @override
   void initState() {
     super.initState();
-    _loadParams();
+    _unsupported = !ref.read(playerProvider.notifier).eqSupported;
+    if (!_unsupported) _loadParams();
   }
 
   Future<void> _loadParams() async {
-    try {
-      final handler = audioHandler as ProtogenixAudioHandler;
-      final params = await handler.equalizer?.parameters;
-      if (mounted) setState(() => _params = params);
-    } catch (e) {
-      debugPrint('Ошибка загрузки параметров эквалайзера: $e');
-      if (mounted) {
-        setState(() => _loadError = 'Ошибка загрузки параметров эквалайзера');
-      }
-    }
+    final params = await ref.read(playerProvider.notifier).loadEq();
+    if (!mounted) return;
+    setState(() {
+      _params = params;
+      if (params == null) _loadError = 'Эквалайзер недоступен';
+    });
   }
 
   @override
@@ -159,13 +158,7 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
 
               // ── Кнопка Reset ─────────────────────────────────────────────
               GestureDetector(
-                onTap: player.eqEnabled
-                    ? () async {
-                        for (int i = 0; i < 5; i++) {
-                          await notifier.setEqBandGain(i, 0.0);
-                        }
-                      }
-                    : null,
+                onTap: player.eqEnabled ? notifier.resetEq : null,
                 child: Opacity(
                   opacity: player.eqEnabled ? 1.0 : 0.3,
                   child: Container(
@@ -258,6 +251,19 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
     PlayerNotifier notifier,
     Color accentColor,
   ) {
+    if (_unsupported) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            'Эквалайзер пока есть только на Android.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withAlpha(80), fontSize: 13),
+          ),
+        ),
+      );
+    }
+
     // Состояние загрузки
     if (_loadError != null) {
       return Center(

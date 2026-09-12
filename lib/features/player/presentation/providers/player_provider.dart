@@ -9,9 +9,12 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show ImageProvider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+import '../../../../core/services/app_visibility.dart';
 import '../../data/audio_handler.dart';
+import '../../data/eq_settings_store.dart';
 import '../../domain/player_state.dart';
 import '../../domain/track_model.dart';
 import 'palette_provider.dart';
@@ -38,13 +41,18 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   // ── Инициализация ─────────────────────────────────────────────────────────
 
   Future<void> _init() async {
+    // Цвета обложки свёрнутому приложению не нужны — считаем по возвращении
+    _ref.listen<bool>(appVisibleProvider, (_, visible) {
+      final track = _paletteDeferred;
+      if (visible && track != null) _updatePalette(track);
+    });
+
     _player.positionStream.listen((pos) {
       if (mounted) state = state.copyWith(position: pos);
     });
 
-    _player.bufferedPositionStream.listen((pos) {
-      if (mounted) state = state.copyWith(buffered: pos);
-    });
+    // bufferedPositionStream не слушаем: state.buffered никто не читает, а
+    // событие приходило до двух раз в секунду и будило всех слушателей.
 
     _player.durationStream.listen((dur) {
       if (mounted && dur != null) state = state.copyWith(total: dur);
@@ -107,7 +115,21 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     }
   }
 
+  // Обложка, для которой цвета уже посчитаны (или считаются)
+  ImageProvider? _paletteImage;
+  // Трек, чьи цвета ждут возвращения приложения на экран
+  TrackModel? _paletteDeferred;
+
   void _updatePalette(TrackModel track) {
+    if (!_ref.read(appVisibleProvider)) {
+      _paletteDeferred = track;
+      return;
+    }
+    _paletteDeferred = null;
+    // Смена трека зовёт это дважды (loadPlaylist и currentIndexStream), а у
+    // треков одного альбома обложка одна — цвета те же, считать незачем.
+    if (track.coverImage == _paletteImage) return;
+    _paletteImage = track.coverImage;
     try {
       _ref.read(paletteProvider.notifier).extractFromImage(track.coverImage);
     } catch (e) {
@@ -190,6 +212,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
         sources: audioSources,
         initialIndex: initialIndex,
       );
+      unawaited(_restoreEq());
       if (tracksList.isNotEmpty) {
         _updatePalette(tracksList[initialIndex]);
       }
@@ -290,29 +313,127 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   }
 
   // ── Эквалайзер ─────────────────────────────────────────────────────────────
+  //
+  // AndroidEqualizer из just_audio стоит в конвейере ProtogenixAudioHandler
+  // (только Android). Полосы — частоты и диапазон дБ — платформа отдаёт, когда
+  // у плеера появляется источник. Поэтому сохранённые настройки применяются
+  // после первой загрузки очереди (_restoreEq), а шторка ждёт полосы через
+  // loadEq. Состояние (eqEnabled, eqBandGains) всегда берётся у самого
+  // эквалайзера, а не хранится отдельно.
 
-  /// Включает или выключает Android DSP эквалайзер.
-  Future<void> setEqEnabled(bool enabled) async {
+  AndroidEqualizer? get _equalizer => _handler.equalizer;
+  late final _eqStore = EqSettingsStore();
+  Timer? _eqSaveTimer;
+  bool _eqRestored = false;
+
+  /// Есть ли эквалайзер на этой платформе.
+  bool get eqSupported => _equalizer != null;
+
+  /// Полосы эквалайзера (заодно обновляет состояние). null — эквалайзера нет
+  /// на этой платформе или плеер ещё не загрузил ни одного трека.
+  Future<AndroidEqualizerParameters?> loadEq({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final eq = _equalizer;
+    if (eq == null) return null;
     try {
-      // Not implemented for now in the custom AudioHandler
+      final params = await eq.parameters.timeout(timeout);
+      _syncEqState(eq, params);
+      return params;
+    } catch (e) {
+      debugPrint('[EQ] Полосы недоступны: $e');
+      return null;
+    }
+  }
+
+  /// Включает или выключает эквалайзер.
+  Future<void> setEqEnabled(bool enabled) async {
+    final eq = _equalizer;
+    if (eq == null) return;
+    try {
+      await eq.setEnabled(enabled);
       if (mounted) state = state.copyWith(eqEnabled: enabled);
+      _scheduleEqSave();
     } catch (e) {
       debugPrint('EQ setEnabled error: $e');
     }
   }
 
-  /// Устанавливает gain указанной полосы в dB.
+  /// Устанавливает усиление полосы в дБ.
   Future<void> setEqBandGain(int bandIndex, double gain) async {
+    final params = await loadEq();
+    if (params == null || bandIndex < 0 || bandIndex >= params.bands.length) {
+      return;
+    }
     try {
-      // Not implemented for now in the custom AudioHandler
-      final newGains = List<double>.from(state.eqBandGains);
-      if (bandIndex >= 0 && bandIndex < newGains.length) {
-        newGains[bandIndex] = gain;
-        if (mounted) state = state.copyWith(eqBandGains: newGains);
-      }
+      await params.bands[bandIndex].setGain(
+          gain.clamp(params.minDecibels, params.maxDecibels).toDouble());
+      _syncEqState(_equalizer!, params);
+      _scheduleEqSave();
     } catch (e) {
       debugPrint('EQ setGain error (band=$bandIndex): $e');
     }
+  }
+
+  /// Все полосы в ноль.
+  Future<void> resetEq() async {
+    final params = await loadEq();
+    if (params == null) return;
+    try {
+      for (final band in params.bands) {
+        await band.setGain(0);
+      }
+      _syncEqState(_equalizer!, params);
+      _scheduleEqSave();
+    } catch (e) {
+      debugPrint('EQ reset error: $e');
+    }
+  }
+
+  void _syncEqState(AndroidEqualizer eq, AndroidEqualizerParameters params) {
+    if (!mounted) return;
+    state = state.copyWith(
+      eqEnabled: eq.enabled,
+      eqBandGains: [for (final band in params.bands) band.gain],
+    );
+  }
+
+  /// Применяет сохранённые настройки, как только у плеера появились полосы.
+  Future<void> _restoreEq() async {
+    final eq = _equalizer;
+    if (eq == null || _eqRestored) return;
+    _eqRestored = true;
+    final params = await loadEq(timeout: const Duration(seconds: 15));
+    if (params == null) {
+      _eqRestored = false; // попробуем при следующей загрузке очереди
+      return;
+    }
+    try {
+      final saved = await _eqStore.load();
+      if (saved != null && saved.gains.length == params.bands.length) {
+        for (var i = 0; i < params.bands.length; i++) {
+          await params.bands[i].setGain(saved.gains[i]
+              .clamp(params.minDecibels, params.maxDecibels)
+              .toDouble());
+        }
+        await eq.setEnabled(saved.enabled);
+      }
+    } catch (e) {
+      debugPrint('[EQ] Не удалось применить сохранённые настройки: $e');
+    }
+    _syncEqState(eq, params);
+  }
+
+  /// Сохраняет настройки через полсекунды после последнего изменения:
+  /// слайдер при перетаскивании меняет усиление десятки раз в секунду.
+  void _scheduleEqSave() {
+    _eqSaveTimer?.cancel();
+    _eqSaveTimer = Timer(const Duration(milliseconds: 500), () {
+      final eq = _equalizer;
+      if (eq == null) return;
+      unawaited(_eqStore.save(
+          EqSettings(enabled: eq.enabled, gains: List.of(state.eqBandGains))));
+    });
   }
 
   // ── Таймер сна ─────────────────────────────────────────────────────────────
@@ -382,6 +503,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   @override
   void dispose() {
     _sleepTimer?.cancel();
+    _eqSaveTimer?.cancel();
     super.dispose();
   }
 }

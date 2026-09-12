@@ -39,22 +39,23 @@ class PaletteState {
 class PaletteNotifier extends StateNotifier<PaletteState> {
   PaletteNotifier() : super(PaletteState.defaultState);
 
+  // Номер последнего запроса: результат устаревшего не перетирает свежий
+  int _generation = 0;
+
   Future<void> extractFromImage(ImageProvider imageProvider) async {
+    final generation = ++_generation;
     state = state.copyWith(isLoading: true);
 
     try {
+      // Цвета считаются по каждому пикселю на UI-потоке, а обложки бывают по
+      // 1280 px (миниатюры YouTube). Параметр size у palette_generator картинку
+      // не уменьшает, поэтому уменьшаем сами: для палитры хватает 96 px.
       final generator = await PaletteGenerator.fromImageProvider(
-        imageProvider,
-        size: const Size(200, 200),
+        ResizeImage(imageProvider,
+            width: 96, height: 96, policy: ResizeImagePolicy.fit),
         maximumColorCount: 16,
       );
-      debugPrint('=== PALETTE DEBUG ===');
-      debugPrint('dominant: ${generator.dominantColor?.color}');
-      debugPrint('vibrant: ${generator.vibrantColor?.color}');
-      debugPrint('lightVibrant: ${generator.lightVibrantColor?.color}');
-      debugPrint('darkVibrant: ${generator.darkVibrantColor?.color}');
-      debugPrint('muted: ${generator.mutedColor?.color}');
-      debugPrint('darkMuted: ${generator.darkMutedColor?.color}');
+      if (generation != _generation || !mounted) return;
 
       final primary = generator.vibrantColor?.color ??
           generator.lightVibrantColor?.color ??
@@ -94,6 +95,7 @@ class PaletteNotifier extends StateNotifier<PaletteState> {
         isLoading: false,
       );
     } catch (e, stack) {
+      if (generation != _generation || !mounted) return;
       debugPrint('PaletteGenerator ERROR: $e');
       debugPrint('Stack: $stack');
       state = PaletteState.defaultState;

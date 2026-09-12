@@ -74,6 +74,14 @@ final _screens = <Widget>[
   const LibraryScreen(),
 ];
 
+/// Вкладки для IndexedStack. Скрытые вкладки остаются в дереве, и IndexedStack
+/// их тикеры не глушит: анимированный фон и коллажи плейлистов на невидимых
+/// вкладках тикали каждый кадр. TickerMode останавливает их до возвращения.
+List<Widget> _tabScreens(int active) => [
+      for (var i = 0; i < _screens.length; i++)
+        TickerMode(enabled: i == active, child: _screens[i]),
+    ];
+
 // ── Хелпер: десктопная платформа? ────────────────────────────────────────────
 
 bool get _isDesktop =>
@@ -167,7 +175,7 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
           Expanded(
             child: IndexedStack(
               index: tabIndex,
-              children: _screens,
+              children: _tabScreens(tabIndex),
             ),
           ),
         ],
@@ -321,7 +329,7 @@ class _ExpandedShell extends ConsumerWidget {
                 Expanded(
                   child: IndexedStack(
                     index: tabIndex,
-                    children: _screens,
+                    children: _tabScreens(tabIndex),
                   ),
                 ),
               ],
@@ -573,7 +581,7 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
                         Expanded(
                           child: IndexedStack(
                             index: tabIndex,
-                            children: _screens,
+                            children: _tabScreens(tabIndex),
                           ),
                         ),
                       ],

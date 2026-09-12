@@ -163,7 +163,12 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     ref.listen(karaokeProvider.select((s) => s.currentIndex), (prev, next) {
       if (prev != next && next >= 0) {
         if (!_userScrolling) _scrollTo(next);
-        HapticPatterns.lyricsLine();
+        // Вид текста остаётся в дереве и со свёрнутым приложением, если перед
+        // этим был открыт, — вибрируем, только пока приложение на экране.
+        if (WidgetsBinding.instance.lifecycleState ==
+            AppLifecycleState.resumed) {
+          HapticPatterns.lyricsLine();
+        }
       }
     });
 
