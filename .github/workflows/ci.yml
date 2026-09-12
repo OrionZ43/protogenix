@@ -52,6 +52,8 @@ jobs:
 
   windows:
     name: Тесты и сборка Windows
+    # Visual Studio 2026, как у Orion (flutter doctor). Что под неё пришлось
+    # поправить — .claude/rules/known-issues.md.
     runs-on: windows-latest
     timeout-minutes: 40
     steps:

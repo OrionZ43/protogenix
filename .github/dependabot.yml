@@ -15,8 +15,6 @@ updates:
     commit-message:
       prefix: "deps"
     ignore:
-      # 1.2+ переходит на native assets и ломает сборку (dependencies.md)
-      - dependency-name: "audiotags"
       # Крупные версии — вручную: в них ломается API (в том числе у
       # youtube_explode_dart — за её мажорами следить самому)
       - dependency-name: "*"
