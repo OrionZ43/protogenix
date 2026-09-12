@@ -61,6 +61,7 @@ flutter build windows --release
 powershell -ExecutionPolicy Bypass -File tool/build_windows_installer.ps1   # installer → build/installer/ (needs Inno Setup 6)
 powershell -ExecutionPolicy Bypass -File tool/release.ps1 -NotesFile docs/release-notes/vX.Y.Z.md   # full release build → build/release/vX.Y.Z/; -Publish uploads it — see release.md
 powershell -ExecutionPolicy Bypass -File tool/release.ps1 -Bump patch -NotesFile docs/release-notes/vX.Y.Z.md -Publish   # bump the version, build, commit, push and publish in one go
+powershell -ExecutionPolicy Bypass -File tool/youtube_health_check.ps1   # does YouTube downloading still work? -Install = daily task on Orion's PC — see dependencies.md
 dart run tool/update_signing.dart   # update-manifest keys and signing — see release.md
 dart run flutter_launcher_icons   # regenerate app icons from assets/images/icon_*.png
 ```
