@@ -1,13 +1,8 @@
 // lib/features/search/presentation/screens/search_screen.dart
 //
-// Экран поиска с Invidious-фолбэком и «сломом 4-й стены».
-//
-// Изменения по сравнению с оригиналом:
-//  • Использует SearchTrack вместо Video из youtube_explode_dart
-//  • _PlayButton создаёт TrackModel с filePath: null — toAudioSource()
-//    автоматически строит Invidious-прокси URL без 403
-//  • _ProxyBanner появляется, если result.usingProxy == true
-//  • _LoadingState иногда показывает фразу «слом 4-й стены»
+// Экран поиска: результаты с YouTube (searchProvider; SearchTrack вместо
+// типов youtube_explode_dart) и кнопка импорта трека в медиатеку через
+// ImporterService.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

@@ -1,25 +1,27 @@
 // lib/features/player/domain/track_model.dart
 //
-// КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: toAudioSource() для сетевых треков
-// —————————————————————————————————————————————————————
-// Если id трека является YouTube video ID (ровно 11 символов из [A-Za-z0-9_-]),
-// аудио-поток строится через Invidious-прокси:
-//   https://<instance>/latest_version?id=<id>&itag=140&local=true
+// toAudioSource() выбирает источник звука трека:
+//   • трек с YouTube ID (ровно 11 символов из [A-Za-z0-9_-]) без локального
+//     файла или со ссылкой на YouTube — прямой поток через youtube_explode
+//     (сначала клиент visionOS, см. youtube_clients.dart). Запасного пути нет
+//     (Invidious удалён 2026-09-12, .claude/rules/known-issues.md): если
+//     YouTube не отдал поток — тишина-заглушка;
+//   • прямая audio-ссылка (MP3 и т.п.) — как есть, на мобильных с кэшем;
+//   • локальный файл, если он есть;
+//   • иначе — тишина-заглушка.
 //
-// Это ПОЛНОСТЬЮ устраняет:
-//   • 403 Forbidden от googlevideo.com (IP-лок + подпись URL)
-//   • Блокировки YouTube на уровне DNS/SNI в РФ
-//
-// Для прямых audio-ссылок (MP3 и т.п.) поведение не изменилось.
+// toAudioSource() не бросает исключений: PlayerNotifier.loadPlaylist ждёт
+// источники всей очереди через Future.wait, и одна ошибка сорвала бы загрузку
+// всей очереди.
 
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:dio/dio.dart';
-import '../../../core/services/invidious_proxy_service.dart';
+import '../../../core/services/app_paths.dart';
+import '../../../core/services/youtube_clients.dart';
 
 // YouTube video ID — ровно 11 символов из A-Za-z0-9_-
 final _ytIdRegex = RegExp(r'^[A-Za-z0-9_-]{11}$');
@@ -57,7 +59,7 @@ class TrackModel {
     if (path != null &&
         (path.startsWith('http://') || path.startsWith('https://'))) {
       if (isYtVideoId) {
-        return _tryDirectOrInvidious();
+        return _tryDirectYouTube();
       }
       // Прямая ссылка (MP3, FLAC и т.д.)
       final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -89,19 +91,32 @@ class TrackModel {
 
     // ── YouTube-трек без локального файла ────────────────────────────────
     if (isYtVideoId) {
-      return _tryDirectOrInvidious();
+      return _tryDirectYouTube();
     }
 
     // ── Тишина-заглушка (нет ни файла, ни YouTube ID) ────────────────────
     return AudioSource.asset('assets/mock/silence.mp3');
   }
 
-  Future<AudioSource> _tryDirectOrInvidious() async {
+  // Сначала visionOS: клиент по умолчанию (android) с августа 2026 на многих
+  // видео отдаёт пустые потоки (youtube_clients.dart).
+  Future<StreamManifest> _getManifest(YoutubeExplode yt) async {
+    try {
+      return await yt.videos.streamsClient
+          .getManifest(id, ytClients: [kVisionOsClient]);
+    } catch (e) {
+      debugPrint('[TrackModel] VISIONOS не отдал потоки ($e), '
+          'пробуем клиент по умолчанию');
+      return yt.videos.streamsClient.getManifest(id);
+    }
+  }
+
+  Future<AudioSource> _tryDirectYouTube() async {
     try {
       // 1. Пробуем получить прямой стрим через youtube_explode_dart
       final yt = YoutubeExplode();
       try {
-        final manifest = await yt.videos.streamsClient.getManifest(id);
+        final manifest = await _getManifest(yt);
 
         // Берем лучший audio/mp4 поток, чтобы избежать проблем с кодеками (например на iOS)
         final audioStreams = manifest.audioOnly.where((s) => s.container.name == 'mp4').toList();
@@ -148,51 +163,17 @@ class TrackModel {
         yt.close();
       }
     } catch (e) {
-      debugPrint('[TrackModel] Ошибка прямого подключения ($e). Включаем обход блокировки через Invidious...');
-      return _buildInvidiousSource();
+      // Запасного пути нет, а исключение сорвало бы загрузку всей очереди
+      // (шапка файла) — трек просто молчит.
+      debugPrint('[TrackModel] YouTube не отдал поток для $id: $e');
+      return AudioSource.asset('assets/mock/silence.mp3');
     }
-  }
-
-  // ── Построение Invidious AudioSource ──────────────────────────────────────
-
-  Future<AudioSource> _buildInvidiousSource() async {
-    final streamUrlStr = await InvidiousProxyService.instance.getProxiedStreamUrl(id);
-    final finalUrl = streamUrlStr ?? 'https://invidious.io.lol/latest_version?id=$id&itag=140&local=true';
-
-    final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    if (isDesktop) {
-      return AudioSource.uri(
-        Uri.parse(finalUrl),
-        headers: const {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-              '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Referer': 'https://www.youtube.com/',
-          'Origin': 'https://www.youtube.com/',
-        },
-      );
-    }
-
-    final cacheFile = await _cacheFile('$id.m4a');
-
-    return LockCachingAudioSource(
-      Uri.parse(finalUrl),
-      headers: const {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-            '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.youtube.com/',
-        'Origin': 'https://www.youtube.com/',
-      },
-      cacheFile: cacheFile,
-    );
   }
 
   // ── Утилита: файл кэша ────────────────────────────────────────────────────
 
   Future<File> _cacheFile(String fileName) async {
-    final appDocDir = await getApplicationDocumentsDirectory();
-    final cacheDir = Directory('${appDocDir.path}/audio_cache');
+    final cacheDir = Directory(AppPaths.audioCacheDir);
     if (!await cacheDir.exists()) {
       await cacheDir.create(recursive: true);
     }
