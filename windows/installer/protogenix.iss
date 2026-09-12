@@ -11,7 +11,7 @@
 ;   iscc /DAppVersion=1.0.1 protogenix.iss
 ;
 ; Тихое обновление из приложения (lib/features/updater/update_installer.dart):
-;   Protogenix-Setup-X.Y.Z.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /update=1 /LOG=...
+;   Protogenix-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /update=1 /LOG=...
 ; Установщик ждёт, пока приложение закроется, заменяет файлы (при сбое
 ; Inno Setup откатывает изменения) и с /update=1 запускает приложение снова.
 

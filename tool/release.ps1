@@ -262,7 +262,7 @@ try {
         } else {
             Invoke-Checked "flutter build apk ($key)" { flutter build apk --release }
         }
-        $target = Join-Path $outDir "protogenix-$version-$key.apk"
+        $target = Join-Path $outDir "protogenix-$key.apk"
         Copy-Item $apkOut $target -Force
         Assert-ReleaseApk $target $build $spec.Abis
         $assetFiles[$key] = $target
@@ -280,9 +280,11 @@ try {
     if ($exeVersion -ne "$version+$build") {
         throw "protogenix.exe собран как $exeVersion, а должен быть $version+$build. Выполни flutter clean и запусти скрипт снова."
     }
-    $setupName = "Protogenix-Setup-$version.exe"
-    $setup = Join-Path $outDir $setupName
-    Copy-Item (Join-Path $root "build\installer\$setupName") $setup -Force
+    # В релизе имена файлов без версии: ссылка releases/latest/download/<имя>
+    # тогда всегда ведёт на свежий релиз (ей пользуется сайт Z43 Studios).
+    # Версия есть в теге и в манифесте. Подробнее — release.md.
+    $setup = Join-Path $outDir 'Protogenix-Setup.exe'
+    Copy-Item (Join-Path $root "build\installer\Protogenix-Setup-$version.exe") $setup -Force
     $assetFiles['windows-x64'] = $setup
 
     # ── 4. Манифест и подпись ────────────────────────────────────────────────
