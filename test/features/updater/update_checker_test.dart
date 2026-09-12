@@ -140,6 +140,35 @@ void main() {
     expect(hits, 2);
   });
 
+  test('checkDetailed отличает «новее нет» от «проверить не удалось»',
+      () async {
+    const keys = ['windows-x64'];
+
+    final upToDate =
+        await checker().checkDetailed(currentBuild: 12, assetKeys: keys);
+    expect(upToDate.outcome, UpdateCheckOutcome.upToDate);
+    expect(upToDate.update, isNull);
+
+    final available =
+        await checker().checkDetailed(currentBuild: 10, assetKeys: keys);
+    expect(available.outcome, UpdateCheckOutcome.available);
+    expect(available.update!.manifest.build, 12);
+
+    final offline = await checker(paths: const ['/missing.json'])
+        .checkDetailed(currentBuild: 1, assetKeys: keys);
+    expect(offline.outcome, UpdateCheckOutcome.failed);
+
+    final stranger = await Ed25519().newKeyPair();
+    final badSignature = await checker(
+      keys: {'test': (await stranger.extractPublicKey()).bytes},
+    ).checkDetailed(currentBuild: 1, assetKeys: keys);
+    expect(badSignature.outcome, UpdateCheckOutcome.failed);
+
+    final disabled = await checker(keys: const {})
+        .checkDetailed(currentBuild: 1, assetKeys: keys);
+    expect(disabled.outcome, UpdateCheckOutcome.disabled);
+  });
+
   test('встроенные ключи подписи — корректные Ed25519 (по 32 байта)', () {
     final keys = decodeUpdateSigningKeys();
     expect(keys, isNotEmpty);

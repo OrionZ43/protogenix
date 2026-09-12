@@ -32,6 +32,31 @@ class AvailableUpdate {
   final bool isMandatory;
 }
 
+/// Чем кончилась проверка обновлений.
+enum UpdateCheckOutcome {
+  /// Есть сборка новее.
+  available,
+
+  /// Опубликованная сборка не новее текущей.
+  upToDate,
+
+  /// Ни один адрес не ответил или подпись не сошлась: неизвестно, есть ли
+  /// обновление.
+  failed,
+
+  /// Ключей подписи нет — проверка выключена.
+  disabled,
+}
+
+class UpdateCheckResult {
+  const UpdateCheckResult(this.outcome, [this.update]);
+
+  final UpdateCheckOutcome outcome;
+
+  /// Только при [UpdateCheckOutcome.available].
+  final AvailableUpdate? update;
+}
+
 class UpdateChecker {
   UpdateChecker({
     Dio? dio,
@@ -60,16 +85,26 @@ class UpdateChecker {
   final Map<String, List<int>> _trustedKeys;
 
   /// Обновление или null: новее нет, сети нет, подпись не сошлась.
-  /// Ошибки наружу не бросает — только пишет в лог. Берётся первый
-  /// ответивший адрес.
+  /// Ошибки наружу не бросает — только пишет в лог. Чем именно кончилась
+  /// проверка, говорит [checkDetailed].
   Future<AvailableUpdate?> check({
+    required int currentBuild,
+    required List<String> assetKeys,
+  }) async =>
+      (await checkDetailed(currentBuild: currentBuild, assetKeys: assetKeys))
+          .update;
+
+  /// То же, что [check], но отличает «новее нет» от «проверить не удалось»:
+  /// странице «Инфо» нельзя писать «последняя версия», когда нет сети.
+  /// Берётся первый ответивший адрес; ошибки только пишутся в лог.
+  Future<UpdateCheckResult> checkDetailed({
     required int currentBuild,
     required List<String> assetKeys,
   }) async {
     if (_trustedKeys.isEmpty) {
       debugPrint('[Updater] Ключ подписи не задан (update_keys.dart) — '
           'проверка обновлений выключена');
-      return null;
+      return const UpdateCheckResult(UpdateCheckOutcome.disabled);
     }
 
     for (final url in _manifestUrls) {
@@ -82,17 +117,22 @@ class UpdateChecker {
           response.data ?? '',
           _trustedKeys,
         );
-        if (manifest.build <= currentBuild) return null;
-        return AvailableUpdate(
-          manifest: manifest,
-          asset: manifest.assetFor(assetKeys),
-          isMandatory: currentBuild < manifest.minSupportedBuild,
+        if (manifest.build <= currentBuild) {
+          return const UpdateCheckResult(UpdateCheckOutcome.upToDate);
+        }
+        return UpdateCheckResult(
+          UpdateCheckOutcome.available,
+          AvailableUpdate(
+            manifest: manifest,
+            asset: manifest.assetFor(assetKeys),
+            isMandatory: currentBuild < manifest.minSupportedBuild,
+          ),
         );
       } catch (e) {
         debugPrint('[Updater] Не удалось проверить обновления ($url): $e');
       }
     }
-    return null;
+    return const UpdateCheckResult(UpdateCheckOutcome.failed);
   }
 }
 

@@ -1,7 +1,8 @@
 // lib/features/updater/update_provider.dart
 //
-// Состояние обновления для баннера: проверка при запуске → скачивание →
-// установка. Проверка идёт один раз за запуск и ошибок наружу не отдаёт.
+// Состояние обновления для баннера и страницы «Инфо»: проверка → скачивание
+// → установка. Проверка идёт при запуске и по кнопке «Проверить» на странице
+// «Инфо» (checkNow); ошибок наружу не отдаёт.
 
 import 'dart:io';
 
@@ -23,6 +24,9 @@ class UpdateState {
     this.progress = 0,
     this.error,
     this.dismissed = false,
+    this.checking = false,
+    this.outcome,
+    this.checkedAt,
   });
 
   final AvailableUpdate? update;
@@ -33,6 +37,13 @@ class UpdateState {
   final String? error;
   final bool dismissed;
 
+  /// Идёт проверка.
+  final bool checking;
+
+  /// Чем кончилась последняя проверка; null — ещё не проверяли.
+  final UpdateCheckOutcome? outcome;
+  final DateTime? checkedAt;
+
   bool get isVisible => update != null && (!dismissed || update!.isMandatory);
 
   UpdateState copyWith({
@@ -40,6 +51,9 @@ class UpdateState {
     double? progress,
     String? error,
     bool? dismissed,
+    bool? checking,
+    UpdateCheckOutcome? outcome,
+    DateTime? checkedAt,
   }) =>
       UpdateState(
         update: update,
@@ -47,6 +61,9 @@ class UpdateState {
         progress: progress ?? this.progress,
         error: error,
         dismissed: dismissed ?? this.dismissed,
+        checking: checking ?? this.checking,
+        outcome: outcome ?? this.outcome,
+        checkedAt: checkedAt ?? this.checkedAt,
       );
 }
 
@@ -60,15 +77,43 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
   final UpdateChecker _checker;
   double _lastProgress = 0;
 
+  /// Проверить ещё раз — кнопка на странице «Инфо». Пока идёт скачивание или
+  /// установка, ничего не делает.
+  Future<void> checkNow() => _check();
+
   Future<void> _check() async {
+    if (state.checking ||
+        state.phase == UpdatePhase.downloading ||
+        state.phase == UpdatePhase.installing) {
+      return;
+    }
+    state = state.copyWith(checking: true);
     try {
-      final update = await _checker.check(
+      final result = await _checker.checkDetailed(
         currentBuild: await currentBuildNumber(),
         assetKeys: await currentAssetKeys(),
       );
-      if (mounted && update != null) state = UpdateState(update: update);
+      if (!mounted) return;
+      if (result.outcome == UpdateCheckOutcome.failed) {
+        // Найденное раньше обновление из-за сбоя сети не теряем
+        state = state.copyWith(
+            checking: false, outcome: result.outcome, checkedAt: DateTime.now());
+      } else {
+        state = UpdateState(
+          update: result.update,
+          outcome: result.outcome,
+          checkedAt: DateTime.now(),
+        );
+      }
     } catch (e) {
       debugPrint('[Updater] Проверка обновлений не удалась: $e');
+      if (mounted) {
+        state = state.copyWith(
+          checking: false,
+          outcome: UpdateCheckOutcome.failed,
+          checkedAt: DateTime.now(),
+        );
+      }
     }
   }
 

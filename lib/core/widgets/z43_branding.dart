@@ -1,71 +1,70 @@
+// lib/core/widgets/z43_branding.dart
+//
+// Подпись Z43 Studios и ссылки на сайт, GitHub и Telegram — внизу страницы
+// «Инфо».
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import 'chip_button.dart';
 
 class Z43BrandingBadge extends StatelessWidget {
   const Z43BrandingBadge({super.key});
 
+  static const _links = [
+    (
+      label: 'Сайт',
+      icon: Icons.public_rounded,
+      url: 'https://z43-studios.vercel.app/',
+    ),
+    (
+      label: 'GitHub',
+      icon: Icons.code_rounded,
+      url: 'https://github.com/OrionZ43/protogenix',
+    ),
+    (
+      label: 'Telegram',
+      icon: Icons.send_rounded,
+      url: 'https://t.me/Orion_Z43',
+    ),
+  ];
+
+  static Future<void> _open(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('[Z43] Не удалось открыть $url: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       children: [
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final link in _links)
+              ChipButton(
+                label: link.label,
+                icon: link.icon,
+                onTap: () => _open(link.url),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
         Text(
           'СДЕЛАНО С ❤ Z43 STUDIOS',
           style: TextStyle(
-            color: Colors.white24,
-            fontSize: 9,
+            color: Colors.white.withAlpha(90),
+            fontSize: 10,
             fontWeight: FontWeight.w700,
-            letterSpacing: 1.5,
+            letterSpacing: 2,
           ),
         ),
-        SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _LinkBtn(label: 'САЙТ', url: 'https://z43-studios.vercel.app/'),
-            _Dot(),
-            _LinkBtn(
-                label: 'GITHUB', url: 'https://github.com/OrionZ43/protogenix'),
-            _Dot(),
-            _LinkBtn(label: 'TG', url: 'https://t.me/Orion_Z43'),
-          ],
-        ),
       ],
-    );
-  }
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot();
-  @override
-  Widget build(BuildContext context) =>
-      const Text(' · ', style: TextStyle(color: Colors.white12, fontSize: 10));
-}
-
-class _LinkBtn extends StatelessWidget {
-  const _LinkBtn({required this.label, required this.url});
-  final String label;
-  final String url;
-
-  Future<void> _open() async {
-    final uri = Uri.parse(url);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _open,
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white38,
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-          decoration: TextDecoration.underline,
-          decorationColor: Colors.white24,
-        ),
-      ),
     );
   }
 }
