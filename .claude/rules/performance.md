@@ -11,7 +11,7 @@ paths:
 
 ## Правила для нового кода
 
-1. **`ref.watch(playerProvider.select(...))` — обязательно.** `PlayerNotifier` делает `state = state.copyWith(position: …)` на каждое событие `positionStream` (just_audio шлёт позицию несколько раз в секунду) и ещё на каждое событие `bufferedPositionStream`. `ref.watch(playerProvider)` без `select` перестраивает виджет всё время, пока идёт воспроизведение. Образец — `app_shell.dart`: `playerProvider.select((s) => s.currentTrack != null)`.
+1. **`ref.watch(playerProvider.select(...))` — обязательно.** `PlayerNotifier` делает `state = state.copyWith(position: …)` на каждое событие `positionStream` (just_audio шлёт позицию несколько раз в секунду; подписку на `bufferedPositionStream` убрали 2026-09-12 — `buffered` никто не читал). `ref.watch(playerProvider)` без `select` перестраивает виджет всё время, пока идёт воспроизведение. Образец — `app_shell.dart`: `playerProvider.select((s) => s.currentTrack != null)`.
 
 2. **Не блокировать UI O(N)-работой в обработчиках и провайдерах.** Сначала дать отрисоваться состоянию загрузки, потом работать:
    - `await SchedulerBinding.instance.endOfFrame;` — дождаться, пока кадр (например, с индикатором загрузки) будет отрисован;
@@ -29,7 +29,7 @@ paths:
 
 Состояние на 2026-09-10. Исправлять только отдельной задачей.
 
-- **13 мест `ref.watch(playerProvider)` без `select`:** `home_screen.dart`, `library_screen.dart`, `favorites_screen.dart`, `playlists_screen.dart`, `player_screen.dart`, `expanded_player_screen.dart`, `desktop_bottom_player.dart`, `mini_player.dart`, `player_controls_compact.dart`, `queue_panel.dart`, `eq_sheet.dart`, `sleep_timer_sheet.dart`, `music_visualizer_controls.dart`. Особенно дорого это на вкладках (`home`, `library`): они живут в `IndexedStack` и перестраиваются, даже когда не видны.
+- **13 мест `ref.watch(playerProvider)` без `select`:** `home_screen.dart`, `library_screen.dart`, `favorites_screen.dart`, `playlists_screen.dart`, `player_screen.dart`, `expanded_player_screen.dart`, `desktop_bottom_player.dart`, `mini_player.dart`, `player_controls_compact.dart`, `queue_panel.dart`, `eq_sheet.dart`, `sleep_timer_sheet.dart`, `music_visualizer_controls.dart`. Особенно дорого это на вкладках (`home`, `library`): они живут в `IndexedStack` и перестраиваются, даже когда не видны. С 2026-09-12 скрытые вкладки обёрнуты в `TickerMode` (`_tabScreens` в `app_shell.dart`): их анимации стоят, но перестраиваются они по-прежнему.
 - **Парсинг в Isolate не реализован**, хотя `.jules/bolt.md` его требует: `KaraokeNotifier` вызывает `AdvancedLrcParser.parse` на UI-изоляте, а `compute`/`Isolate` в `lib/` нигде не используются.
 - **`playlistTracksProvider`** (`playlist_provider.dart`) вызывает `LibraryDatabase.getAllTracks()` внутри цикла по трекам плейлиста. Это полное чтение таблицы на каждый трек, O(N×M). Его вызывает каждая `PlaylistCard` в сетке плейлистов (`playlists_screen.dart`). Рядом `PlaylistTracksNotifier._load` делает то же правильно: одно чтение и `Map` по id.
 
@@ -39,7 +39,25 @@ paths:
 - **`SyllableKaraokeView._onAmbientTick`** вызывает `setState` каждый кадр, и весь вид караоке перестраивается (нарушение правила 3).
 - **Тикеры строк `BeautifulLyricsView`** не останавливаются никогда. `setState` вызывается, только пока пружины активны, но колбэк с перебором слогов идёт каждый кадр у каждой построенной строки.
 - **`PlayerScreen`** делает `ref.watch(playerProvider)` и `ref.watch(karaokeProvider)` на верхнем уровне, так что весь экран плеера перестраивается на каждое обновление позиции и на каждую строку текста.
-- **`karaokeProvider` без `autoDispose`.** После первого открытия плеера он живёт всю сессию: `HapticFeedback.selectionClick()` на каждой смене строки, даже когда текста на экране нет, и поиск текста в сети на каждой смене трека (до 5 вариантов запроса × 2 провайдера; NetEase на каждый запрос делает ещё до 5 запросов текста).
+- **`karaokeProvider` без `autoDispose`.** После первого открытия плеера он живёт всю сессию и ищет текст на каждой смене трека (два этапа, до ~30 запросов). С 2026-09-12 он больше не вибрирует (вибрация — в `beautiful_lyrics_view.dart`, только пока приложение на экране), а пока приложение свёрнуто, поиск и расчёт активной строки ждут возвращения (раздел «Аудит фоновой работы» ниже).
 - **Очередь пересобирается целиком** при `playNext` / `addToQueue` / `reloadFromLibrary`: новый `ConcatenatingAudioSource` из всех треков, `toAudioSource()` для каждого, и вся очередь уходит в MediaSession (`audio_service` → `_observeQueue` → `setQueue`).
-- **Изображения:** `cacheWidth` / `cacheHeight` / `ResizeImage` нигде не используются, поэтому обложки (`thumbnails.highResUrl` при импорте) декодируются в полном размере даже в маленьких плитках.
+- **Изображения:** `cacheWidth` / `cacheHeight` / `ResizeImage` нигде не используются, поэтому обложки (`thumbnails.highResUrl` при импорте) декодируются в полном размере даже в маленьких плитках. С 2026-09-12 `ResizeImage` (96 px) стоит только перед расчётом палитры обложки (`palette_provider.dart`).
 - **`debugPrint`:** 135 вызовов в `lib/`. В релизной сборке они работают и пишут в logcat, в том числе поисковые запросы и URL.
+
+## Аудит фоновой работы (2026-09-12)
+
+Проверялось, что продолжает работать на слабом телефоне, когда приложение свёрнуто или экран выключен, и когда закрыт полноэкранный плеер. До этого жизненный цикл приложения не слушал никто, и в фоне ничего не останавливалось.
+
+Сделано:
+- вибрация на смене строки — только в виде текста и только когда приложение на экране (`beautiful_lyrics_view.dart`); баг Orion: телефон вибрировал и со свёрнутым плеером;
+- пока приложение свёрнуто (`core/services/app_visibility.dart`), поиск текста, расчёт активной строки и палитра обложки ждут возвращения на экран;
+- палитра считается по обложке 96 px, не пересчитывается для той же обложки, а устаревший результат не перетирает свежий;
+- `TickerMode` на скрытых вкладках;
+- убрана подписка на `bufferedPositionStream`.
+
+Осталось — отдельной задачей, по убыванию пользы:
+- позицию вынести в свой `autoDispose`-провайдер. Сейчас `positionStream` (таймер just_audio до 5 Гц, тикает и на паузе) будит всех слушателей `playerProvider`;
+- `_broadcastState` (`audio_handler.dart`) отдаёт в медиасессию Android каждое событие плеера, включая изменения буфера (до 2 раз в секунду). Пропускать события, где изменился только буфер, но так, чтобы позиция после перемотки оставалась верной;
+- мини-плеер смотрит весь `playerProvider`, а его `AnimatedContainer` прогресса не успевает доиграть и держит кадры, пока идёт музыка;
+- анимированный фон тикает и на паузе; лучше один общий фон на оболочку, чем по одному на вкладку;
+- разбор текста (`AdvancedLrcParser.parse`) и палитра — на UI-изоляте.

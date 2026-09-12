@@ -62,6 +62,7 @@ powershell -ExecutionPolicy Bypass -File tool/build_windows_installer.ps1   # in
 powershell -ExecutionPolicy Bypass -File tool/release.ps1 -NotesFile docs/release-notes/vX.Y.Z.md   # full release build → build/release/vX.Y.Z/; -Publish uploads it — see release.md
 powershell -ExecutionPolicy Bypass -File tool/release.ps1 -Bump patch -NotesFile docs/release-notes/vX.Y.Z.md -Publish   # bump the version, build, commit, push and publish in one go
 powershell -ExecutionPolicy Bypass -File tool/youtube_health_check.ps1   # does YouTube downloading still work? -Install = daily task on Orion's PC — see dependencies.md
+powershell -ExecutionPolicy Bypass -File tool/record_demo.ps1 -TrackId <id> -AudioFile <track audio> -From 63 -To 90   # demo video for the Z43 Studios site (lib/app/demo_mode.dart)
 dart run tool/update_signing.dart   # update-manifest keys and signing — see release.md
 dart run flutter_launcher_icons   # regenerate app icons from assets/images/icon_*.png
 ```
@@ -95,11 +96,12 @@ All shells share one `_tabIndexProvider` and one `_screens` list (Home / Search 
 
 ### Playback
 
-- `player/data/audio_handler.dart` defines the global `late AudioHandler audioHandler`. `ProtogenixAudioHandler` (an audio_service `BaseAudioHandler`) wraps a single just_audio `AudioPlayer` playing a `ConcatenatingAudioSource`. On Android an `AndroidEqualizer` is added to the audio pipeline.
+- `player/data/audio_handler.dart` defines the global `late AudioHandler audioHandler`. `ProtogenixAudioHandler` (an audio_service `BaseAudioHandler`) wraps a single just_audio `AudioPlayer` playing a `ConcatenatingAudioSource`. On Android an `AndroidEqualizer` is added to the audio pipeline; `PlayerNotifier` drives it and persists its settings (`eq_settings_store.dart`).
 - `playerProvider` (`PlayerNotifier`) is the UI's single source of truth.
   - It casts `audioHandler` and subscribes directly to the `AudioPlayer` streams.
   - Every queue change (`playNext`, `addToQueue`) rebuilds the whole playlist through `loadPlaylist`.
   - On startup it loads the entire library as the queue.
+- While the app is hidden (`core/services/app_visibility.dart`), lyrics search, active-line tracking and cover-palette extraction wait and catch up when it returns. Lyric-line haptics live only in `beautiful_lyrics_view.dart` and fire only while the app is resumed.
 - `TrackModel.toAudioSource()` (`player/domain/track_model.dart`) chooses the audio source:
   - A network `filePath` pointing to a YouTube video goes the YouTube route below; any other http(s) URL is played directly on desktop, or through `LockCachingAudioSource` in `AppPaths.audioCacheDir` on mobile.
   - Otherwise the local file, if it exists.

@@ -75,9 +75,17 @@ paths:
 
 Папка `web/` есть (шаблон Flutter), но на вебе приложение не запустится. `Platform.isWindows` и подобные проверки из `dart:io` вызываются без `kIsWeb` начиная с первых строк `main()`, а на вебе `Platform` бросает `UnsupportedError`. К тому же `sqflite` и работа с файлами на вебе недоступны. Попутно веб не чинить.
 
-## EQ не подключён к звуку
+## Эквалайзер (подключён 2026-09-12)
 
-`ProtogenixAudioHandler` добавляет `AndroidEqualizer` в конвейер (только на Android), и `eq_sheet.dart` читает у него параметры полос: частоты и диапазон dB. Но включение и gain уходят в `PlayerNotifier.setEqEnabled` / `setEqBandGain`, которые **только меняют состояние** (в коде комментарий `// Not implemented for now`). `AndroidEqualizer.setEnabled` и `band.setGain` нигде не вызываются: интерфейс работает, звук не меняется.
+До 2026-09-12 эквалайзер к звуку подключён не был: `setEqEnabled` / `setEqBandGain` только меняли состояние, а шторку `eq_sheet.dart` не открывала ни одна кнопка. Теперь:
+- `PlayerNotifier` вызывает `AndroidEqualizer.setEnabled` и `band.setGain`, а состояние (`eqEnabled`, `eqBandGains`) берёт у самого эквалайзера;
+- полосы платформа отдаёт, только когда у плеера есть источник, поэтому сохранённые настройки применяются после первой загрузки очереди (`_restoreEq`), а шторка ждёт полосы через `loadEq`: 5 секунд, потом «недоступен»;
+- настройки хранятся в `equalizer.json` в папке данных (`eq_settings_store.dart`) и применяются, только если число полос совпало;
+- кнопка — иконка в верхней панели плеера (`player_main_controls.dart`), только на Android. На других платформах шторка пишет, что эквалайзер есть только на Android: `AndroidEqualizer` из just_audio работает только там.
+
+Известное:
+- шторка показывает не больше 5 полос (`bandCount.clamp(0, 5)`); если телефон даёт больше, остальные остаются на своём усилении;
+- на настоящем телефоне на 2026-09-12 не проверено: что звук меняется и что настройки переживают перезапуск.
 
 ## Визуализатор — мёртвый код, разрешение на микрофон не нужно
 
@@ -90,9 +98,15 @@ paths:
 
 ## Предупреждение Flutter про Kotlin Gradle Plugin
 
-При сборке Android Flutter 3.44 пишет, что модуль `app` подключает Kotlin Gradle Plugin (`id("kotlin-android")` в `android/app/build.gradle.kts`) и что в будущих версиях Flutter это приведёт к ошибкам сборки. То же — про плагины, которые подключают KGP сами: `audiotags`, `device_info_plus`, `dynamic_color`, `file_picker`, `package_info_plus`, `url_launcher_android`, `wakelock_plus` (список из сборки 2026-09-11). Инструкция по миграции: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers. Предупреждение было и до правок 2026-09-11. Сейчас сборку не ломает; разбираться при следующем обновлении Flutter, попутно не трогать.
+При сборке Android Flutter 3.44 пишет, что модуль `app` подключает Kotlin Gradle Plugin (`id("kotlin-android")` в `android/app/build.gradle.kts`) и что в будущих версиях Flutter это приведёт к ошибкам сборки. То же — про плагины, которые подключают KGP сами: `device_info_plus`, `dynamic_color`, `file_picker`, `package_info_plus`, `url_launcher_android`, `wakelock_plus` (список из сборки 2026-09-11). Инструкция по миграции: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers. Предупреждение было и до правок 2026-09-11. Сейчас сборку не ломает; разбираться при следующем обновлении Flutter, попутно не трогать.
 
 Во время первой release-сборки 2026-09-11 мигратор Flutter сам дописал в `android/gradle.properties` две строки с комментарием «added automatically by Flutter migrator»: `android.builtInKotlin=false` и `android.newDsl=false`. Это флаги AGP 9, а проект на AGP 8.11.1, Kotlin 2.2.20, Gradle 8.14; все сборки 2026-09-11 прошли с этими строками. Закоммитить их вместе с остальным. Откатывать не нужно: при откате мигратор, скорее всего, допишет их при следующей сборке (не проверялось). Убирать — в рамках той же миграции на встроенный Kotlin.
+
+## Visual Studio 2026: что пришлось поправить (2026-09-12)
+
+У Orion Flutter собирает Windows через Visual Studio 2026 Insiders (18.3, см. `flutter doctor -v`; `vswhere` без `-prerelease` предварительные версии не показывает). В CI на `windows-latest` тоже VS 2026, но с более свежим MSVC (14.51) и CMake 4.1. Первый прогон CI упал на двух вещах:
+- `permission_handler_windows` собирается с `/await` и `<experimental/coroutine>`, а в MSVC 14.51 это ошибка STL1011. Обход — макрос `_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS` для цели `permission_handler_windows_plugin` в `windows/CMakeLists.txt`. Убрать, когда плагин перейдёт на `<coroutine>` из C++20. У Orion с MSVC из 18.3 это пока предупреждение, но после обновления студии упало бы и локально.
+- `audiotags` не распаковывал свой архив через symlink — пакет удалён (`dependencies.md`).
 
 ## Тесты
 

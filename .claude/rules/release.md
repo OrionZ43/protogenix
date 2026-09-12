@@ -58,7 +58,12 @@ Android генерирует debug-keystore **отдельно на каждой
   - `assets` с ключами `android-arm64-v8a`, `android-armeabi-v7a`, `android-x86_64`, `android-universal`, `windows-x64`. У каждого файла: `urls` (только https, в порядке попыток), `size`, `sha256`. Скрипт релиза кладёт все, кроме `android-x86_64`: x86_64 бывает только у эмуляторов и Chromebook, им достаётся universal.
 - **`build` в манифесте = `+N` в `pubspec.yaml` той сборки, которая лежит в релизе.** Если манифест обещает сборку новее реальной, после установки приложение снова увидит «новую» версию, и получится петля. `+N` — это и Android `versionCode`: уменьшать нельзя.
 - **`--split-per-abi` не использовать.** Flutter тогда ставит каждому APK свой versionCode: код ABI × 1000 + N (arm32 = 1, arm64 = 2, x86_64 = 4; `FlutterPlugin.kt`, `versionCodeOverride`). arm64-APK сборки `+1` получил бы versionCode 2001, и приложение, сравнивая его с `build` манифеста, перестало бы видеть обновления. APK под одну архитектуру собираются через `--target-platform` (раздел «Размер и совместимость сборок»).
-- **Выбор файла:** на Android сначала архитектуры устройства (`supportedAbis` из `device_info_plus`), затем `android-universal`; на Windows — `windows-x64` (установщик `Protogenix-Setup-X.Y.Z.exe`).
+- **Выбор файла:** на Android сначала архитектуры устройства (`supportedAbis` из `device_info_plus`), затем `android-universal`; на Windows — `windows-x64` (установщик `Protogenix-Setup.exe`).
+- **Имена файлов в релизе — без версии** (с 2026-09-12): `protogenix-android-arm64-v8a.apk`, `protogenix-android-armeabi-v7a.apk`, `protogenix-android-universal.apk`, `Protogenix-Setup.exe`. Версия есть в теге и в манифесте. Без неё в имени ссылка `https://github.com/OrionZ43/protogenix/releases/latest/download/<имя>` всегда ведёт на свежий релиз.
+  - Этими ссылками пользуется сайт Z43 Studios (`C:\Project\Z43 Studios`, `src/lib/data.ts`, кнопки Windows и Android). Переименуешь файл — поправь и сайт.
+  - Обновлялке одинаковое имя не мешает: файл сохраняется под последним сегментом адреса и сверяется по SHA-256, так что старый файл с тем же именем не пройдёт.
+  - Недокачанный `.part` от прошлой версии даст одну неудачную попытку: хэш не сойдётся, `.part` удалится, следующая попытка скачает файл заново.
+  - Установщик собирается как `build/installer/Protogenix-Setup-X.Y.Z.exe`, а в релиз скрипт кладёт его под именем без версии.
 
 ### Ключ подписи манифеста
 
@@ -118,7 +123,7 @@ Android генерирует debug-keystore **отдельно на каждой
   llvm-readelf -lW <lib>.so   # в строках LOAD выравнивание должно быть 0x4000 или больше
   ```
 - **Android-манифест:** minSdk 24, targetSdk 36, compileSdk 36. R8 включён (`build/app/outputs/mapping/release/mapping.txt` создаётся).
-- **Windows** (`flutter build windows --release`, 137 с, успешно): 83,0 МБ. `libmpv-2.dll` (28,4 МБ) и ~17,7 МБ ANGLE/SwiftShader (`libGLESv2.dll`, `d3dcompiler_47.dll`, `vk_swiftshader.dll`, `vulkan-1.dll`, `libEGL.dll`) приходят из `media_kit_libs_windows_video`, хотя видео в приложении нет. `audiotags.dll` (0,8 МБ) — пакет не используется (см. `dependencies.md`). Установщик сжимает всё это до 27,1 МБ.
+- **Windows** (`flutter build windows --release`, 137 с, успешно): 83,0 МБ. `libmpv-2.dll` (28,4 МБ) и ~17,7 МБ ANGLE/SwiftShader (`libGLESv2.dll`, `d3dcompiler_47.dll`, `vk_swiftshader.dll`, `vulkan-1.dll`, `libEGL.dll`) приходят из `media_kit_libs_windows_video`, хотя видео в приложении нет. В этот замер ещё входил `audiotags.dll` (0,8 МБ) — пакет удалён 2026-09-12 (`dependencies.md`). Установщик сжимает всё это до 27,1 МБ.
 - **Метаданные exe** (`windows/runner/Runner.rc`, с 2026-09-11): `CompanyName` = `Z43 Studios`, `ProductName` и `FileDescription` = `Protogenix`. Папка данных от них не зависит: путь задан явно (`data.md`).
 
 ## Платформы и каналы

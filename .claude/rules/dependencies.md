@@ -14,7 +14,7 @@ paths:
 
 - `.github/dependabot.yml`: каждый день в 06:00 по Минску Dependabot проверяет pub.dev и открывает PR. `youtube_explode_dart` идёт отдельным PR (группа `youtube`), всё остальное — одним общим (`other`). Раз в неделю — версии GitHub Actions в `ci.yml`.
   - В общий PR идут только минорные версии и патчи.
-  - Закрыты явно: `audiotags` (раздел ниже), `just_audio` 0.10+ и `audio_session` 0.2+, `flutter_riverpod` 3+ и неиспользуемая кодогенерация (`riverpod_annotation`, `riverpod_generator`, `build_runner`).
+  - Закрыты явно: `just_audio` 0.10+ и `audio_session` 0.2+, `flutter_riverpod` 3+ и неиспользуемая кодогенерация (`riverpod_annotation`, `riverpod_generator`, `build_runner`).
   - Почему явно: первый же PR (2026-09-12) принёс их все разом. Общее правило «без semver-major» Dependabot для pub в группе не применил, а переход 0.9 → 0.10 он считает минорным.
   - Переход на just_audio 0.10 и riverpod 3 — отдельные задачи с переделкой кода.
 - `.github/workflows/ci.yml` на каждый PR и на push в master:
@@ -31,14 +31,13 @@ paths:
 - Дальше: слить PR, `git pull` и выпустить релиз одной командой — `tool/release.ps1 -Bump patch -NotesFile docs/release-notes/vX.Y.Z.md -Publish` (`release.md`).
 - Версию Flutter в CI (`FLUTTER_VERSION`) Dependabot не обновляет: поднимать вручную вместе со своим Flutter.
 
-## `audiotags` — строго `1.1.3`
+## `audiotags` удалён (2026-09-12)
 
-Версия зафиксирована точно, без `^`; в `pubspec.yaml` рядом есть комментарий. Версии 1.2+ переходят на native assets и ломают сборку под Windows и Android.
+Пакет не импортировался в `lib/` ни разу за всю историю git, но попадал в сборки (`audiotags.dll` 0,8 МБ, регистранты плагинов) и тянул `flutter_rust_bridge`. Версия была прибита к 1.1.3: 1.2+ переходит на native assets и ломала сборку.
 
-- Не менять версию и не заменять на `^1.1.3`.
-- Обычный `flutter pub upgrade` точную версию не трогает. А `flutter pub upgrade --major-versions` переписывает ограничения в `pubspec.yaml`: не запускать его без просмотра diff, а после запуска вернуть `audiotags: 1.1.3`.
+С CMake 4 из Visual Studio 2026 сборка под Windows падала и на 1.1.3: архив с библиотекой не распаковывался через `windows/flutter/ephemeral/.plugin_symlinks` («Cannot extract through symlink», CI 2026-09-12). У Orion это не всплывало, потому что архив давно лежал распакованным в кэше пакетов. На чистом кэше упало бы так же.
 
-**Факт (2026-09-11): пакет не используется.** `audiotags` не импортируется нигде в `lib/` и не импортировался ни разу за всю историю git (`git log -S "package:audiotags" -- lib` пуст). При этом он попадает в сборки (`audiotags.dll` 0,8 МБ в Windows-релизе, регистранты плагинов Windows/Linux/macOS) и тянет `flutter_rust_bridge` 1.82.6. Хак с `namespace` в `android/build.gradle.kts` написан для старых плагинов, и `audiotags` в его комментарии назван примером. Удалить пакет — решение Orion; пока он в `pubspec.yaml`, правило про 1.1.3 действует.
+По решению Orion пакет удалён. Если понадобится чтение тегов — брать пакет без нативной сборки или сначала проверить его на чистом кэше и в CI.
 
 ## `youtube_explode_dart` — рабочий клиент YouTube объявлен у нас
 
