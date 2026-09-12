@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "z43.studios" "\0"
-            VALUE "FileDescription", "protogenix" "\0"
+            VALUE "CompanyName", "Z43 Studios" "\0"
+            VALUE "FileDescription", "Protogenix" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "protogenix" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 z43.studios. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Z43 Studios. All rights reserved." "\0"
             VALUE "OriginalFilename", "protogenix.exe" "\0"
-            VALUE "ProductName", "protogenix" "\0"
+            VALUE "ProductName", "Protogenix" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
