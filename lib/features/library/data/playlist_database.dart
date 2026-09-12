@@ -9,6 +9,8 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../../../core/services/app_paths.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MODELS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,9 +79,8 @@ class PlaylistDatabase {
   }
 
   Future<Database> _open() async {
-    final dbPath = await getDatabasesPath();
     return openDatabase(
-      join(dbPath, 'protogenix_playlists.db'),
+      join(AppPaths.databasesDir, 'protogenix_playlists.db'),
       version: 1,
       onCreate: (db, version) async {
         await db.execute('''

@@ -1,5 +1,6 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import '../../../core/services/app_paths.dart';
 import '../domain/library_track.dart';
 
 class LibraryDatabase {
@@ -14,9 +15,8 @@ class LibraryDatabase {
   }
 
   Future<Database> _open() async {
-    final dbPath = await getDatabasesPath();
     return openDatabase(
-      join(dbPath, 'protogenix.db'),
+      join(AppPaths.databasesDir, 'protogenix.db'),
       version: 2,
       onCreate: (db, version) {
         return db.execute('''

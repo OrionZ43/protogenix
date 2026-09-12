@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
+import 'core/services/app_paths.dart';
 import 'features/player/data/audio_handler.dart';
-import 'core/utils/telemetry_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +17,10 @@ Future<void> main() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
+
+  // Куда складывать базы и файлы; на десктопе — ещё и перенос баз со старого
+  // места. Должно отработать до первого обращения к базам.
+  await AppPaths.init();
 
   if (Platform.isAndroid || Platform.isIOS) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -54,8 +58,6 @@ Future<void> main() async {
 
   // Инициализируем фоновое воспроизведение ПЕРЕД runApp
   await initAudioService();
-
-  TelemetryService.sendAppLaunchPing();
 
   runApp(
     const ProviderScope(
