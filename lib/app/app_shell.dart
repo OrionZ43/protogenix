@@ -46,6 +46,7 @@ import '../features/player/presentation/widgets/beautiful_lyrics_view.dart';
 import '../features/player/presentation/widgets/protogenix_background.dart';
 import '../features/library/presentation/screens/info_screen.dart';
 import '../core/widgets/neon_logo.dart';
+import 'demo_mode.dart';
 
 // ── Провайдер текущей вкладки ─────────────────────────────────────────────────
 
@@ -530,6 +531,19 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
   bool _isPlayerExpanded = false;
   double _rightPanelWidth = 400.0;
   bool _isDragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Запись демо для сайта (demo_mode.dart): трек и сразу развёрнутый плеер
+    if (kIsDemo) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (await startDemo(ref) && mounted) {
+          setState(() => _isPlayerExpanded = true);
+        }
+      });
+    }
+  }
 
   void _openPlayer(BuildContext context) {
     setState(() => _isPlayerExpanded = true);

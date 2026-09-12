@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
+import 'app/demo_mode.dart';
 import 'core/services/app_paths.dart';
 import 'features/player/data/audio_handler.dart';
 
@@ -35,7 +36,8 @@ Future<void> main() async {
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
     WindowOptions windowOptions = const WindowOptions(
-      size: Size(1000, 700),
+      // Запись демо (demo_mode.dart) — окно под пропорции картинки на сайте
+      size: kIsDemo ? Size(1280, 853) : Size(1000, 700),
       minimumSize: Size(1000, 700),
       maximumSize: Size(2560, 1440),
       center: true,
