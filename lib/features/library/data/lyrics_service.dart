@@ -1,27 +1,21 @@
 // lib/features/library/data/lyrics_service.dart
 //
-// Scoring Engine v2 — исправленные веса:
-//   Title:  до +150 баллов  (было: 40)
-//   Artist: до +80  баллов  (было: 20)
-//   Format: тайбрейкер      (было: до +60)
-//     syllable → +15  (было: 60)
-//     enhanced → +10  (было: 45)
-//     synced   → +5   (было: 25)
-//     plain    → +0   (было: 5)
-//
-// Математика победы:
-//   Точное совпадение plain = 150 + 80 + 0 = 230 баллов
-//   50% совпадение + syllable = 75 + 40 + 15 = 130 баллов
-//   → Правильная песня в plain ВСЕГДА выигрывает у чужой в syllable.
+// Поиск текстов: запросы к источникам (LRCLIB, NetEase, Kugou) по
+// разобранному названию трека (track_query.dart), выбор — lyrics_matcher.dart.
+// Два этапа: сначала точные запросы по основному прочтению; если среди
+// найденного нет той же песни с совпавшей длительностью и таймингами —
+// более широкие. Правила и замер — .claude/rules/lyrics.md.
 
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import 'package:string_similarity/string_similarity.dart';
+import '../../../core/services/app_paths.dart';
+import '../../player/domain/lyrics_timing.dart';
+import '../domain/lyrics_matcher.dart';
 import '../domain/lyrics_models.dart';
 import '../domain/lyrics_query_builder.dart';
 import 'lyrics_provider.dart';
+import 'providers/kugou_provider.dart';
 import 'providers/lrclib_provider.dart';
 import 'providers/netease_provider.dart';
 
@@ -30,6 +24,7 @@ class LyricsService {
     _providers = [
       LrcLibProvider(),
       NetEaseProvider(),
+      KugouProvider(),
     ];
   }
 
@@ -38,28 +33,26 @@ class LyricsService {
   late final List<LyricsProvider> _providers;
   final _queryBuilder = LyricsQueryBuilder();
 
+  static const _requestTimeout = Duration(seconds: 12);
+  static const _maxResults = 15;
+  static const _maxBroadQueries = 3;
+  static const _maxBroadInterpretations = 2;
+
   // ══════════════════════════════════════════════════════════════════════════
   // ПУБЛИЧНЫЙ API
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Основной метод поиска.
-  /// Возвращает топ-10 результатов, отсортированных по score.
+  /// Все найденные варианты по порядку выбора (lyrics_matcher.dart): первыми
+  /// идут «та же песня» ([ScoredLyric.isConfident]), дальше — остальные для
+  /// ручного выбора.
   Future<List<ScoredLyric>> fetchLyrics({
     required String title,
     required String artist,
     String? filePath,
     int? trackDurationMs,
   }) async {
-    debugPrint('\n╔══════════════════════════════════════════════════');
-    debugPrint('║ LyricsService.fetchLyrics');
-    debugPrint('║ title:    "$title"');
-    debugPrint('║ artist:   "$artist"');
-    debugPrint(
-        '║ duration: ${trackDurationMs != null ? "${trackDurationMs}ms" : "—"}');
-    debugPrint('╚══════════════════════════════════════════════════');
-
-    // 1. Проверяем локальный файл
-    if (filePath != null) {
+    // 1. Локальный .lrc рядом с аудиофайлом
+    if (filePath != null && filePath.isNotEmpty) {
       final local = _readLocalLrc(filePath);
       if (local != null) {
         debugPrint('[LyricsService] ✓ Локальный .lrc файл');
@@ -75,180 +68,118 @@ class LyricsService {
       }
     }
 
-    // 2. Генерируем поисковые запросы
-    final queries = _queryBuilder.build(title, artist);
-    debugPrint('[LyricsService] Запросов: ${queries.length}');
-    for (var i = 0; i < queries.length; i++) {
-      debugPrint('[LyricsService]   ${i + 1}. "${queries[i]}"');
-    }
-
-    // 3. Параллельный поиск по всем провайдерам и запросам
-    final allFutures = <Future<List<LyricsMetadata>>>[];
-
-    for (final provider in _providers) {
-      for (final query in queries) {
-        allFutures.add(provider.search(query));
-      }
-    }
-
-    debugPrint(
-      '[LyricsService] Параллельных запросов: '
-      '${_providers.length} провайдера × ${queries.length} запросов '
-      '= ${allFutures.length}',
+    final matcher = LyricsMatcher(
+      title: title,
+      artist: artist,
+      durationMs: trackDurationMs,
     );
+    final primary = matcher.primary;
+    final queries = _queryBuilder.queries(matcher.interpretations);
+    debugPrint('[LyricsService] "$title" / "$artist" → $primary, '
+        'длительность ${matcher.durationMs ?? '—'} мс');
 
-    final allLists = await Future.wait(allFutures);
+    final found = <String, LyricsMetadata>{};
+    LyricsSearchRequest text(String query) => LyricsSearchRequest(
+          mode: LyricsSearchMode.text,
+          query: query,
+          durationMs: matcher.durationMs,
+          relevance: matcher.relevance,
+        );
+    LyricsSearchRequest fielded(String trackTitle, String? trackArtist) =>
+        LyricsSearchRequest(
+          mode: LyricsSearchMode.fielded,
+          title: trackTitle,
+          artist: trackArtist,
+          durationMs: matcher.durationMs,
+          relevance: matcher.relevance,
+        );
 
-    // 4. Собираем и дедуплицируем результаты
-    final seen = <String>{};
-    final unique = <LyricsMetadata>[];
+    // 2. Точные запросы по основному прочтению
+    final mainArtist = primary.artists.isEmpty ? null : primary.artists.first;
+    await _run([
+      if (mainArtist != null && matcher.durationMs != null)
+        LyricsSearchRequest(
+          mode: LyricsSearchMode.exact,
+          title: primary.title,
+          artist: mainArtist,
+          durationMs: matcher.durationMs,
+        ),
+      fielded(primary.title, mainArtist),
+      if (queries.isNotEmpty) text(queries.first),
+    ], found);
+    var ranked = matcher.rank(found.values);
 
-    for (final list in allLists) {
-      for (final meta in list) {
-        if (seen.add(meta.id)) {
-          unique.add(meta);
-        }
+    // 3. Широкие запросы, если точные не дали той же песни с таймингами:
+    //    остальные строки свободного поиска и другие прочтения по полям.
+    if (!LyricsMatcher.isGoodEnough(LyricsMatcher.best(ranked))) {
+      final broad = [
+        for (final q in queries.skip(1).take(_maxBroadQueries)) text(q),
+        for (final t
+            in matcher.interpretations.skip(1).take(_maxBroadInterpretations))
+          if (t.artists.isNotEmpty) fielded(t.title, t.artists.first),
+      ];
+      if (broad.isNotEmpty) {
+        await _run(broad, found);
+        ranked = matcher.rank(found.values);
       }
     }
 
-    debugPrint('[LyricsService] Уникальных результатов: ${unique.length}');
-
-    if (unique.isEmpty) {
-      debugPrint('[LyricsService] ✗ Ничего не найдено');
-      return [];
+    for (final m in ranked.take(5)) {
+      debugPrint('[LyricsService] ${m.isSameSong ? '✓' : '·'} '
+          '${m.score.toStringAsFixed(0)} ${m.metadata.type.name} '
+          '${m.metadata.source} "${m.metadata.artistName} — ${m.metadata.trackName}"'
+          '${m.timeScale != 1.0 ? ' ×${m.timeScale.toStringAsFixed(3)}' : ''}'
+          '${m.timingsReliable ? '' : ' (тайминги от другой версии)'}');
+    }
+    if (ranked.isEmpty || !ranked.first.isSameSong) {
+      debugPrint('[LyricsService] ✗ Той же песни не найдено');
     }
 
-    // 5. Scoring
-    final scored = unique.map((meta) {
-      final score = _calculateScore(
-        meta: meta,
-        originalTitle: title,
-        originalArtist: artist,
-        trackDurationMs: trackDurationMs,
-      );
-      return ScoredLyric(metadata: meta, score: score);
-    }).toList();
-
-    // Сортируем по убыванию
-    scored.sort((a, b) => b.score.compareTo(a.score));
-
-    // Берём топ-10
-    final top10 = scored.take(10).toList();
-
-    debugPrint('\n[LyricsService] ══ ТОП-10 ══');
-    for (var i = 0; i < top10.length; i++) {
-      final s = top10[i];
-      debugPrint(
-        '[LyricsService] #${i + 1} '
-        '"${s.metadata.artistName} — ${s.metadata.trackName}" '
-        '| ${s.metadata.type} | ${s.metadata.source} '
-        '| score=${s.scoreLabel}',
-      );
-    }
-
-    return top10;
+    return ranked.take(_maxResults).map((m) => m.toScored()).toList();
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // SCORING ENGINE v2
-  // ══════════════════════════════════════════════════════════════════════════
-  //
-  // Принцип: соответствие названию и артисту — ГЛАВНЫЙ критерий.
-  // Формат — ТАЙБРЕЙКЕР среди одинаково релевантных результатов.
-  //
-  // Максимумы:
-  //   title:   150 баллов  (sim ∈ [0..1] × 150)
-  //   artist:   80 баллов  (sim ∈ [0..1] × 80)
-  //   duration: 15 баллов  (точное совпадение ±3 сек)
-  //   format:   15 баллов  (syllable, тайбрейкер)
-  //
-  // Итого max ≈ 260 баллов при идеальном совпадении.
-
-  double _calculateScore({
-    required LyricsMetadata meta,
-    required String originalTitle,
-    required String originalArtist,
+  /// Лучший вариант для автовыбора или null — «текст не найден».
+  Future<ScoredLyric?> findBest({
+    required String title,
+    required String artist,
+    String? filePath,
     int? trackDurationMs,
-  }) {
-    double score = 0.0;
+  }) async {
+    final results = await fetchLyrics(
+      title: title,
+      artist: artist,
+      filePath: filePath,
+      trackDurationMs: trackDurationMs,
+    );
+    return results.isNotEmpty && results.first.isConfident
+        ? results.first
+        : null;
+  }
 
-    // Нормализуем для сравнения
-    final normTitle = _normalize(originalTitle);
-    final normArtist = _normalize(originalArtist);
-    final normMTitle = _normalize(meta.trackName);
-    final normMArtist = _normalize(meta.artistName);
-
-    // ── Схожесть названия: до +150 баллов ────────────────────────────────
-    final titleSim = normTitle.isNotEmpty && normMTitle.isNotEmpty
-        ? normTitle.similarityTo(normMTitle)
-        : 0.0;
-    score += titleSim * 150.0;
-
-    // ── Схожесть артиста: до +80 баллов ──────────────────────────────────
-    final artistSim = normArtist.isNotEmpty && normMArtist.isNotEmpty
-        ? normArtist.similarityTo(normMArtist)
-        : 0.0;
-    score += artistSim * 80.0;
-
-    // ── Бонус за длительность: до +15 баллов ─────────────────────────────
-    if (trackDurationMs != null && meta.durationMs != null) {
-      final diffMs = (trackDurationMs - meta.durationMs!).abs();
-      final diffSec = diffMs / 1000.0;
-
-      if (diffSec < 3.0) {
-        score += 15.0;
-        debugPrint(
-          '[SCORE] "${meta.trackName}" +15.0 (длит. совпадает, '
-          'diff=${diffSec.toStringAsFixed(1)}s)',
-        );
-      } else if (diffSec < 10.0) {
-        score += 5.0;
-      } else if (diffSec > 60.0) {
-        // Штраф — явно другой трек
-        score -= 10.0;
-        debugPrint(
-          '[SCORE] "${meta.trackName}" -10.0 '
-          '(длит. сильно отличается, diff=${diffSec.toStringAsFixed(0)}s)',
-        );
+  Future<void> _run(
+    List<LyricsSearchRequest> requests,
+    Map<String, LyricsMetadata> found,
+  ) async {
+    final futures = <Future<List<LyricsMetadata>>>[];
+    for (final request in requests) {
+      for (final provider in _providers) {
+        if (!provider.modes.contains(request.mode)) continue;
+        futures.add(provider.search(request).timeout(
+              _requestTimeout,
+              onTimeout: () => const <LyricsMetadata>[],
+            ));
       }
     }
-
-    // ── Бонус за формат (тайбрейкер): до +15 баллов ──────────────────────
-    // Помогает выбирать лучший формат ТОЛЬКО среди равно релевантных треков.
-    // НЕ перебивает совпадение названия/артиста.
-    final formatBonus = switch (meta.type) {
-      LyricsType.syllable => 15.0,
-      LyricsType.enhanced => 10.0,
-      LyricsType.synced => 5.0,
-      LyricsType.plain => 0.0,
-    };
-    score += formatBonus;
-
-    debugPrint(
-      '[SCORE] "${meta.artistName} — ${meta.trackName}" '
-      '| title=${(titleSim * 150).toStringAsFixed(1)} '
-      'artist=${(artistSim * 80).toStringAsFixed(1)} '
-      'format=$formatBonus '
-      '| TOTAL=${score.toStringAsFixed(1)} [${meta.type}] [${meta.source}]',
-    );
-
-    return score;
+    for (final list in await Future.wait(futures)) {
+      for (final meta in list) {
+        found.putIfAbsent(meta.id, () => meta);
+      }
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
   // ══════════════════════════════════════════════════════════════════════════
-
-  /// Нормализует строку для сравнения:
-  /// приводит к нижнему регистру, убирает скобки и лишние пробелы.
-  String _normalize(String s) {
-    return s
-        .toLowerCase()
-        .replaceAll(RegExp(r'[\(\[\{][^\)\]\}]*[\)\]\}]'), '')
-        .replaceAll(RegExp(r'[^\w\s]'), ' ')
-        .replaceAll(RegExp(r'\s{2,}'), ' ')
-        .trim();
-  }
 
   /// Определяет тип текста по содержимому.
   LyricsType _classifyContent(String content) {
@@ -276,8 +207,7 @@ class LyricsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   Future<String> saveLrc(String lrcContent, String trackId) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dir.path, 'lyrics', '$trackId.lrc'));
+    final file = File(p.join(AppPaths.lyricsDir, '$trackId.lrc'));
     await file.parent.create(recursive: true);
     await file.writeAsString(lrcContent);
     return file.path;
@@ -287,20 +217,23 @@ class LyricsService {
   // ОБРАТНАЯ СОВМЕСТИМОСТЬ
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Упрощённый метод — возвращает только лучший контент или null.
-  /// Используется старым кодом.
+  /// Лучший текст для сохранения при импорте или null. Текст с таймингами от
+  /// другой версии не возвращается: закреплённый за треком, он бы уезжал.
   Future<String?> getLrc({
     required String filePath,
     required String title,
     required String artist,
     int? trackDurationMs,
   }) async {
-    final results = await fetchLyrics(
+    final best = await findBest(
       title: title,
       artist: artist,
       filePath: filePath,
       trackDurationMs: trackDurationMs,
     );
-    return results.isEmpty ? null : results.first.metadata.content;
+    if (best == null || !best.timingsReliable) return null;
+    return best.metadata.type == LyricsType.plain
+        ? best.metadata.content
+        : withScaleTag(best.metadata.content, best.timeScale);
   }
 }

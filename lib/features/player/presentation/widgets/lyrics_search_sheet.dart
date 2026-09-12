@@ -17,6 +17,7 @@ import '../providers/karaoke_provider.dart';
 import '../../../../features/library/data/lyrics_service.dart';
 import '../../../../features/library/domain/lyrics_models.dart';
 import '../../../../features/player/domain/advanced_lrc_parser.dart';
+import '../../../../features/player/domain/lyrics_timing.dart';
 import '../../../../features/library/presentation/library_provider.dart';
 
 /// Открыть шторку ручного поиска текста
@@ -85,9 +86,13 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
     });
 
     try {
+      // Длительность трека: по ней видно ту же версию, и для slowed/sped up
+      // считается растяжение таймингов.
+      final durationMs = widget.track.duration.inMilliseconds;
       final results = await LyricsService.instance.fetchLyrics(
         title: title,
         artist: artist,
+        trackDurationMs: durationMs > 0 ? durationMs : null,
       );
       if (mounted) {
         setState(() {
@@ -99,17 +104,21 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
         });
       }
     } catch (e) {
+      debugPrint('[LyricsSearch] Ошибка поиска: $e');
       if (mounted) {
         setState(() {
           _isSearching = false;
-          _error = 'Ошибка: $e';
+          _error = 'Не получилось выполнить поиск. Попробуй ещё раз.';
         });
       }
     }
   }
 
   void _apply(ScoredLyric scored) {
-    final parsed = AdvancedLrcParser.parse(scored.metadata.content);
+    final meta = scored.metadata;
+    // Для slowed/sped up — текст оригинала с растянутыми таймингами
+    final parsed = scaleLyricsTimings(
+        AdvancedLrcParser.parse(meta.content), scored.timeScale);
 
     // 1. Мгновенно применяем к karaoke (UI обновляется сразу)
     ref.read(karaokeProvider.notifier).invalidateCache(widget.track.id);
@@ -117,7 +126,9 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
 
     // 2. Захватываем нотифаер ДО pop, чтобы не потерять ref после unmount
     final trackId = widget.track.id;
-    final content = scored.metadata.content;
+    final content = meta.type == LyricsType.plain
+        ? meta.content
+        : withScaleTag(meta.content, scored.timeScale);
     final libraryNotifier = ref.read(libraryProvider.notifier);
 
     Navigator.of(context).pop();
@@ -432,6 +443,18 @@ class _LyricResultTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+          // Та же песня (lyrics_matcher.dart) — такой вариант выбрал бы автопоиск
+          if (scored.isConfident) ...[
+            const Tooltip(
+              message: 'Точно эта песня',
+              child: Icon(
+                Icons.verified_rounded,
+                color: Color(0xFF66BB6A),
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
           Text(
             scored.scoreLabel,
             style: const TextStyle(color: Colors.white38, fontSize: 12),

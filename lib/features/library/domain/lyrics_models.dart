@@ -53,12 +53,30 @@ class LyricsMetadata {
       'LyricsMetadata("$artistName — $trackName", type: $type, source: $source)';
 }
 
-/// Результат с баллом уверенности алгоритма [0.0 … 100.0]
+/// Найденный текст с оценкой (lyrics_matcher.dart).
 class ScoredLyric {
   final LyricsMetadata metadata;
+
+  /// Для сортировки и показа, примерно 0…200.
   final double score;
 
-  const ScoredLyric({required this.metadata, required this.score});
+  /// Точно та же песня — можно выбирать автоматически. Остальные варианты
+  /// показываются только в ручном поиске.
+  final bool isConfident;
+
+  /// ≠ 1 — текст оригинала для slowed/sped up: тайминги умножить на него.
+  final double timeScale;
+
+  /// false — тайминги от другой версии трека: показывать без синхронизации.
+  final bool timingsReliable;
+
+  const ScoredLyric({
+    required this.metadata,
+    required this.score,
+    this.isConfident = true,
+    this.timeScale = 1.0,
+    this.timingsReliable = true,
+  });
 
   String get scoreLabel => score.toStringAsFixed(1);
 

@@ -5,12 +5,16 @@
 //   • Debounce 400мс — если пользователь пролистал трек, запрос не уходит
 //   • Отмена in-flight запроса при быстрой смене трека (_currentLoadToken)
 //   • Это решает проблему "тексты с пролистанных треков накладываются"
+// v3.3 — автопоиск берёт только «ту же песню» (lyrics_matcher.dart) и
+//   передаёт длительность трека; тайминги slowed/sped up растягиваются,
+//   тайминги от другой версии трека не показываются (lyrics_timing.dart).
 
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/advanced_lrc_parser.dart';
+import '../../domain/lyrics_timing.dart';
 import '../../domain/track_model.dart';
 import '../../../library/data/lyrics_service.dart';
 import '../../../library/domain/lyrics_models.dart';
@@ -146,14 +150,16 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
 
     try {
       String? content;
-      LyricsType? sourceType;
+      var timeScale = 1.0;
+      var timingsReliable = true;
 
-      // 1. Кэшированный lrcPath из БД
+      // 1. Сохранённый текст (ручной выбор или импорт) — lrcPath из БД
       if (track.lrcPath != null) {
         final file = File(track.lrcPath!);
         if (await file.exists()) {
-          content = await file.readAsString();
-          sourceType = null;
+          final saved = readScaleTag(await file.readAsString());
+          content = saved.content;
+          timeScale = saved.scale;
           debugPrint('[Karaoke] Загружен файл: ${track.lrcPath}');
         }
       }
@@ -161,25 +167,29 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
       // Проверяем токен после async операции
       if (_currentLoadToken != token || !mounted) return;
 
-      // 2. Поиск через LyricsService
+      // 2. Поиск: только «та же песня», иначе — «текст не найден»
       if (content == null) {
-        final results = await LyricsService.instance.fetchLyrics(
+        final durationMs = track.duration.inMilliseconds;
+        final best = await LyricsService.instance.findBest(
           title: track.title,
           artist: track.artist,
           filePath: track.filePath ?? '',
+          trackDurationMs: durationMs > 0 ? durationMs : null,
         );
 
         // Снова проверяем — пока шёл сетевой запрос, трек мог смениться
         if (_currentLoadToken != token || !mounted) return;
 
-        if (results.isNotEmpty) {
-          final best = results.first;
+        if (best != null) {
           content = best.metadata.content;
-          sourceType = best.metadata.type;
+          timeScale = best.timeScale;
+          timingsReliable = best.timingsReliable;
           debugPrint(
             '[Karaoke] Найдено: ${best.metadata.type.label} '
             'score=${best.scoreLabel} '
-            'source=${best.metadata.source}',
+            'source=${best.metadata.source}'
+            '${timeScale != 1.0 ? ' ×${timeScale.toStringAsFixed(3)}' : ''}'
+            '${timingsReliable ? '' : ' (без синхронизации)'}',
           );
         }
       }
@@ -193,7 +203,7 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
         return;
       }
 
-      final parsed = _parseContent(content, sourceType);
+      final parsed = _prepare(content, timeScale, timingsReliable);
 
       // Сохраняем в кэш
       _cache[track.id] = parsed;
@@ -227,8 +237,17 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
     }
   }
 
-  ParsedLyrics _parseContent(String content, LyricsType? hint) {
-    return AdvancedLrcParser.parse(content);
+  /// Разбор + растяжение для slowed/sped up. Тайминги от другой версии трека
+  /// уехали бы — такой текст показываем без синхронизации.
+  ParsedLyrics _prepare(String content, double timeScale, bool timingsReliable) {
+    final parsed =
+        scaleLyricsTimings(AdvancedLrcParser.parse(content), timeScale);
+    if (timingsReliable) return parsed;
+    return ParsedLyrics(
+      lines: parsed.lines,
+      format: LyricsFormat.plain,
+      tags: parsed.tags,
+    );
   }
 
   // ── Обновление активной строки ─────────────────────────────────────────────
@@ -266,7 +285,8 @@ class KaraokeNotifier extends StateNotifier<KaraokeState> {
     _lastLineIndex = -1;
     state = const KaraokeState(isLoaded: false);
 
-    final parsed = AdvancedLrcParser.parse(content);
+    final saved = readScaleTag(content);
+    final parsed = _prepare(saved.content, saved.scale, true);
 
     // Обновляем кэш для текущего трека
     final trackId = _ref.read(playerProvider).currentTrack?.id;
