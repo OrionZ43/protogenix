@@ -14,6 +14,7 @@ import '../../domain/player_state.dart' as ps;
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
 import '../../../library/presentation/playlist_provider.dart';
+import '../../../library/presentation/widgets/add_to_playlist_sheet.dart';
 import '../../../../core/utils/haptic_patterns.dart';
 import 'waveform_progress_bar.dart';
 
@@ -195,21 +196,27 @@ class _CompactLayout extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Flexible: на узком телефоне подписи сокращаются многоточием,
+                // а не выталкивают кнопки за край экрана
                 if (onAddTrack != null) ...[
-                  _CapsuleButton(
-                    icon: Icons.add_rounded,
-                    label: 'Добавить трек',
-                    color: palette.primary,
-                    onTap: onAddTrack!,
+                  Flexible(
+                    child: _CapsuleButton(
+                      icon: Icons.add_rounded,
+                      label: 'Добавить трек',
+                      color: palette.primary,
+                      onTap: onAddTrack!,
+                    ),
                   ),
                   const SizedBox(width: 10),
                 ],
                 if (onChangeLyrics != null)
-                  _CapsuleButton(
-                    icon: Icons.manage_search_rounded,
-                    label: 'Другой текст',
-                    color: palette.secondary,
-                    onTap: onChangeLyrics!,
+                  Flexible(
+                    child: _CapsuleButton(
+                      icon: Icons.manage_search_rounded,
+                      label: 'Другой текст',
+                      color: palette.secondary,
+                      onTap: onChangeLyrics!,
+                    ),
                   ),
               ],
             ),
@@ -257,9 +264,9 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
           scale: _isHovered ? 1.05 : 1.0,
           duration: const Duration(milliseconds: 150),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
               color: _isHovered
                   ? Colors.white.withAlpha(25)
                   : Colors.white.withAlpha(18),
@@ -268,11 +275,15 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(widget.icon, color: widget.color, size: 15),
+                Icon(widget.icon, color: widget.color, size: 17),
                 const SizedBox(width: 6),
-                Text(widget.label,
-                    style:
-                        const TextStyle(color: Colors.white60, fontSize: 12)),
+                Flexible(
+                  child: Text(widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white60, fontSize: 13)),
+                ),
               ],
             ),
           ),
@@ -412,8 +423,26 @@ class _TrackInfo extends ConsumerWidget {
           ),
         ),
 
-        // Правый балансировочный спейсер (40px)
-        const SizedBox(width: 40),
+        // Справа — «в плейлист», симметрично сердечку (раньше тут был пустой
+        // противовес). Просили в отзывах: без «⋮» и выбора пунктов
+        if (showFavorite)
+          SizedBox(
+            width: 40,
+            child: Tooltip(
+              message: 'В плейлист',
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  showAddToPlaylistSheet(context, [track.id]);
+                },
+                behavior: HitTestBehavior.opaque,
+                child: const Icon(Icons.playlist_add_rounded,
+                    color: Colors.white38, size: 24),
+              ),
+            ),
+          )
+        else
+          const SizedBox(width: 40),
       ],
     );
   }

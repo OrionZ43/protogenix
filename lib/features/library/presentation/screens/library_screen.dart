@@ -10,12 +10,16 @@ import '../../domain/library_track.dart';
 import '../library_provider.dart';
 import '../playlist_provider.dart';
 import '../widgets/track_context_menu.dart';
+import '../widgets/add_to_playlist_sheet.dart';
 import 'playlists_screen.dart';
 import '../../../importer/presentation/importer_sheet.dart';
 import '../../../player/presentation/providers/palette_provider.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
+import '../../../../core/theme/cover_placeholder.dart';
+import '../../../../core/widgets/chip_button.dart';
+import '../../../../core/widgets/glass_dialog.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -388,6 +392,82 @@ class _TrackListState extends ConsumerState<_TrackList> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // Выделение нескольких треков — чтобы добавить их в плейлист разом
+  // (из отзывов: 400 треков по одному не накидаешь)
+  bool _selecting = false;
+  final Set<String> _selected = {};
+
+  void _startSelection([String? trackId]) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selecting = true;
+      if (trackId != null) _selected.add(trackId);
+    });
+  }
+
+  void _toggle(String trackId) {
+    setState(() {
+      if (!_selected.remove(trackId)) _selected.add(trackId);
+    });
+  }
+
+  void _exitSelection() {
+    setState(() {
+      _selecting = false;
+      _selected.clear();
+    });
+  }
+
+  /// В порядке, в котором треки сейчас показаны; выделенные, но скрытые
+  /// поиском, — следом.
+  Future<void> _addSelectedToPlaylist(List<LibraryTrack> shown) async {
+    final shownIds = {for (final t in shown) t.id};
+    final ids = [
+      for (final t in shown)
+        if (_selected.contains(t.id)) t.id,
+      for (final t in widget.tracks)
+        if (_selected.contains(t.id) && !shownIds.contains(t.id)) t.id,
+    ];
+    if (await showAddToPlaylistSheet(context, ids) && mounted) {
+      _exitSelection();
+    }
+  }
+
+  /// Удаление пачкой — например, неправильно скачанных треков. Своя музыка
+  /// с телефона остаётся на месте (library_provider.dart).
+  Future<void> _deleteSelected() async {
+    final tracks = [
+      for (final t in widget.tracks)
+        if (_selected.contains(t.id)) t,
+    ];
+    if (tracks.isEmpty) return;
+    final fromPhone = tracks.where((t) => t.source == 'device').length;
+    final confirmed = await showGlassConfirm(
+      context,
+      title: 'Удалить ${tracks.length} ${tracksWord(tracks.length)}?',
+      message:
+          'Треки пропадут из медиатеки, скачанные файлы удалятся с устройства.'
+          '${fromPhone == 0 ? '' : ' Музыка с телефона останется на месте — '
+              '$fromPhone ${tracksWord(fromPhone)} уйдут только из медиатеки.'}',
+      confirmLabel: 'Удалить',
+    );
+    if (!confirmed || !mounted) return;
+
+    final currentId = ref.read(playerProvider).currentTrack?.id;
+    await ref.read(libraryProvider.notifier).removeTracksWithFiles(tracks);
+    // Плейлисты хранят id отдельно (data.md): перечитать, чтобы удалённые
+    // пропали и там
+    ref.invalidate(playlistTracksProvider);
+    ref.invalidate(playlistTracksNotifierProvider);
+    if (tracks.any((t) => t.id == currentId)) {
+      await ref.read(playerProvider.notifier).reloadFromLibrary();
+    }
+    if (!mounted) return;
+    _exitSelection();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Удалено: ${tracks.length} ${tracksWord(tracks.length)}')));
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -423,7 +503,16 @@ class _TrackListState extends ConsumerState<_TrackList> {
         break;
     }
 
-    return SafeArea(
+    final allSelected = filteredTracks.isNotEmpty &&
+        filteredTracks.every((t) => _selected.contains(t.id));
+
+    return PopScope(
+      // «Назад» сначала снимает выделение
+      canPop: !_selecting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _exitSelection();
+      },
+      child: SafeArea(
       bottom: false,
       child: CustomScrollView(
         slivers: [
@@ -431,7 +520,25 @@ class _TrackListState extends ConsumerState<_TrackList> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Row(
+              child: _selecting
+                  ? _SelectionBar(
+                      count: _selected.length,
+                      allSelected: allSelected,
+                      accent: palette.primary,
+                      onClose: _exitSelection,
+                      onToggleAll: () => setState(() {
+                        final ids = filteredTracks.map((t) => t.id);
+                        if (allSelected) {
+                          _selected.removeAll(ids);
+                        } else {
+                          _selected.addAll(ids);
+                        }
+                      }),
+                      onAddToPlaylist: () =>
+                          _addSelectedToPlaylist(filteredTracks),
+                      onDelete: _deleteSelected,
+                    )
+                  : Row(
                 children: [
                   const Text(
                     'Треки',
@@ -451,6 +558,17 @@ class _TrackListState extends ConsumerState<_TrackList> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // Выделить несколько треков: на ПК до долгого нажатия
+                  // не догадаться
+                  if (widget.tracks.isNotEmpty) ...[
+                    _GlassIconButton(
+                      icon: Icons.checklist_rounded,
+                      isActive: false,
+                      activeColor: palette.primary,
+                      onTap: _startSelection,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   // Кнопка сортировки — круглая стеклянная с hover-эффектом
                   _GlassIconButton(
                     icon: Icons.sort_rounded,
@@ -547,11 +665,20 @@ class _TrackListState extends ConsumerState<_TrackList> {
           else
             SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _TrackTile(
-                  track: filteredTracks[index],
-                  index: index,
-                  tracks: filteredTracks,
-                ),
+                (context, index) {
+                  final track = filteredTracks[index];
+                  return _TrackTile(
+                    track: track,
+                    index: index,
+                    tracks: filteredTracks,
+                    selecting: _selecting,
+                    selected: _selected.contains(track.id),
+                    onSelect: () => _toggle(track.id),
+                    onLongPress: () => _selecting
+                        ? _toggle(track.id)
+                        : _startSelection(track.id),
+                  );
+                },
                 childCount: filteredTracks.length,
               ),
             ),
@@ -559,6 +686,7 @@ class _TrackListState extends ConsumerState<_TrackList> {
           // Отступ снизу (под мини-плеер + навбар)
           const SliverToBoxAdapter(child: SizedBox(height: 140)),
         ],
+      ),
       ),
     );
   }
@@ -568,16 +696,95 @@ class _TrackListState extends ConsumerState<_TrackList> {
 // TRACK TILE
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Шапка списка в режиме выделения: сколько выбрано, «Все», корзина,
+/// «В плейлист». Кнопки — те же стеклянные, что в обычной шапке.
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    required this.count,
+    required this.allSelected,
+    required this.accent,
+    required this.onClose,
+    required this.onToggleAll,
+    required this.onAddToPlaylist,
+    required this.onDelete,
+  });
+
+  final int count;
+  final bool allSelected;
+  final Color accent;
+  final VoidCallback onClose;
+  final VoidCallback onToggleAll;
+  final VoidCallback onAddToPlaylist;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    // На узком телефоне у «В плейлист» только иконка — иначе не влезает
+    final narrow = MediaQuery.sizeOf(context).width < 400;
+    return Row(
+      children: [
+        _GlassIconButton(icon: Icons.close_rounded, onTap: onClose),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            count == 0 ? 'Выбери треки' : 'Выбрано: $count',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        ChipButton(label: allSelected ? 'Снять' : 'Все', onTap: onToggleAll),
+        const SizedBox(width: 8),
+        // Корзина — красная, как «Удалить трек» в меню «⋮»
+        Opacity(
+          opacity: count == 0 ? 0.4 : 1,
+          child: IgnorePointer(
+            ignoring: count == 0,
+            child: _GlassIconButton(
+              icon: Icons.delete_outline_rounded,
+              isActive: true,
+              activeColor: Colors.redAccent,
+              onTap: onDelete,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        ChipButton(
+          icon: Icons.playlist_add_rounded,
+          label: narrow ? null : 'В плейлист',
+          accent: accent,
+          onTap: count == 0 ? null : onAddToPlaylist,
+        ),
+      ],
+    );
+  }
+}
+
 class _TrackTile extends ConsumerWidget {
   const _TrackTile({
     required this.track,
     required this.index,
     required this.tracks,
+    this.selecting = false,
+    this.selected = false,
+    this.onSelect,
+    this.onLongPress,
   });
 
   final LibraryTrack track;
   final int index;
   final List<LibraryTrack> tracks;
+
+  /// Режим выделения: нажатие отмечает трек, а не включает его.
+  final bool selecting;
+  final bool selected;
+  final VoidCallback? onSelect;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -587,7 +794,10 @@ class _TrackTile extends ConsumerWidget {
     final palette = ref.watch(paletteProvider);
 
     return InkWell(
-      onTap: () {
+      onLongPress: onLongPress,
+      onTap: selecting
+          ? onSelect
+          : () {
         // Оптимизация производительности: используем Iterable (map) без toList(),
         // чтобы избежать блокировки UI-потока перед запуском плеера.
         final models = tracks.map((t) => t.toTrackModel());
@@ -602,12 +812,17 @@ class _TrackTile extends ConsumerWidget {
           border: isPlaying
               ? Border(
                   left: BorderSide(
-                    color: Theme.of(context).colorScheme.primary,
+                    // Цвет обложки, как и значок эквалайзера на обложке
+                    color: palette.primary,
                     width: 3,
                   ),
                 )
               : null,
-          color: isPlaying ? Colors.white.withAlpha(8) : Colors.transparent,
+          color: selected
+              ? palette.primary.withAlpha(34)
+              : isPlaying
+                  ? Colors.white.withAlpha(8)
+                  : Colors.transparent,
         ),
         child: Row(
           children: [
@@ -620,7 +835,7 @@ class _TrackTile extends ConsumerWidget {
                   child: Image(
                     image: track.coverPath != null
                         ? FileImage(File(track.coverPath!)) as ImageProvider
-                        : const AssetImage('assets/images/mock_cover.jpg'),
+                        : kCoverPlaceholder,
                     width: 50,
                     height: 50,
                     fit: BoxFit.cover,
@@ -639,19 +854,25 @@ class _TrackTile extends ConsumerWidget {
                       color: palette.primary,
                       size: 22,
                     ),
-                  )
-                else
+                  ),
+                // Раньше в else здесь было затемнение с динамиком: это прежний
+                // индикатор «играет», который при добавлении эквалайзера уехал
+                // в ветку для всех остальных треков
+                // Режим выделения — отметка поверх обложки
+                if (selecting)
                   Container(
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      color: Colors.black.withAlpha(120),
+                      color: Colors.black.withAlpha(150),
                     ),
-                    child: const Icon(
-                      Icons.volume_up_rounded,
-                      color: Colors.white,
-                      size: 22,
+                    child: Icon(
+                      selected
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      color: selected ? palette.primary : Colors.white70,
+                      size: 24,
                     ),
                   ),
               ],
@@ -699,15 +920,19 @@ class _TrackTile extends ConsumerWidget {
 
             const SizedBox(width: 4),
 
-            // Три точки → контекстное меню
-            IconButton(
-              icon: const Icon(Icons.more_vert_rounded),
-              color: Colors.white38,
-              iconSize: 20,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: () => showTrackContextMenu(context, ref, track),
-            ),
+            // Три точки → контекстное меню (при выделении не нужны; место
+            // остаётся, чтобы строка не прыгала)
+            if (selecting)
+              const SizedBox(width: 36)
+            else
+              IconButton(
+                icon: const Icon(Icons.more_vert_rounded),
+                color: Colors.white38,
+                iconSize: 20,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                onPressed: () => showTrackContextMenu(context, ref, track),
+              ),
           ],
         ),
       ),
@@ -848,7 +1073,7 @@ class _FavoriteTile extends ConsumerWidget {
               child: Image(
                 image: track.coverPath != null
                     ? FileImage(File(track.coverPath!)) as ImageProvider
-                    : const AssetImage('assets/images/mock_cover.jpg'),
+                    : kCoverPlaceholder,
                 width: 50,
                 height: 50,
                 fit: BoxFit.cover,

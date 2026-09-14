@@ -10,10 +10,12 @@ import '../../data/playlist_database.dart';
 import '../../domain/library_track.dart';
 import '../playlist_provider.dart';
 import '../widgets/track_context_menu.dart';
+import '../../../player/presentation/providers/palette_provider.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/cover_placeholder.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // PLAYLISTS SCREEN
@@ -280,7 +282,7 @@ class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
 
   Widget _cover(String? path, {BoxFit fit = BoxFit.cover}) {
     final image = path == null
-        ? Image.asset('assets/images/mock_cover.jpg', fit: fit)
+        ? Image(image: kCoverPlaceholder, fit: fit)
         : Image(
       image: ResizeImage(FileImage(File(path)), width: 200),
       fit: fit,
@@ -873,10 +875,11 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           loading: () => const Center(
             child: CircularProgressIndicator(color: Colors.white24),
           ),
-          error: (e, _) => Center(
+          // Само исключение пользователю не показываем (security.md, п. 3)
+          error: (_, __) => Center(
             child: Text(
-              'Ошибка: $e',
-              style: const TextStyle(color: Colors.red),
+              'Не удалось открыть плейлист',
+              style: TextStyle(color: Colors.white.withAlpha(150)),
             ),
           ),
           data: (tracks) => _buildContent(context, tracks),
@@ -1266,7 +1269,7 @@ class _ReorderableTrackTile extends ConsumerWidget {
             child: Image(
               image: track.coverPath != null
                   ? FileImage(File(track.coverPath!)) as ImageProvider
-                  : const AssetImage('assets/images/mock_cover.jpg'),
+                  : kCoverPlaceholder,
               width: 44,
               height: 44,
               fit: BoxFit.cover,
@@ -1506,6 +1509,10 @@ class _AddTrackToPlaylistSheet extends ConsumerStatefulWidget {
 class _AddTrackToPlaylistSheetState extends ConsumerState<_AddTrackToPlaylistSheet> {
   List<LibraryTrack>? _allTracks;
 
+  /// Уже в плейлисте или добавлены сейчас — с галочкой. Раньше нажатие «+»
+  /// ничего не показывало, и трек добавляли по нескольку раз.
+  final _added = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -1515,13 +1522,20 @@ class _AddTrackToPlaylistSheetState extends ConsumerState<_AddTrackToPlaylistShe
   Future<void> _loadAllTracks() async {
     final db = LibraryDatabase.instance;
     final tracks = await db.getAllTracks();
+    final inPlaylist = ref
+            .read(playlistTracksNotifierProvider(widget.playlistId))
+            .valueOrNull ??
+        const <LibraryTrack>[];
+    if (!mounted) return;
     setState(() {
       _allTracks = tracks;
+      _added.addAll(inPlaylist.map((t) => t.id));
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final accent = ref.watch(paletteProvider.select((p) => p.primary));
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
@@ -1587,6 +1601,7 @@ class _AddTrackToPlaylistSheetState extends ConsumerState<_AddTrackToPlaylistShe
                     itemCount: _allTracks!.length,
                     itemBuilder: (context, index) {
                       final track = _allTracks![index];
+                      final added = _added.contains(track.id);
                       return ListTile(
                         leading: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
@@ -1617,18 +1632,21 @@ class _AddTrackToPlaylistSheetState extends ConsumerState<_AddTrackToPlaylistShe
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: IconButton(
-                          icon: const Icon(
-                            Icons.add_circle_outline_rounded,
-                            color: Colors.white38,
+                          icon: Icon(
+                            added
+                                ? Icons.check_circle_rounded
+                                : Icons.add_circle_outline_rounded,
+                            color: added ? accent : Colors.white38,
                           ),
                           onPressed: () {
+                            if (added) return;
                             ref
                                 .read(playlistTracksNotifierProvider(
                                 widget.playlistId)
                                 .notifier)
                                 .add(track.id);
                             HapticFeedback.lightImpact();
-                            // Optional: visually show it's added
+                            setState(() => _added.add(track.id));
                           },
                         ),
                       );

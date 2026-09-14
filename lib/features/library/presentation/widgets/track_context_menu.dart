@@ -1,4 +1,3 @@
-import '../screens/playlists_screen.dart';
 // lib/features/library/presentation/widgets/track_context_menu.dart
 //
 // Контекстное меню трека (BottomSheet).
@@ -10,12 +9,15 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/cover_placeholder.dart';
+import '../../../../core/widgets/glass_dialog.dart';
+
 import '../../domain/library_track.dart';
-import '../../data/playlist_database.dart';
 import '../library_provider.dart';
 import '../playlist_provider.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/lyrics_search_sheet.dart';
+import 'add_to_playlist_sheet.dart';
 import 'track_edit_sheet.dart';
 
 // ── Точка входа ───────────────────────────────────────────────────────────────
@@ -82,7 +84,7 @@ class _TrackContextMenu extends ConsumerWidget {
                     child: Image(
                       image: track.coverPath != null
                           ? FileImage(File(track.coverPath!)) as ImageProvider
-                          : const AssetImage('assets/images/mock_cover.jpg'),
+                          : kCoverPlaceholder,
                       width: 48,
                       height: 48,
                       fit: BoxFit.cover,
@@ -168,7 +170,8 @@ class _TrackContextMenu extends ConsumerWidget {
                   label: 'Добавить в плейлист',
                   onTap: () {
                     Navigator.of(context).pop();
-                    _showAddToPlaylistSheet(context, container, track);
+                    showAddToPlaylistSheet(context, [track.id],
+                        container: container);
                   },
                 ),
 
@@ -214,183 +217,34 @@ class _TrackContextMenu extends ConsumerWidget {
   }
 }
 
-// ── Добавить в плейлист ───────────────────────────────────────────────────────
-
-void _showAddToPlaylistSheet(
-  BuildContext context,
-  ProviderContainer container,
-  LibraryTrack track,
-) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => UncontrolledProviderScope(
-      container: container,
-      child: _AddToPlaylistSheet(track: track),
-    ),
-  );
-}
-
-class _AddToPlaylistSheet extends ConsumerWidget {
-  const _AddToPlaylistSheet({required this.track});
-  final LibraryTrack track;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final playlists = ref.watch(playlistsProvider);
-    final container = ProviderScope.containerOf(context);
-
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withAlpha(200),
-            border: Border(top: BorderSide(color: Colors.white.withAlpha(30))),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 16),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Добавить в плейлист',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Создать новый
-                _MenuItem(
-                  icon: Icons.add_circle_outline_rounded,
-                  label: 'Создать новый плейлист',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    showCreatePlaylistSheet(context, ref).then((_) {
-                      // Note: We can't easily wait for it if showCreatePlaylistSheet doesn't return the new playlist.
-                      // The new playlist is created via ref.read(playlistsProvider.notifier).create(name).
-                    });
-                  },
-                ),
-
-            if (playlists.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Text(
-                  'Нет плейлистов',
-                  style: TextStyle(color: Colors.white38, fontSize: 14),
-                ),
-              )
-            else
-              ...playlists.map(
-                (pl) => _MenuItem(
-                  icon: Icons.queue_music_rounded,
-                  label: pl.name,
-                  onTap: () async {
-                    await PlaylistDatabase.instance.addTrackToPlaylist(
-                      playlistId: pl.id,
-                      trackId: track.id,
-                    );
-
-                    container.invalidate(playlistTracksProvider(pl.id));
-                    final notifier = container.read(playlistTracksNotifierProvider(pl.id).notifier);
-                    notifier.add(track.id);
-
-                    if (context.mounted) {
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Добавлено в «${pl.name}»'),
-                          backgroundColor: const Color(0xFF1A1A2E),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                ),
-              ),
-
-                const SizedBox(height: 12),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ── Подтверждение удаления — удаляет из БД + с диска ─────────────────────────
 
-void _confirmDelete(
+Future<void> _confirmDelete(
   BuildContext context,
   ProviderContainer container,
   LibraryTrack track,
-) {
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF13131F),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
-        'Удалить трек?',
-        style: TextStyle(color: Colors.white, fontSize: 17),
-      ),
-      content: Text(
-        '«${track.title}» будет удалён из библиотеки и с диска.',
-        style: const TextStyle(color: Colors.white54, fontSize: 14),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Отмена', style: TextStyle(color: Colors.white54)),
-        ),
-        TextButton(
-          onPressed: () async {
-            Navigator.of(ctx).pop();
-
-            final isCurrentTrack =
-                container.read(playerProvider).currentTrack?.id == track.id;
-
-            // Удаляем из БД + физические файлы с диска
-            await container
-                .read(libraryProvider.notifier)
-                .removeTrackWithFiles(track);
-
-            // Если удалённый трек сейчас играл — перезагружаем плеер
-            if (isCurrentTrack) {
-              await container.read(playerProvider.notifier).reloadFromLibrary();
-            }
-          },
-          child:
-              const Text('Удалить', style: TextStyle(color: Colors.redAccent)),
-        ),
-      ],
-    ),
+) async {
+  final confirmed = await showGlassConfirm(
+    context,
+    title: 'Удалить трек?',
+    message: track.source == 'device'
+        ? '«${track.title}» пропадёт из медиатеки, а файл на телефоне '
+            'останется.'
+        : '«${track.title}» будет удалён из медиатеки и с устройства.',
+    confirmLabel: 'Удалить',
   );
+  if (!confirmed) return;
+
+  final isCurrentTrack =
+      container.read(playerProvider).currentTrack?.id == track.id;
+
+  // Удаляем из БД + физические файлы с диска
+  await container.read(libraryProvider.notifier).removeTrackWithFiles(track);
+
+  // Если удалённый трек сейчас играл — перезагружаем плеер
+  if (isCurrentTrack) {
+    await container.read(playerProvider.notifier).reloadFromLibrary();
+  }
 }
 
 // ── Вспомогательный виджет пункта меню ───────────────────────────────────────

@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:protogenix/core/utils/system_insets.dart';
 
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
@@ -30,15 +31,17 @@ class PlayerMainControls extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
-        _TopBar(track: track, compact: compact, onClose: onClose),
+        _TopBar(onClose: onClose),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32.0),
             child: MusicVisualizerControls(
               compact: compact,
               showFavorite: true,
-              onAddTrack: () => showImporterSheet(context),
-              onChangeLyrics: track != null
+              // Дубли убраны (отзыв после 1.0.0): «Добавить» — в нижнем ряду,
+              // а ручной поиск текста на телефоне — в шапке шторки с текстом.
+              // В развёрнутом плеере его больше негде открыть — там он остаётся
+              onChangeLyrics: !compact && track != null
                   ? () => showLyricsSearchSheet(context, ref, track!)
                   : null,
             ),
@@ -51,9 +54,7 @@ class PlayerMainControls extends ConsumerWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.track, required this.compact, this.onClose});
-  final TrackModel? track;
-  final bool compact;
+  const _TopBar({this.onClose});
   final VoidCallback? onClose;
 
   @override
@@ -107,7 +108,8 @@ class _TopBar extends StatelessWidget {
               ),
             ),
 
-            // Справа: эквалайзер (только Android) и текст
+            // Справа: эквалайзер (только Android). Иконка текста отсюда
+            // убрана — её дублировала кнопка «Текст» в нижнем ряду
             Positioned(
               right: 16,
               child: Row(
@@ -123,96 +125,12 @@ class _TopBar extends StatelessWidget {
                         child: _EqIcon(),
                       ),
                     ),
-                  if (compact && track != null)
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _showLyricsSheet(context, track!);
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Icon(Icons.lyrics_outlined,
-                            color: Colors.white54, size: 22),
-                      ),
-                    ),
                 ],
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  void _showLyricsSheet(BuildContext context, TrackModel track) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Consumer(
-          builder: (context, ref, child) {
-             return Scaffold(
-              backgroundColor: Colors.transparent,
-              body: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(160),
-                    ),
-                    child: Column(
-                      children: [
-                        // Pull indicator
-                        Center(
-                          child: Container(
-                            margin: const EdgeInsets.only(top: 12, bottom: 12),
-                            width: 40,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(50),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        // Search button inside lyrics view
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const SizedBox(width: 40),
-                              const Text(
-                                'LYRICS',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.manage_search_rounded,
-                                    color: Colors.white54),
-                                onPressed: () {
-                                  showLyricsSearchSheet(context, ref, track);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Expanded(child: BeautifulLyricsView()),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-        );
-      },
     );
   }
 }
@@ -254,7 +172,10 @@ class _BottomRow extends ConsumerWidget {
     final sleepTimerRemaining = ref.watch(playerProvider.select((s) => s.sleepTimerRemaining));
 
     return Padding(
-      padding: const EdgeInsets.only(left: 24, right: 24, top: 8, bottom: 32),
+      // Снизу — над системной панелью Android: с тремя кнопками постоянные
+      // 32 dp уводили этот ряд под неё
+      padding: EdgeInsets.only(
+          left: 16, right: 16, top: 8, bottom: bottomSafePadding(context)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -271,21 +192,26 @@ class _BottomRow extends ConsumerWidget {
               ),
             ),
           ),
-          _CapsuleBtn(
-            icon: Icons.bedtime_rounded,
-            label: !timerActive
-                ? 'Таймер'
-                : stopAfterTrack
-                    ? 'До конца трека'
-                    : (sleepTimerRemaining != null
-                        ? _formatDuration(sleepTimerRemaining)
-                        : 'Таймер активен'),
-            isActive: timerActive,
-            accentColor: palette.primary,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              showSleepTimerSheet(context, ref);
-            },
+          // Ширина ограничена: длинная подпись («До конца трека») сокращается
+          // многоточием, а не выдавливает соседние кнопки за экран
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 150),
+            child: _CapsuleBtn(
+              icon: Icons.bedtime_rounded,
+              label: !timerActive
+                  ? 'Таймер'
+                  : stopAfterTrack
+                      ? 'До конца трека'
+                      : (sleepTimerRemaining != null
+                          ? _formatDuration(sleepTimerRemaining)
+                          : 'Таймер активен'),
+              isActive: timerActive,
+              accentColor: palette.primary,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                showSleepTimerSheet(context, ref);
+              },
+            ),
           ),
           Expanded(
             child: compact
@@ -402,9 +328,10 @@ class _CapsuleBtn extends StatelessWidget {
       child: Opacity(
         opacity: onTap != null ? 1.0 : 0.4,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          // Кнопки стали выше (было ~34 dp): в отзывах просили побольше
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(22),
             color: isActive ? color.withAlpha(30) : Colors.white.withAlpha(12),
             border: Border.all(
               color:
@@ -414,14 +341,19 @@ class _CapsuleBtn extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 16),
+              Icon(icon, color: color, size: 18),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: color,
+                      fontSize: 13,
+                      fontWeight:
+                          isActive ? FontWeight.w600 : FontWeight.normal),
+                ),
               ),
             ],
           ),

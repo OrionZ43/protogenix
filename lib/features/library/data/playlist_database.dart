@@ -113,13 +113,30 @@ class PlaylistDatabase {
 
   // ── Плейлисты ──────────────────────────────────────────────────────────────
 
-  Future<Playlist> createPlaylist(String name) async {
-    final database = await db;
-    // Sanitize playlist name: remove surrounding whitespace and generic invisible characters
+  /// Имя плейлиста после очистки (security.md п. 4): без пробелов по краям
+  /// и управляющих символов, пустое — 'Unnamed Playlist'.
+  static String _cleanName(String name) {
     final sanitizedName =
         name.trim().replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '');
-    final finalName =
-        sanitizedName.isNotEmpty ? sanitizedName : 'Unnamed Playlist';
+    return sanitizedName.isNotEmpty ? sanitizedName : 'Unnamed Playlist';
+  }
+
+  /// Самый старый плейлист с таким же именем (после той же очистки).
+  Future<Playlist?> findPlaylistByName(String name) async {
+    final database = await db;
+    final rows = await database.query(
+      'playlists',
+      where: 'name = ?',
+      whereArgs: [_cleanName(name)],
+      orderBy: 'createdAt ASC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : Playlist.fromMap(rows.first);
+  }
+
+  Future<Playlist> createPlaylist(String name) async {
+    final database = await db;
+    final finalName = _cleanName(name);
 
     final playlist = Playlist(
       id: '${DateTime.now().millisecondsSinceEpoch}_${finalName.hashCode}',
@@ -179,6 +196,45 @@ class PlaylistDatabase {
       ).toMap(),
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
+  }
+
+  /// Несколько треков разом (выделение в медиатеке): одна транзакция, те, что
+  /// уже в плейлисте, пропускаются. Возвращает, сколько добавлено.
+  Future<int> addTracksToPlaylist({
+    required String playlistId,
+    required List<String> trackIds,
+  }) async {
+    final database = await db;
+    return database.transaction((txn) async {
+      final existing = (await txn.query(
+        'playlist_tracks',
+        columns: ['trackId'],
+        where: 'playlistId = ?',
+        whereArgs: [playlistId],
+      ))
+          .map((row) => row['trackId'] as String)
+          .toSet();
+      // Позиция — как в addTrackToPlaylist: следующая после имеющихся
+      var position = existing.length;
+      final fresh = [
+        for (final id in trackIds)
+          if (existing.add(id)) id,
+      ];
+      final batch = txn.batch();
+      for (final trackId in fresh) {
+        batch.insert(
+          'playlist_tracks',
+          PlaylistTrack(
+            playlistId: playlistId,
+            trackId: trackId,
+            position: position++,
+          ).toMap(),
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+      await batch.commit(noResult: true);
+      return fresh.length;
+    });
   }
 
   Future<void> removeTrackFromPlaylist({

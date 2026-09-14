@@ -20,19 +20,37 @@ class LibraryNotifier extends StateNotifier<List<LibraryTrack>> {
 
   // ── Удалить трек + физические файлы с диска ──────────────────────────────
 
-  Future<void> removeTrackWithFiles(LibraryTrack track) async {
-    // 1. Удаляем из БД
-    await LibraryDatabase.instance.deleteTrack(track.id);
+  Future<void> removeTrackWithFiles(LibraryTrack track) =>
+      removeTracksWithFiles([track]);
 
-    // 2. Удаляем аудиофайл
-    try {
-      final audio = File(track.filePath);
-      if (await audio.exists()) await audio.delete();
-    } catch (e) {
-      debugPrint('[Library] Не удалось удалить аудиофайл: $e');
+  /// Несколько треков разом (выделение в медиатеке): записи и файлы, потом
+  /// одно обновление списка — без перестройки медиатеки на каждый трек.
+  Future<void> removeTracksWithFiles(List<LibraryTrack> tracks) async {
+    for (final track in tracks) {
+      // 1. Удаляем из БД
+      await LibraryDatabase.instance.deleteTrack(track.id);
+      // 2–3. Аудиофайл и сохранённый текст
+      await _deleteFiles(track);
     }
 
-    // 3. Удаляем .lrc файл (если он был сохранён в app-директории)
+    // 4. Обновляем стейт мгновенно
+    final removed = {for (final t in tracks) t.id};
+    state = state.where((t) => !removed.contains(t.id)).toList();
+  }
+
+  Future<void> _deleteFiles(LibraryTrack track) async {
+    // Аудиофайл. Музыку с телефона (source 'device') не трогаем: это файл
+    // самого пользователя, приложение его не копировало
+    if (track.source != 'device') {
+      try {
+        final audio = File(track.filePath);
+        if (await audio.exists()) await audio.delete();
+      } catch (e) {
+        debugPrint('[Library] Не удалось удалить аудиофайл: $e');
+      }
+    }
+
+    // .lrc файл (если он был сохранён в app-директории)
     if (track.lrcPath != null) {
       try {
         final lrc = File(track.lrcPath!);
@@ -42,8 +60,16 @@ class LibraryNotifier extends StateNotifier<List<LibraryTrack>> {
       }
     }
 
-    // 4. Обновляем стейт мгновенно
-    state = state.where((t) => t.id != track.id).toList();
+    // Обложка: её всегда сохраняет само приложение (covers/<id>), в том числе
+    // у музыки с телефона. Раньше оставалась лежать после удаления трека
+    if (track.coverPath != null) {
+      try {
+        final cover = File(track.coverPath!);
+        if (await cover.exists()) await cover.delete();
+      } catch (e) {
+        debugPrint('[Library] Не удалось удалить обложку: $e');
+      }
+    }
   }
 
   // ── Устаревший метод без удаления файлов (для обратной совместимости) ────

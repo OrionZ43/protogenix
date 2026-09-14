@@ -8,6 +8,7 @@ import '../../domain/player_state.dart' as ps;
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
 import '../../../library/presentation/playlist_provider.dart';
+import '../../../library/presentation/widgets/add_to_playlist_sheet.dart';
 import 'waveform_progress_bar.dart';
 
 class DesktopBottomPlayer extends ConsumerWidget {
@@ -107,6 +108,14 @@ class DesktopBottomPlayer extends ConsumerWidget {
                       },
                     );
                   },
+                ),
+                // Быстро в плейлист — без «⋮» (просили в отзывах)
+                IconButton(
+                  iconSize: 24 * scale,
+                  tooltip: 'В плейлист',
+                  icon: const Icon(Icons.playlist_add_rounded,
+                      color: Colors.white54),
+                  onPressed: () => showAddToPlaylistSheet(context, [track.id]),
                 ),
                 SizedBox(width: 16 * scale),
               ],
