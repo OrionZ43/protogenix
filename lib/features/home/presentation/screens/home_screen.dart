@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'dart:ui';
 import '../../../library/presentation/library_provider.dart';
-import '../../../library/presentation/screens/info_screen.dart';
+import '../../../settings/presentation/settings_screen.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
@@ -131,7 +131,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                       if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS)
-                        const _InfoButton(),
+                        const _SettingsButton(),
                     ],
                   ),
                 ),
@@ -187,8 +187,9 @@ class _RecentTrackCard extends ConsumerStatefulWidget {
   ConsumerState<_RecentTrackCard> createState() => _RecentTrackCardState();
 }
 
-class _InfoButton extends StatelessWidget {
-  const _InfoButton();
+/// Шестерёнка на главной (телефон): «Настройки», внутри — «О приложении».
+class _SettingsButton extends StatelessWidget {
+  const _SettingsButton();
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +198,7 @@ class _InfoButton extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: IconButton(
-          icon: const Icon(Icons.info_outline_rounded),
+          icon: const Icon(Icons.settings_rounded),
           color: Colors.white.withAlpha(217), // ~0.85
           style: IconButton.styleFrom(
             backgroundColor: Colors.white.withAlpha(26), // ~0.1
@@ -206,9 +207,9 @@ class _InfoButton extends StatelessWidget {
               side: BorderSide(color: Colors.white.withAlpha(38)), // ~0.15
             ),
           ),
-          tooltip: 'О приложении',
+          tooltip: 'Настройки',
           onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const InfoScreen()),
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
           ),
         ),
       ),

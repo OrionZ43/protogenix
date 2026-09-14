@@ -45,7 +45,7 @@ import '../features/player/presentation/widgets/desktop_bottom_player.dart';
 import '../features/player/presentation/widgets/queue_panel.dart';
 import '../features/player/presentation/widgets/beautiful_lyrics_view.dart';
 import '../features/player/presentation/widgets/protogenix_background.dart';
-import '../features/library/presentation/screens/info_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
 import '../core/widgets/neon_logo.dart';
 import 'demo_mode.dart';
 
@@ -812,18 +812,18 @@ class _DesktopSidebar extends StatelessWidget {
             );
           }),
 
-          const Spacer(), // Прижимает "Инфо" книзу
+          const Spacer(), // Прижимает «Настройки» книзу
 
-          // Пункт "Инфо"
+          // «Настройки», внутри — «О приложении»
           _DesktopNavItem(
             tab: const _TabItem(
-              icon: Icons.info_outline_rounded,
-              activeIcon: Icons.info_rounded,
-              label: 'Инфо',
+              icon: Icons.settings_outlined,
+              activeIcon: Icons.settings_rounded,
+              label: 'Настройки',
             ),
             selected: false,
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const InfoScreen()),
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
           ),
 
