@@ -8,7 +8,7 @@ Protogenix is a Flutter music player by Z43 Studios. It streams and downloads fr
 
 - Release targets are **Android and Windows**. Linux builds but has never been tested. iOS and macOS are out of scope: the `ios/` and `macos/` folders are template leftovers, don't spend effort on them. The `web/` folder exists too, but the app does not run on web, because `dart:io` `Platform` checks are used unguarded (starting in `main.dart`).
 - **The repository is public** (since 2026-09-11). Never commit secrets — keystores, `key.properties`, tokens, API keys. Anything compiled into the app (`const` strings, assets) is public as well.
-- The UI is dark-only (`AppTheme.dark()`, background `0xFF080810`).
+- The UI is dark-only (`AppTheme.dark()`, background `0xFF080810`). The accent colour is the cover palette (`paletteProvider`), not `colorScheme.primary` (a fixed purple seed). Shared styled widgets live in `lib/core/widgets/`: `GlassPanel` (dark glass for overlays), `showGlassConfirm` (confirmations — don't use `AlertDialog`), `AccentButton` (primary full-width action — don't use `ElevatedButton`), `ChipButton` (pills). Don't put a `Tooltip` in anything placed in `MaterialApp.builder` (the import overlay): there is no `Overlay` above the `Navigator`.
 - There is no l10n. All user-facing strings are hardcoded in Russian, and most code comments are Russian as well. Keep new strings consistent with that.
 - Most changes arrive as PRs from the Jules bot (`google-labs-jules[bot]`). Its learning logs live in `.jules/`; their rules are folded into `.claude/rules/`.
 - `repomix-output.xml` in the repo root, if present, is a generated snapshot of the whole repo. Ignore it when searching.
@@ -52,7 +52,7 @@ A lesson learned during a task goes into the matching rules file; the changelog 
 ```bash
 flutter pub get
 flutter run -d windows            # or: android, linux, macos
-flutter analyze                   # slow (~2 min); baseline is 7 issues, 0 errors — see known-issues.md
+flutter analyze                   # slow (~2 min); baseline is 6 issues, 0 errors — see known-issues.md
 flutter test
 flutter test test/features/player/domain/advanced_lrc_parser_test.dart
 flutter test --plain-name "detects YRC format"
@@ -77,7 +77,7 @@ The code is split into `lib/app/` (root widget and navigation shells), `lib/core
 
 The order of these steps matters:
 1. On Windows/Linux, switch sqflite to the FFI backend.
-2. Call `await AppPaths.init()`. It decides where databases and files live and, on desktop, migrates the databases from the old location. Nothing may touch the databases before it.
+2. Call `await AppPaths.init()`. It decides where databases and files live and, on desktop, migrates the databases from the old location. Nothing may touch the databases before it. Right after it, `LocalTagsMigration.runOnce()` re-reads tags once for local files imported before 1.1 (before the player loads the queue).
 3. On mobile, enable edge-to-edge.
 4. On desktop, set up `window_manager` (hidden native title bar, minimum size 1000×700).
 5. On Windows/Linux, call `JustAudioMediaKit.ensureInitialized()`.
@@ -115,7 +115,10 @@ Two separate sqflite databases: `LibraryDatabase` (`protogenix.db`, tracks) and 
 ### Import (`importer/data/importer_service.dart`)
 
 `ImporterService.importFromUrl` dispatches by URL type: Spotify, Yandex Music, YouTube, SoundCloud, or a direct audio link. SoundCloud is only a stub that reports «SoundCloud в следующем обновлении».
-- For Spotify and Yandex Music it resolves the metadata, then searches YouTube and downloads the match.
+- For Spotify and Yandex Music it resolves the metadata, then searches YouTube and downloads the match. Which video counts as a match is decided by `youtube_match.dart`: same title, same artist, same version, with the exact duration and the artist's own channel first. A track without a match is skipped rather than replaced by a cover or a live version (`known-issues.md`). Yandex Music goes through `api.music.yandex.net` without a token (`yandex_music.dart`: track, album and playlist links on any `music.yandex.*` domain); the API answers only from countries where Yandex Music works, so behind a foreign VPN exit the import reports 451 — see `known-issues.md`.
+- Local files (`importLocalFiles`) get tags and the embedded cover from `audio_metadata_reader` (`local_tags.dart`) and an id from a content hash (`data.md`). On desktop, files and folders can also be dropped onto the window (`desktop_drop_import.dart`).
+- On Android, «Найти музыку на телефоне» lists MediaStore through a method channel in `MainActivity.kt` (`device_music.dart`) and adds the tracks in place, without copying (`source: 'device'`; deleting such a track never deletes the file).
+- All of these, and «В медиатеку» in search, run in the background through `ImportManager` (`importer/presentation/import_manager.dart`), one job at a time; the rest wait in an in-memory queue (the same link is not queued twice, «Остановить» clears the queue). The sheet can be closed, and `ImportStatusOverlay` (placed in `MaterialApp.builder`) shows progress and «Остановить». `ImportControl` stops between tracks and reports each saved track, so the library refreshes during the import. An interrupted URL import is offered for resume on the next start; re-importing a Yandex link skips tracks already in the library without searching YouTube (matched by the stored Yandex title, artists and album, `yandex_library_index.dart`) and fills the same-named playlist.
 - YouTube downloads try each youtube_explode client in `_clientFallbackOrder` (= `kYoutubeClientFallbackOrder` in `lib/core/services/youtube_clients.dart`, visionOS first). There is no fallback: if every client fails, the import reports an error (a Yandex Music playlist skips that track). Since August 2026 YouTube requires PO tokens from most clients, and the visionOS client is a workaround — read `known-issues.md` before touching YouTube code, and test on real tracks, not one popular video.
 - Results are written to `LibraryDatabase`, with lyrics fetched during the import. Progress is reported through `ImportProgress` callbacks.
 
