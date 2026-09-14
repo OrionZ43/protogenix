@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
 import 'app/demo_mode.dart';
 import 'core/services/app_paths.dart';
+import 'features/importer/data/local_tags_migration.dart';
 import 'features/player/data/audio_handler.dart';
 
 Future<void> main() async {
@@ -23,12 +24,22 @@ Future<void> main() async {
   // места. Должно отработать до первого обращения к базам.
   await AppPaths.init();
 
+  // Один раз после обновления: теги своих файлов, добавленных до 1.1.
+  // До загрузки плеера — чтобы очередь сразу получила новые названия.
+  await LocalTagsMigration.runOnce();
+
   if (Platform.isAndroid || Platform.isIOS) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
         systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.light,
+        // Иначе под тремя кнопками навигации Android рисует светлую подложку:
+        // тёмный интерфейс перечёркивала серая полоса
+        systemNavigationBarContrastEnforced: false,
       ),
     );
   }

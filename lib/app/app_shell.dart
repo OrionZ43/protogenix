@@ -39,6 +39,7 @@ import '../features/player/presentation/screens/expanded_player_screen.dart';
 import '../features/player/presentation/providers/player_provider.dart';
 
 import '../features/updater/update_banner.dart';
+import '../features/importer/presentation/desktop_drop_import.dart';
 import '../features/home/presentation/screens/home_screen.dart';
 import '../features/player/presentation/widgets/desktop_bottom_player.dart';
 import '../features/player/presentation/widgets/queue_panel.dart';
@@ -262,7 +263,9 @@ class _ExpandedShell extends ConsumerWidget {
             color: Colors.white.withAlpha(6),
             child: Column(
               children: [
-                const SizedBox(height: 24),
+                // Сверху — под статус-баром, снизу — над панелью навигации:
+                // экран рисуется от края до края
+                SizedBox(height: 24 + MediaQuery.paddingOf(context).top),
 
                 // Лого (скрыто на десктопе — уже есть в тайтлбаре)
                 if (!_isDesktop)
@@ -314,7 +317,7 @@ class _ExpandedShell extends ConsumerWidget {
                     ),
                   ),
 
-                const SizedBox(height: 16),
+                SizedBox(height: 16 + MediaQuery.paddingOf(context).bottom),
               ],
             ),
           ),
@@ -571,7 +574,9 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF080810),
-      body: ProtogenixBackground(
+      // Файлы и папки можно бросить в окно — они добавятся в медиатеку
+      body: DesktopDropImport(
+      child: ProtogenixBackground(
         child: Column(
           children: [
             Expanded(
@@ -709,6 +714,7 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
               ),
           ],
         ),
+      ),
       ),
     );
   }

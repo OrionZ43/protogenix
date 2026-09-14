@@ -23,7 +23,7 @@ env:
   FLUTTER_VERSION: "3.44.4"
   # Базовый уровень flutter analyze (.claude/rules/known-issues.md): больше —
   # значит, появились новые замечания. Исправили старые — уменьшить.
-  ANALYZE_BASELINE: "7"
+  ANALYZE_BASELINE: "6"
 
 jobs:
   analyze:

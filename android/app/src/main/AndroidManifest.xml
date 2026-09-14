@@ -11,10 +11,13 @@
     <!-- Установка APK из внешнего источника -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
+    <!-- requestLegacyExternalStorage: на Android 10 без него музыку с телефона
+         не прочитать по пути (device_music.dart); на 11+ флаг ни на что не влияет -->
     <application
         android:label="Protogenix"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true">
 
         <activity
             android:name=".MainActivity"

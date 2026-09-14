@@ -1,15 +1,15 @@
 // lib/features/search/presentation/screens/search_screen.dart
 //
 // Экран поиска: результаты с YouTube (searchProvider; SearchTrack вместо
-// типов youtube_explode_dart) и кнопка импорта трека в медиатеку через
-// ImporterService.
+// типов youtube_explode_dart) и кнопка «В медиатеку» — через общий
+// ImportManager, с плашкой и очередью.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
-import '../../../importer/data/importer_service.dart';
+import '../../../importer/presentation/import_manager.dart';
 import '../../../library/presentation/library_provider.dart';
 import '../providers/search_provider.dart';
 
@@ -135,11 +135,14 @@ class _SearchBody extends StatelessWidget {
         );
       },
       loading: () => const _LoadingState(),
-      error: (error, _) => Center(
+      // Текст исключения пользователю не показываем (security.md, п. 3):
+      // он уже в логе провайдера
+      error: (_, __) => Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Text(
-            'Ошибка поиска: $error',
+            'Не получилось выполнить поиск. '
+            'Попробуй другой запрос или повтори позже.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white.withAlpha(153)),
           ),
@@ -266,52 +269,52 @@ class _SearchResultCard extends ConsumerWidget {
 
 // ── Import Button ─────────────────────────────────────────────────────────────
 
-class _ImportButton extends ConsumerStatefulWidget {
+/// Что с треком этой карточки в общем импорте.
+enum _ImportPhase { idle, queued, running }
+
+/// «В медиатеку» — через общий ImportManager: плашка с прогрессом,
+/// «Остановить» и очередь, если нажать у нескольких треков подряд. Раньше
+/// карточка качала сама, мимо плашки, а итог показывала всплывашкой.
+class _ImportButton extends ConsumerWidget {
   final SearchTrack track;
   const _ImportButton({required this.track});
 
   @override
-  ConsumerState<_ImportButton> createState() => _ImportButtonState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final url = 'https://www.youtube.com/watch?v=${track.id}';
+    final phase = ref.watch(importManagerProvider.select((job) {
+      if (job == null || !job.running) return _ImportPhase.idle;
+      if (job.url == url) return _ImportPhase.running;
+      if (job.queue.contains(url)) return _ImportPhase.queued;
+      return _ImportPhase.idle;
+    }));
+    // Уже скачан: id трека в медиатеке — id ролика
+    final inLibrary = ref.watch(libraryProvider
+        .select((tracks) => tracks.any((t) => t.id == track.id)));
 
-class _ImportButtonState extends ConsumerState<_ImportButton> {
-  bool _isLoading = false;
-
-  Future<void> _onImport() async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
-
-    try {
-      final url = 'https://www.youtube.com/watch?v=${widget.track.id}';
-
-      await ImporterService.instance.importFromUrl(
-        url: url,
-        onProgress: (progress) {
-          if (!mounted) return;
-          if (progress.status == ImportStatus.error) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(progress.error ?? progress.message)),
-            );
-          } else if (progress.status == ImportStatus.done) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(progress.message)),
-            );
-            ref.read(libraryProvider.notifier).reload();
-          }
-        },
+    if (inLibrary && phase == _ImportPhase.idle) {
+      return const _GlassActionButton(
+        onPressed: null,
+        isLoading: false,
+        icon: Icons.check_rounded,
+        label: 'В медиатеке',
       );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return _GlassActionButton(
-      onPressed: _onImport,
-      isLoading: _isLoading,
-      icon: Icons.add_rounded,
-      label: 'В медиатеку',
+      onPressed: phase == _ImportPhase.idle
+          ? () => ref
+              .read(importManagerProvider.notifier)
+              .importUrl(url, title: _cleanTitle(track.title))
+          : null,
+      isLoading: phase == _ImportPhase.running,
+      icon: phase == _ImportPhase.queued
+          ? Icons.schedule_rounded
+          : Icons.add_rounded,
+      label: switch (phase) {
+        _ImportPhase.running => 'Скачивается…',
+        _ImportPhase.queued => 'В очереди',
+        _ImportPhase.idle => 'В медиатеку',
+      },
     );
   }
 }
@@ -319,7 +322,8 @@ class _ImportButtonState extends ConsumerState<_ImportButton> {
 // ── Glass Action Button ───────────────────────────────────────────────────────
 
 class _GlassActionButton extends StatelessWidget {
-  final VoidCallback onPressed;
+  /// null — кнопка не нажимается (трек уже в медиатеке или в очереди).
+  final VoidCallback? onPressed;
   final bool isLoading;
   final IconData icon;
   final String label;

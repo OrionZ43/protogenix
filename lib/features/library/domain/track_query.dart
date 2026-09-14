@@ -93,7 +93,10 @@ class TrackQueryParser {
         RegExp(r'remix|\brmx\b|ремикс|bootleg', caseSensitive: false),
     TrackVariant.live: RegExp(r'\blive\b|концерт|живое|вживую|unplugged',
         caseSensitive: false),
-    TrackVariant.acoustic: RegExp(r'acoustic|акустик', caseSensitive: false),
+    // stripped — «раздетая» версия, по сути акустика (у KALEO «Way Down We
+    // Go (Stripped)» — другая запись)
+    TrackVariant.acoustic:
+        RegExp(r'acoustic|акустик|stripped', caseSensitive: false),
     TrackVariant.instrumental: RegExp(
         r'instrumental|инструментал|минус|backing\s+track',
         caseSensitive: false),
@@ -120,6 +123,7 @@ class TrackQueryParser {
   static const _descriptorWords = {
     'remaster', 'remastered', 'version', 'edit', 'radio', 'mono', 'stereo',
     'mix', 'original', 'single', 'bonus', 'track', 'demo', 'live', 'acoustic',
+    'stripped',
     'remix', 'rmx', 'slowed', 'reverb', 'sped', 'speed', 'up', 'nightcore',
     '8d', 'extended', 'instrumental', 'karaoke', 'cover', 'ремикс', 'версия',
     'кавер', 'концерт', 'живое', 'акустика', 'акустическая', 'замедленная',

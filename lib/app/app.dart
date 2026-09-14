@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 import '../core/theme/app_theme.dart';
 import 'app_shell.dart';
+import '../features/importer/presentation/import_status_overlay.dart';
 import '../core/widgets/window_title_bar.dart';
 
 class ProtogenixApp extends ConsumerWidget {
@@ -19,12 +20,18 @@ class ProtogenixApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
       builder: (context, child) {
-        if (!isDesktop) return child!;
-        return Column(
-          children: [
-            const WindowTitleBar(),
-            Expanded(child: child!),
-          ],
+        final content = isDesktop
+            ? Column(
+                children: [
+                  const WindowTitleBar(),
+                  Expanded(child: child!),
+                ],
+              )
+            : child!;
+        // Плашка фонового импорта — поверх всех экранов и шторок
+        return Stack(
+          fit: StackFit.expand,
+          children: [content, const ImportStatusOverlay()],
         );
       },
       home: const AppShell(),

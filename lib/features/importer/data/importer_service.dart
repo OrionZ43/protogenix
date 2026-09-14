@@ -20,8 +20,14 @@ import '../../library/data/library_database.dart';
 import '../../library/data/playlist_database.dart';
 import '../../library/data/lyrics_service.dart';
 import '../../library/domain/library_track.dart';
+import '../../library/domain/lyrics_text.dart';
 import '../../../core/services/app_paths.dart';
 import '../../../core/services/youtube_clients.dart';
+import 'device_music.dart';
+import 'local_tags.dart';
+import 'yandex_library_index.dart';
+import 'yandex_music.dart';
+import 'youtube_match.dart';
 
 // ── Модели прогресса ──────────────────────────────────────────────────────────
 
@@ -40,14 +46,45 @@ class ImportProgress {
   final double progress;
   final String? error;
 
+  /// Что импортируется, если известно: название плейлиста или альбома.
+  final String? label;
+
+  /// Импорт оборвался по внешней причине (YouTube ограничил запросы) —
+  /// ссылку стоит предложить продолжить (import_manager.dart).
+  final bool resumable;
+
   const ImportProgress({
     required this.status,
     required this.message,
     this.progress = 0.0,
     this.error,
+    this.label,
+    this.resumable = false,
   });
 
   static const idle = ImportProgress(status: ImportStatus.idle, message: '');
+}
+
+/// Управление долгим импортом из фона (import_manager.dart): остановка между
+/// треками и сигнал «трек сохранён» — по нему медиатека обновляется по ходу.
+class ImportControl {
+  ImportControl({this.onTrackSaved});
+
+  final void Function()? onTrackSaved;
+  bool _cancelled = false;
+
+  bool get cancelled => _cancelled;
+
+  /// Остановиться после трека, который обрабатывается сейчас.
+  void cancel() => _cancelled = true;
+}
+
+/// Среди роликов YouTube нет той же записи (youtube_match.dart).
+class _NoMatchException implements Exception {
+  const _NoMatchException();
+
+  @override
+  String toString() => 'Нет подходящей записи на YouTube';
 }
 
 // ── ImporterService ───────────────────────────────────────────────────────────
@@ -66,6 +103,7 @@ class ImporterService {
   Future<void> importFromUrl({
     required String url,
     required void Function(ImportProgress) onProgress,
+    ImportControl? control,
   }) async {
     try {
       if (!url.toLowerCase().startsWith('http://') &&
@@ -81,7 +119,8 @@ class ImporterService {
       if (_isSpotify(url)) {
         await _importSpotify(url: url, onProgress: onProgress);
       } else if (_isYandexMusic(url)) {
-        await _importYandexMusic(url: url, onProgress: onProgress);
+        await _importYandexMusic(
+            url: url, onProgress: onProgress, control: control);
       } else if (_isYouTube(url)) {
         await _importYouTube(url: url, onProgress: onProgress);
       } else if (_isSoundCloud(url)) {
@@ -92,7 +131,8 @@ class ImporterService {
         onProgress(const ImportProgress(
           status: ImportStatus.error,
           message: 'Неизвестный формат ссылки',
-          error: 'Поддерживаются: YouTube, прямые ссылки на MP3/FLAC',
+          error: 'Подойдут ссылки YouTube, Spotify, Яндекс Музыки '
+              'и прямые ссылки на аудиофайлы',
         ));
       }
     } catch (e) {
@@ -171,6 +211,7 @@ class ImporterService {
     required String albumName,
     required void Function(ImportProgress) onProgress,
     String? artistOverride,
+    String? coverUrlOverride,
   }) async {
     final id = video.id.value;
     String? savePath;
@@ -214,7 +255,13 @@ class ImporterService {
       progress: 0.92,
     ));
 
-    final coverPath = await _downloadCover(video.thumbnails.highResUrl, id);
+    // Квадратная обложка альбома (из Яндекса) лучше кадра из ролика;
+    // не скачалась — берём кадр
+    String? coverPath;
+    if (coverUrlOverride != null) {
+      coverPath = await _downloadCover(coverUrlOverride, id);
+    }
+    coverPath ??= await _downloadCover(video.thumbnails.highResUrl, id);
 
     await LibraryDatabase.instance.insertTrack(LibraryTrack(
       id: id,
@@ -328,24 +375,82 @@ class ImporterService {
     }
   }
 
-  /// Ищет трек на YouTube (для Spotify и Яндекс Музыки). Из первых десяти
-  /// результатов берёт «- Topic», VEVO или «(Official Audio)», иначе — первый.
-  Future<Video> _searchYouTube(
-    YoutubeExplode yt,
-    String query,
-    Duration timeout,
-  ) async {
-    final results = await yt.search.search(query).timeout(timeout);
-    if (results.isEmpty) throw Exception('Не найдено на YouTube: $query');
-    for (final v in results.take(10)) {
-      final author = v.author.toLowerCase();
-      if (author.contains('topic') ||
-          author.contains('vevo') ||
-          v.title.toLowerCase().contains('(official audio)')) {
-        return v;
-      }
+  /// Ролик для трека из Яндекс Музыки или Spotify; что подходит — решает
+  /// youtube_match.dart. Сначала запрос «Артист - Название», не нашлось
+  /// подходящего — ещё один, с «topic»: он выводит в выдачу записи с канала
+  /// исполнителя. Нет и там — _NoMatchException: лучше пропустить трек,
+  /// чем скачать чужую запись.
+  Future<Video> _findOnYouTube(
+    YoutubeExplode yt, {
+    required String title,
+    required String artist,
+    int? durationMs,
+  }) async {
+    final matcher = YoutubeTrackMatcher(
+        title: title, artist: artist, durationMs: durationMs);
+    final artists = splitArtists(artist);
+    final mainArtist = artists.isEmpty ? '' : artists.first;
+    final queries = mainArtist.isEmpty
+        ? [title]
+        : ['$mainArtist - $title', '$mainArtist $title topic'];
+    for (final query in queries) {
+      final results = await _throttledSearch(yt, query);
+      final byId = <String, Video>{
+        for (final v in results.take(15)) v.id.value: v,
+      };
+      final picked = matcher.pick([
+        for (final v in byId.values)
+          YoutubeCandidate(
+            id: v.id.value,
+            title: v.title,
+            author: v.author,
+            durationMs: v.duration?.inMilliseconds,
+          ),
+      ]);
+      if (picked != null) return byId[picked.id]!;
     }
-    return results.first;
+    throw const _NoMatchException();
+  }
+
+  /// Поиск с одной паузой на минуту, если YouTube ограничил запросы.
+  /// null — во время паузы импорт остановили. Повторное ограничение уходит
+  /// наверх как RequestLimitExceededException.
+  Future<Video?> _findWithBackoff(
+    YoutubeExplode yt,
+    YandexTrack track,
+    ImportControl? control, {
+    required void Function() onPause,
+  }) async {
+    try {
+      return await _findOnYouTube(yt,
+          title: track.title,
+          artist: track.artists,
+          durationMs: track.durationMs);
+    } on RequestLimitExceededException {
+      debugPrint('[YT] YouTube ограничил запросы — пауза');
+      onPause();
+      for (var s = 0; s < 60; s++) {
+        if (control?.cancelled ?? false) return null;
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      return _findOnYouTube(yt,
+          title: track.title,
+          artist: track.artists,
+          durationMs: track.durationMs);
+    }
+  }
+
+  DateTime _lastSearchAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Не чаще раза в 1,5 секунды: сотни поисков подряд (например, плейлист,
+  /// где многое уже скачано) быстро упираются в ограничение YouTube.
+  Future<VideoSearchList> _throttledSearch(
+      YoutubeExplode yt, String query) async {
+    final wait = const Duration(milliseconds: 1500) -
+        DateTime.now().difference(_lastSearchAt);
+    if (wait > Duration.zero) await Future<void>.delayed(wait);
+    _lastSearchAt = DateTime.now();
+    return yt.search.search(query).timeout(const Duration(seconds: 8));
   }
 
   // ── Spotify ───────────────────────────────────────────────────────────────
@@ -407,8 +512,11 @@ class ImporterService {
 
       final yt = YoutubeExplode();
       try {
-        final video =
-            await _searchYouTube(yt, query, const Duration(seconds: 8));
+        final video = await _findOnYouTube(
+          yt,
+          title: trackTitle,
+          artist: artist == 'Unknown Artist' ? '' : artist,
+        );
         await _downloadYouTubeVideo(
           yt: yt,
           video: video,
@@ -432,6 +540,13 @@ class ImporterService {
         message: '✓ "$trackTitle" добавлен!',
         progress: 1.0,
       ));
+    } on _NoMatchException {
+      onProgress(const ImportProgress(
+        status: ImportStatus.error,
+        message: 'На YouTube нет подходящей записи',
+        error: 'Нашлись только другие версии — клипы, концерты, каверы. '
+            'Попробуй найти трек через поиск.',
+      ));
     } catch (e) {
       debugPrint('Ошибка импорта Spotify: $e');
       onProgress(const ImportProgress(
@@ -444,159 +559,222 @@ class ImporterService {
 
   // ── Yandex Music ──────────────────────────────────────────────────────────
 
+  // Список треков — из API Яндекса (yandex_music.dart), сами треки — с YouTube.
   Future<void> _importYandexMusic({
     required String url,
     required void Function(ImportProgress) onProgress,
+    ImportControl? control,
   }) async {
     onProgress(const ImportProgress(
       status: ImportStatus.fetchingMeta,
-      message: 'Получение данных с Яндекс.Музыки...',
+      message: 'Получение данных с Яндекс Музыки...',
       progress: 0.05,
     ));
 
-    try {
-      final uri = Uri.parse(url);
-      List<dynamic> tracksJson = [];
-      String playlistName = 'Yandex Playlist';
-
-      final headers = {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-      };
-
-      if (url.contains('/album/')) {
-        final pathSegments = uri.pathSegments;
-        final albumIndex = pathSegments.indexOf('album');
-        if (albumIndex != -1 && albumIndex + 1 < pathSegments.length) {
-          final albumId = pathSegments[albumIndex + 1];
-          final response = await _dio.get(
-            'https://music.yandex.ru/handlers/album.jsx?album=$albumId',
-            options: Options(headers: headers),
-          );
-          if (response.statusCode == 200) {
-            final data = response.data;
-            playlistName = data['title'] ?? 'Yandex Album';
-            if (data['volumes'] != null) {
-              for (var volume in data['volumes']) tracksJson.addAll(volume);
-            }
-          } else {
-            throw Exception('Ошибка альбома (${response.statusCode})');
-          }
-        }
-      } else if (url.contains('/playlists/')) {
-        final pathSegments = uri.pathSegments;
-        final usersIndex = pathSegments.indexOf('users');
-        final playlistsIndex = pathSegments.indexOf('playlists');
-        if (usersIndex != -1 && playlistsIndex != -1) {
-          final owner = pathSegments[usersIndex + 1];
-          final kind = pathSegments[playlistsIndex + 1];
-          final response = await _dio.get(
-            'https://music.yandex.ru/handlers/playlist.jsx?owner=$owner&kinds=$kind',
-            options: Options(headers: headers),
-          );
-          if (response.statusCode == 200) {
-            final playlist = response.data['playlist'];
-            if (playlist != null) {
-              playlistName = playlist['title'] ?? 'Yandex Playlist';
-              tracksJson = playlist['tracks'] ?? [];
-            } else {
-              throw Exception('Плейлист не найден');
-            }
-          } else {
-            throw Exception('Ошибка плейлиста (${response.statusCode})');
-          }
-        }
-      }
-
-      if (tracksJson.isEmpty) throw Exception('В плейлисте нет треков');
-
-      await Future.microtask(() {});
-
-      final parsedTracks = <Map<String, String>>[];
-      for (var track in tracksJson) {
-        if (track['available'] == false) continue;
-        final title = track['title']?.toString() ?? 'Unknown Title';
-        final artistsList = track['artists'] as List?;
-        final artist = (artistsList != null && artistsList.isNotEmpty)
-            ? artistsList.map((a) => a['name']).join(', ')
-            : 'Unknown Artist';
-        parsedTracks.add({'title': title, 'artist': artist});
-      }
-
-      if (parsedTracks.isEmpty) {
-        throw Exception('Нет доступных треков');
-      }
-
-      onProgress(ImportProgress(
-        status: ImportStatus.done,
-        message: 'Создание плейлиста "$playlistName"...',
-        progress: 0.05,
-      ));
-      final playlist =
-          await PlaylistDatabase.instance.createPlaylist(playlistName);
-
-      final yt = YoutubeExplode();
-      final downloadedIds = <String>[];
-      int i = 0;
-
-      try {
-        for (final track in parsedTracks) {
-          i++;
-          final query = "${track['artist']} - ${track['title']}";
-          final progressBase = (i - 1) / parsedTracks.length;
-          final progressStep = 1 / parsedTracks.length;
-
-          onProgress(ImportProgress(
-            status: ImportStatus.fetchingMeta,
-            message: 'Поиск: $query ($i из ${parsedTracks.length})',
-            progress: progressBase,
-          ));
-
-          try {
-            final video =
-                await _searchYouTube(yt, query, const Duration(seconds: 6));
-            final trackId = await _downloadYouTubeVideo(
-              yt: yt,
-              video: video,
-              cleanTitle: track['title'] ?? video.title,
-              albumName: playlistName,
-              artistOverride: track['artist'],
-              onProgress: (p) => onProgress(ImportProgress(
-                status: p.status,
-                message: '$i/${parsedTracks.length}: ${p.message}',
-                progress: progressBase + progressStep * p.progress,
-              )),
-            );
-
-            downloadedIds.add(trackId);
-            await PlaylistDatabase.instance.addTrackToPlaylist(
-              playlistId: playlist.id,
-              trackId: trackId,
-            );
-          } catch (e) {
-            debugPrint('[Yandex] Пропуск "$query": $e');
-          }
-        }
-      } finally {
-        yt.close();
-      }
-
-      onProgress(ImportProgress(
-        status: ImportStatus.done,
-        message: '✓ Импортировано ${downloadedIds.length} из '
-            '${parsedTracks.length} треков ("$playlistName")',
-        progress: 1.0,
-      ));
-    } catch (e) {
-      debugPrint('Ошибка Яндекс.Музыки: $e');
+    final link = YandexLink.parse(url);
+    if (link == null) {
       onProgress(const ImportProgress(
         status: ImportStatus.error,
-        message: 'Ошибка импорта Яндекс.Музыки',
-        error: 'Проверь ссылку или попробуй ещё раз позже.',
+        message: 'Эту ссылку Яндекс Музыки импорт не понимает',
+        error: 'Подойдёт ссылка на трек, альбом или плейлист.',
       ));
+      return;
     }
+
+    final YandexCollection collection;
+    try {
+      collection = await YandexMusicApi().fetch(link);
+    } on YandexMusicException catch (e) {
+      onProgress(ImportProgress(
+        status: ImportStatus.error,
+        message: 'Ошибка импорта из Яндекс Музыки',
+        error: e.message,
+      ));
+      return;
+    }
+
+    if (collection.tracks.isEmpty) {
+      onProgress(const ImportProgress(
+        status: ImportStatus.error,
+        message: 'Ошибка импорта из Яндекс Музыки',
+        error: 'Здесь нет доступных треков.',
+      ));
+      return;
+    }
+
+    await _importYandexCollection(collection, onProgress, control);
+  }
+
+  /// Треки из Яндекса ищутся и качаются с YouTube. Альбом или плейлист
+  /// становится плейлистом Protogenix (_playlistNamed), отдельный трек —
+  /// просто трек медиатеки. Уже скачанные треки не ищутся и не качаются
+  /// заново (YandexLibraryIndex): повторный импорт той же ссылки — после
+  /// прерванного или когда в плейлист добавили песен — сразу переходит к
+  /// недостающим. Остановка — между треками (ImportControl).
+  Future<void> _importYandexCollection(
+    YandexCollection collection,
+    void Function(ImportProgress) onProgress, [
+    ImportControl? control,
+  ]) async {
+    final tracks = collection.tracks;
+    final single = collection.isSingleTrack;
+    final label = single ? null : collection.title;
+    String? playlistId;
+    var saved = 0;
+    var alreadyHad = 0;
+    var notFound = 0;
+    var stopped = false;
+    var rateLimited = false;
+    final known =
+        YandexLibraryIndex(await LibraryDatabase.instance.getAllTracks());
+
+    final yt = YoutubeExplode();
+    try {
+      for (var i = 0; i < tracks.length; i++) {
+        if (control?.cancelled ?? false) {
+          stopped = true;
+          break;
+        }
+        final track = tracks[i];
+        final artist = track.artists.split(', ').first;
+        final query =
+            artist.isEmpty ? track.title : '$artist - ${track.title}';
+        final ofTotal = single ? '' : ' (${i + 1} из ${tracks.length})';
+        final base = i / tracks.length;
+        final step = 1 / tracks.length;
+        // То же, что уходит в альбом трека: по нему YandexLibraryIndex
+        // узнаёт трек при повторном импорте
+        final album = track.album ?? collection.title;
+
+        try {
+          final String trackId;
+          final knownId = known.find(track, album: album);
+          if (knownId != null) {
+            trackId = knownId;
+            alreadyHad++;
+            onProgress(ImportProgress(
+              status: ImportStatus.fetchingMeta,
+              message: 'Уже в медиатеке: $query$ofTotal',
+              progress: base + step,
+              label: label,
+            ));
+          } else {
+            onProgress(ImportProgress(
+              status: ImportStatus.fetchingMeta,
+              message: 'Поиск на YouTube: $query$ofTotal',
+              progress: base,
+              label: label,
+            ));
+            final video = await _findWithBackoff(
+              yt,
+              track,
+              control,
+              onPause: () => onProgress(ImportProgress(
+                status: ImportStatus.fetchingMeta,
+                message: 'YouTube просит подождать — пауза на минуту$ofTotal',
+                progress: base,
+                label: label,
+              )),
+            );
+            if (video == null) {
+              stopped = true;
+              break;
+            }
+            // Мог быть скачан и не отсюда (поиск, ссылка YouTube) — тогда
+            // метаданные другие, но ролик тот же
+            if (await LibraryDatabase.instance.getTrackById(video.id.value) !=
+                null) {
+              trackId = video.id.value;
+              alreadyHad++;
+            } else {
+              trackId = await _downloadYouTubeVideo(
+                yt: yt,
+                video: video,
+                cleanTitle: track.title,
+                albumName: album,
+                artistOverride: track.artists.isEmpty ? null : track.artists,
+                coverUrlOverride: track.coverUrl,
+                onProgress: (p) => onProgress(ImportProgress(
+                  status: p.status,
+                  message: '${p.message}$ofTotal',
+                  progress: base + step * p.progress,
+                  label: label,
+                )),
+              );
+            }
+            known.add(track, album: album, id: trackId);
+          }
+          if (!single) {
+            playlistId ??= await _playlistNamed(collection.title);
+            await PlaylistDatabase.instance.addTrackToPlaylist(
+              playlistId: playlistId,
+              trackId: trackId,
+            );
+          }
+          saved++;
+          control?.onTrackSaved?.call();
+        } on RequestLimitExceededException {
+          // Второй раз подряд, уже после паузы: дальше будет только хуже.
+          // Стоп с «продолжи позже» — скачанное при этом пропустится
+          rateLimited = true;
+          break;
+        } on _NoMatchException {
+          notFound++;
+          debugPrint('[Yandex] Нет подходящей записи: "$query"');
+        } catch (e) {
+          debugPrint('[Yandex] Пропуск "$query": $e');
+        }
+      }
+    } finally {
+      yt.close();
+    }
+
+    if (saved == 0 && !stopped && !rateLimited) {
+      onProgress(ImportProgress(
+        status: ImportStatus.error,
+        message: notFound > 0
+            ? 'На YouTube нет подходящей записи'
+            : 'Не удалось скачать с YouTube',
+        error: notFound > 0
+            ? 'Нашлись только другие версии — клипы, концерты, каверы. '
+                'Попробуй найти трек через поиск.'
+            : 'YouTube не отдал аудио. Попробуй ещё раз позже.',
+        label: label,
+      ));
+      return;
+    }
+
+    final notes = [
+      if (alreadyHad > 0) 'уже были: $alreadyHad',
+      if (notFound > 0) 'не нашлось на YouTube: $notFound',
+      if (collection.unavailable > 0)
+        'недоступны в самом Яндексе: ${collection.unavailable}',
+    ];
+    final tail = notes.isEmpty ? '' : ', ${notes.join(', ')}';
+    onProgress(ImportProgress(
+      status: ImportStatus.done,
+      message: rateLimited
+          ? '■ YouTube ограничил запросы: $saved из ${tracks.length}$tail. '
+              'Продолжи позже — скачанное пропустится'
+          : single
+              ? alreadyHad > 0
+                  ? '✓ "${tracks.first.title}" уже есть в медиатеке'
+                  : '✓ "${tracks.first.title}" добавлен!'
+              : stopped
+                  ? '■ Остановлено: $saved из ${tracks.length}$tail'
+                  : '✓ Готово: $saved из ${tracks.length}$tail',
+      progress: 1.0,
+      label: label,
+      resumable: rateLimited,
+    ));
+  }
+
+  /// Плейлист для импорта: тот же, если такой уже есть, — повторный импорт
+  /// той же ссылки дополняет его, а не плодит копии. Иначе новый.
+  Future<String> _playlistNamed(String name) async {
+    final existing = await PlaylistDatabase.instance.findPlaylistByName(name);
+    if (existing != null) return existing.id;
+    return (await PlaylistDatabase.instance.createPlaylist(name)).id;
   }
 
   // ── Прямая ссылка ─────────────────────────────────────────────────────────
@@ -693,18 +871,24 @@ class ImporterService {
   Future<void> importLocalFiles({
     required List<String> paths,
     required void Function(ImportProgress) onProgress,
+    ImportControl? control,
   }) async {
     int i = 0;
+    var alreadyInLibrary = 0;
+    var stopped = false;
     final imported = <String>[];
 
     for (final path in paths) {
+      if (control?.cancelled ?? false) {
+        stopped = true;
+        break;
+      }
       i++;
       final file = File(path);
       if (!await file.exists()) continue;
 
       final fileName = p.basename(path);
       final title = p.basenameWithoutExtension(path);
-      final id = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
 
       onProgress(ImportProgress(
         status: ImportStatus.downloading,
@@ -713,11 +897,23 @@ class ImporterService {
       ));
 
       try {
-        final savePath = await _getTrackPath(fileName);
-        if (file.path != savePath) await file.copy(savePath);
+        // id по содержимому, а не по имени файла: из имени оставались только
+        // латиница и цифры, и у русских названий одинаковой длины id совпадал —
+        // второй трек затирал первый (как и одноимённые файлы из разных папок)
+        final id = await localTrackId(file);
+        if (await LibraryDatabase.instance.getTrackById(id) != null) {
+          alreadyInLibrary++;
+          continue;
+        }
+
+        final tags = await readLocalTags(path);
+        final (nameArtist, nameTitle) = splitArtistTitle(title);
+        final savePath =
+            await _getTrackPath('$id${p.extension(path).toLowerCase()}');
+        if (!p.equals(file.path, savePath)) await file.copy(savePath);
 
         String? lrcPath;
-        final srcLrc = File(path.replaceAll(p.extension(path), '.lrc'));
+        final srcLrc = File(p.setExtension(path, '.lrc'));
         if (await srcLrc.exists()) {
           final content = await srcLrc.readAsString();
           lrcPath = await LyricsService.instance.saveLrc(content, id);
@@ -725,17 +921,19 @@ class ImporterService {
 
         await LibraryDatabase.instance.insertTrack(LibraryTrack(
           id: id,
-          title: title,
-          artist: 'Unknown Artist',
-          album: 'Local Import',
+          title: tags.title ?? nameTitle,
+          artist: tags.artist ?? nameArtist ?? 'Unknown Artist',
+          album: tags.album ?? 'Local Import',
           filePath: savePath,
+          coverPath: await _saveLocalCover(id, tags),
           lrcPath: lrcPath,
-          durationMs: 0,
+          durationMs: tags.duration?.inMilliseconds ?? 0,
           source: 'local',
           addedAt: DateTime.now(),
         ));
 
         imported.add(id);
+        control?.onTrackSaved?.call();
       } catch (e) {
         debugPrint('Ошибка локального импорта $fileName: $e');
       }
@@ -743,9 +941,100 @@ class ImporterService {
 
     onProgress(ImportProgress(
       status: ImportStatus.done,
-      message: '✓ Импортировано ${imported.length} локальных файлов',
+      message: [
+        stopped
+            ? '■ Остановлено: импортировано ${imported.length} '
+                'из ${paths.length}'
+            : '✓ Импортировано файлов: ${imported.length}',
+        if (alreadyInLibrary > 0) 'уже были в медиатеке: $alreadyInLibrary',
+      ].join(', '),
       progress: 1.0,
     ));
+  }
+
+  /// Музыка с телефона (device_music.dart): треки добавляются с места, без
+  /// копирования. Уже добавленные — по пути или по содержимому — пропускаются.
+  Future<void> importDeviceTracks({
+    required List<DeviceTrack> tracks,
+    required void Function(ImportProgress) onProgress,
+    ImportControl? control,
+  }) async {
+    var added = 0;
+    var already = 0;
+    var stopped = false;
+    for (var i = 0; i < tracks.length; i++) {
+      if (control?.cancelled ?? false) {
+        stopped = true;
+        break;
+      }
+      final track = tracks[i];
+      final baseName = p.basenameWithoutExtension(track.path);
+      onProgress(ImportProgress(
+        status: ImportStatus.downloading,
+        message: 'Добавление: ${track.title ?? baseName} '
+            '(${i + 1} из ${tracks.length})',
+        progress: (i + 1) / tracks.length,
+      ));
+      try {
+        final file = File(track.path);
+        if (!await file.exists()) continue;
+        if (await LibraryDatabase.instance.exists(track.path)) {
+          already++;
+          continue;
+        }
+        final id = await localTrackId(file);
+        if (await LibraryDatabase.instance.getTrackById(id) != null) {
+          already++;
+          continue;
+        }
+        final tags = await readLocalTags(track.path);
+        final (nameArtist, nameTitle) = splitArtistTitle(baseName);
+        await LibraryDatabase.instance.insertTrack(LibraryTrack(
+          id: id,
+          title: tags.title ?? track.title ?? nameTitle,
+          artist:
+              tags.artist ?? track.artist ?? nameArtist ?? 'Unknown Artist',
+          album: tags.album ?? track.album ?? 'На телефоне',
+          filePath: track.path,
+          coverPath: await _saveLocalCover(id, tags),
+          durationMs: tags.duration?.inMilliseconds ?? track.durationMs ?? 0,
+          source: 'device',
+          addedAt: DateTime.now(),
+        ));
+        added++;
+        control?.onTrackSaved?.call();
+      } catch (e) {
+        debugPrint('Ошибка добавления с телефона: $e');
+      }
+    }
+
+    onProgress(ImportProgress(
+      status: ImportStatus.done,
+      message: [
+        stopped
+            ? '■ Остановлено: добавлено $added'
+            : '✓ Добавлено с телефона: $added',
+        if (already > 0) 'уже были в медиатеке: $already',
+      ].join(', '),
+      progress: 1.0,
+    ));
+  }
+
+  /// Встроенная обложка своего файла — в папку обложек.
+  Future<String?> _saveLocalCover(String id, LocalTags tags) async {
+    final bytes = tags.cover;
+    if (bytes == null) return null;
+    try {
+      final ext = tags.coverMime == 'image/png' ? 'png' : 'jpg';
+      final dir = Directory(AppPaths.coversDir);
+      await dir.create(recursive: true);
+      final path = p.join(dir.path, '$id.$ext');
+      await File(path).writeAsBytes(bytes, flush: true);
+      return path;
+    } catch (e) {
+      debugPrint('Не удалось сохранить обложку $id: $e');
+      return null;
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -754,9 +1043,10 @@ class ImporterService {
       url.contains('youtube.com') || url.contains('youtu.be');
   bool _isSoundCloud(String url) => url.contains('soundcloud.com');
   bool _isSpotify(String url) => url.contains('open.spotify.com');
+  // Любой домен Яндекс Музыки; непонятный вид ссылки (исполнитель) получит
+  // своё сообщение в _importYandexMusic, а не «неизвестный формат»
   bool _isYandexMusic(String url) =>
-      url.contains('music.yandex.ru') &&
-      (url.contains('/playlists/') || url.contains('/album/'));
+      YandexLink.isYandexMusicHost(Uri.tryParse(url)?.host ?? '');
   bool _isDirectAudio(String url) =>
       url.endsWith('.mp3') ||
       url.endsWith('.flac') ||
