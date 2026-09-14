@@ -45,6 +45,7 @@ import '../../domain/advanced_lrc_parser.dart';
 import '../../domain/spring.dart';
 import '../../../../core/utils/haptic_patterns.dart';
 import '../providers/karaoke_provider.dart';
+import '../providers/lyrics_display_provider.dart';
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
 
@@ -159,6 +160,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     // 1. СНАЧАЛА ВСЕ ПРОВАЙДЕРЫ И СЛУШАТЕЛИ
     final karaoke = ref.watch(karaokeProvider);
     final palette = ref.watch(paletteProvider);
+    final linesOnly = ref.watch(lyricsLinesOnlyProvider);
 
     ref.listen(karaokeProvider.select((s) => s.currentIndex), (prev, next) {
       if (prev != next && next >= 0) {
@@ -192,8 +194,11 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     }
 
     final activeIndex = karaoke.currentIndex;
-    final hasWordSync = karaoke.format == LyricsFormat.yrc ||
+    // Тайминги по словам и слогам можно показать и просто строками — так
+    // легче слабому телефону (lyrics_display_provider.dart)
+    final canWordSync = karaoke.format == LyricsFormat.yrc ||
         karaoke.format == LyricsFormat.enhancedLrc;
+    final hasWordSync = canWordSync && !linesOnly;
 
     return RepaintBoundary(
       child: Stack(
@@ -279,6 +284,12 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
               ),
             ),
           ),
+          if (canWordSync)
+            const Positioned(
+              top: 8,
+              right: 12,
+              child: _LyricsModeToggle(),
+            ),
           AnimatedPositioned(
             duration: const Duration(milliseconds: 350),
             curve: Curves.easeOutCubic,
@@ -327,6 +338,46 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
 // ═══════════════════════════════════════════════════════════════════════════
 // LINE ITEM
 // ═══════════════════════════════════════════════════════════════════════════
+
+/// «Слоги / Строки» — как показывать текст с таймингами по словам. Кнопка
+/// видна, только когда такие тайминги есть.
+class _LyricsModeToggle extends ConsumerWidget {
+  const _LyricsModeToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final linesOnly = ref.watch(lyricsLinesOnlyProvider);
+    return Tooltip(
+      message: linesOnly ? 'Показать по слогам' : 'Показать по строкам',
+      child: GestureDetector(
+        onTap: () => ref.read(lyricsLinesOnlyProvider.notifier).toggle(),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            color: Colors.black.withAlpha(90),
+            border: Border.all(color: Colors.white.withAlpha(35)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                linesOnly ? Icons.segment_rounded : Icons.graphic_eq_rounded,
+                color: Colors.white70,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                linesOnly ? 'Строки' : 'Слоги',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _LineItem extends StatelessWidget {
   const _LineItem({
