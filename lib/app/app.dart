@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 import '../core/theme/app_theme.dart';
 import 'app_shell.dart';
+import '../features/discord/presentation/discord_presence.dart';
 import '../features/importer/presentation/import_status_overlay.dart';
 import '../features/listen/domain/listen_link.dart';
 import '../features/listen/presentation/listen_links.dart';
@@ -20,6 +21,8 @@ class ProtogenixApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    // Статус «Слушает…» в Discord (только Windows) — живёт вместе с приложением
+    ref.watch(discordPresenceProvider);
     // «Слушать в Protogenix»: ссылки со страницы сайта (кнопка в Discord)
     ref.watch(listenLinksProvider);
     ref.listen<ListenLink?>(pendingListenLinkProvider, (_, link) {
