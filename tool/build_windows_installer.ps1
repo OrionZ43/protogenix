@@ -29,6 +29,15 @@ if (-not $iscc) { throw 'Не найден Inno Setup 6 (ISCC.exe). Устано
 Push-Location $root
 try {
     if (-not $SkipFlutterBuild) {
+        # Сборка в чистую папку: flutter не удаляет из неё файлы плагинов, которых
+        # больше нет, а установщик упаковывает её целиком (в 1.1.0 так уехали
+        # audiotags*.dll, release.md). Промежуточные файлы сборки лежат в другой
+        # папке и остаются — пересборка не с нуля.
+        $releaseDir = Join-Path $root 'build\windows\x64\runner\Release'
+        if (Test-Path $releaseDir) {
+            try { Remove-Item $releaseDir -Recurse -Force }
+            catch { throw "Не удалось очистить $releaseDir — закрой Protogenix, запущенный из этой папки. $_" }
+        }
         flutter build windows --release
         if ($LASTEXITCODE -ne 0) { throw "flutter build windows завершился с кодом $LASTEXITCODE" }
     }
