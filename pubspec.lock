@@ -49,6 +49,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
+  audio_metadata_reader:
+    dependency: "direct main"
+    description:
+      name: audio_metadata_reader
+      sha256: "5c769c77f19a38c0cf2a4a7e3728ed1cdefb2ce4a016111527b6b986c17663f9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.8.0"
   audio_service:
     dependency: "direct main"
     description:
@@ -161,6 +169,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  charset:
+    dependency: transitive
+    description:
+      name: charset
+      sha256: "27802032a581e01ac565904ece8c8962564b1070690794f0072f6865958ce8b9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.1"
   checked_yaml:
     dependency: transitive
     description:
@@ -281,6 +297,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.12"
+  desktop_drop:
+    dependency: "direct main"
+    description:
+      name: desktop_drop
+      sha256: "47ded09c85909edfed644fd4cbb5051b040d0aed5c79e7e062ea4b3b7156dbe4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.4"
   device_info_plus:
     dependency: "direct main"
     description:
@@ -520,6 +544,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.8.0"
+  intl:
+    dependency: transitive
+    description:
+      name: intl
+      sha256: "1ca20c894b1717686a2319b8548763d812bc0aabdac580420a44c5178c57a867"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.20.3"
   io:
     dependency: transitive
     description:
@@ -1528,10 +1560,11 @@ packages:
   youtube_explode_dart:
     dependency: "direct main"
     description:
-      name: youtube_explode_dart
-      sha256: "10134a53989b2f3dc576121735aec8fc6d88784956f4a2ad1a2525b006373a76"
-      url: "https://pub.dev"
-    source: hosted
+      path: "."
+      ref: "4dee1fcd033cbffe7a18ec7a17de38e02a8aeea2"
+      resolved-ref: "4dee1fcd033cbffe7a18ec7a17de38e02a8aeea2"
+      url: "https://github.com/OrionZ43/youtube_explode_dart.git"
+    source: git
     version: "3.1.0"
 sdks:
   dart: ">=3.11.0 <4.0.0"

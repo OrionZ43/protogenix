@@ -31,8 +31,13 @@ dependencies:
   sqflite: ^2.3.3+1
   path: ^1.9.0
 
-  # YouTube
-  youtube_explode_dart: ^3.1.0
+  # YouTube. Форк 3.1.0 с одним исправлением: трансляция в выдаче роняла весь
+  # поиск (known-issues.md). Вернуться на pub.dev, когда исправление выйдет
+  # в релизе у автора (dependencies.md).
+  youtube_explode_dart:
+    git:
+      url: https://github.com/OrionZ43/youtube_explode_dart.git
+      ref: 4dee1fcd033cbffe7a18ec7a17de38e02a8aeea2
 
   scrollable_positioned_list: ^0.3.8
   string_similarity: ^2.0.0
@@ -51,6 +56,8 @@ dependencies:
   url_launcher: ^6.3.2
   crypto: ^3.0.7
   cryptography: ^2.9.0
+  audio_metadata_reader: ^1.8.0
+  desktop_drop: ^0.8.4
 
 dev_dependencies:
   flutter_test:
