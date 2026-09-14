@@ -171,16 +171,11 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF080810),
-      body: Column(
-        children: [
-          const UpdateBanner(),
-          Expanded(
-            child: IndexedStack(
-              index: tabIndex,
-              children: _tabScreens(tabIndex),
-            ),
-          ),
-        ],
+      body: UpdateBannerLayout(
+        child: IndexedStack(
+          index: tabIndex,
+          children: _tabScreens(tabIndex),
+        ),
       ),
 
       // MiniPlayer + BottomNavigationBar в одной колонке
@@ -327,16 +322,11 @@ class _ExpandedShell extends ConsumerWidget {
 
           // ── Контент справа ────────────────────────────────────────────────
           Expanded(
-            child: Column(
-              children: [
-                const UpdateBanner(),
-                Expanded(
-                  child: IndexedStack(
-                    index: tabIndex,
-                    children: _tabScreens(tabIndex),
-                  ),
-                ),
-              ],
+            child: UpdateBannerLayout(
+              child: IndexedStack(
+                index: tabIndex,
+                children: _tabScreens(tabIndex),
+              ),
             ),
           ),
         ],
@@ -594,16 +584,11 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
 
                   // ── Контентная зона ────────────────────────────────────────────────
                   Expanded(
-                    child: Column(
-                      children: [
-                        const UpdateBanner(),
-                        Expanded(
-                          child: IndexedStack(
-                            index: tabIndex,
-                            children: _tabScreens(tabIndex),
-                          ),
-                        ),
-                      ],
+                    child: UpdateBannerLayout(
+                      child: IndexedStack(
+                        index: tabIndex,
+                        children: _tabScreens(tabIndex),
+                      ),
                     ),
                   ),
 
