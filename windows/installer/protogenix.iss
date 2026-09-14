@@ -87,6 +87,15 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
+[Registry]
+; Схема protogenix:// — «Слушать в Protogenix» со страницы сайта
+; (lib/features/listen/domain/listen_link.dart). В профиле пользователя, прав
+; администратора не нужно; удаляется вместе с программой.
+Root: HKCU; Subkey: "Software\Classes\protogenix"; ValueType: string; ValueName: ""; ValueData: "URL:Protogenix"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\protogenix"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\protogenix\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"
+Root: HKCU; Subkey: "Software\Classes\protogenix\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
+
 [Run]
 ; Обычная установка — флажок «Запустить» на последней странице.
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent

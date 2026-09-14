@@ -2,11 +2,17 @@
 #define RUNNER_FLUTTER_WINDOW_H_
 
 #include <flutter/dart_project.h>
+#include <flutter/encodable_value.h>
 #include <flutter/flutter_view_controller.h>
+#include <flutter/method_channel.h>
 
 #include <memory>
 
 #include "win32_window.h"
+
+// WM_COPYDATA id of a "Listen in Protogenix" link that a second launch of the
+// app forwards to the running one (main.cpp).
+constexpr ULONG_PTR kListenLinkCopyDataId = 0x50524C4B;  // "PRLK"
 
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
@@ -28,6 +34,11 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
+  // Channel z43.studios.protogenix/links: forwarded links go to Dart
+  // (lib/features/listen/presentation/listen_links.dart).
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      links_channel_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

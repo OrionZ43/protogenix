@@ -1,11 +1,14 @@
 package z43.studios.protogenix
 
+import android.content.Intent
 import android.provider.MediaStore
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
+    private var linksChannel: MethodChannel? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // Музыка на телефоне (lib/features/importer/data/device_music.dart):
@@ -26,6 +29,32 @@ class MainActivity : AudioServiceActivity() {
                     }
                 }.start()
             }
+
+        // «Слушать в Protogenix» (lib/features/listen/presentation/listen_links.dart):
+        // ссылку запуска Dart забирает сам, пришедшие позже — через onNewIntent
+        linksChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LINKS_CHANNEL)
+            .also { channel ->
+                channel.setMethodCallHandler { call, result ->
+                    if (call.method == "initialLink") {
+                        result.success(listenLink(intent))
+                    } else {
+                        result.notImplemented()
+                    }
+                }
+            }
+    }
+
+    // Приложение уже открыто (singleTop) — ссылка приходит сюда
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        listenLink(intent)?.let { linksChannel?.invokeMethod("open", it) }
+    }
+
+    /** protogenix://listen?… из intent; разбирает и проверяет её Dart. */
+    private fun listenLink(intent: Intent?): String? {
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        val data = intent.data ?: return null
+        return if (data.scheme == "protogenix") data.toString() else null
     }
 
     private fun queryAudio(): List<Map<String, Any?>> {
@@ -71,5 +100,6 @@ class MainActivity : AudioServiceActivity() {
 
     companion object {
         private const val MEDIA_CHANNEL = "z43.studios.protogenix/media"
+        private const val LINKS_CHANNEL = "z43.studios.protogenix/links"
     }
 }

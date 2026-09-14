@@ -453,6 +453,77 @@ class ImporterService {
     return yt.search.search(query).timeout(const Duration(seconds: 8));
   }
 
+  // ── По названию и исполнителю ─────────────────────────────────────────────
+
+  /// Трек по названию и исполнителю — для «Слушать в Protogenix», когда у
+  /// друга свой файл без ролика (listen_link.dart). Запись ищется тем же
+  /// строгим подбором, что при импорте из Яндекса и Spotify.
+  Future<void> importSearchedTrack({
+    required String title,
+    required String artist,
+    Duration? duration,
+    required void Function(ImportProgress) onProgress,
+    ImportControl? control,
+  }) async {
+    onProgress(ImportProgress(
+      status: ImportStatus.fetchingMeta,
+      message: 'Поиск на YouTube: ${artist.isEmpty ? title : '$artist - $title'}',
+      progress: 0.1,
+    ));
+    final yt = YoutubeExplode();
+    try {
+      final video = await _findOnYouTube(
+        yt,
+        title: title,
+        artist: artist,
+        durationMs: duration?.inMilliseconds,
+      );
+      if (await LibraryDatabase.instance.getTrackById(video.id.value) !=
+          null) {
+        onProgress(ImportProgress(
+          status: ImportStatus.done,
+          message: '✓ "$title" уже есть в медиатеке',
+          progress: 1,
+        ));
+        return;
+      }
+      await _downloadYouTubeVideo(
+        yt: yt,
+        video: video,
+        cleanTitle: title,
+        albumName: 'Protogenix',
+        artistOverride: artist.isEmpty ? null : artist,
+        onProgress: (p) => onProgress(ImportProgress(
+          status: p.status,
+          message: p.message,
+          progress: 0.3 + p.progress * 0.7,
+        )),
+      );
+      control?.onTrackSaved?.call();
+      onProgress(ImportProgress(
+        status: ImportStatus.done,
+        message: '✓ "$title" добавлен!',
+        progress: 1,
+      ));
+    } on _NoMatchException {
+      onProgress(const ImportProgress(
+        status: ImportStatus.error,
+        message: 'На YouTube нет подходящей записи',
+        error: 'Нашлись только другие версии — клипы, концерты, каверы. '
+            'Попробуй найти трек через поиск.',
+      ));
+    } catch (e) {
+      debugPrint('Ошибка импорта по названию: $e');
+      onProgress(const ImportProgress(
+        status: ImportStatus.error,
+        message: 'Не удалось скачать трек',
+        error: 'Попробуй ещё раз позже.',
+      ));
+    } finally {
+      yt.close();
+    }
+  }
+
   // ── Spotify ───────────────────────────────────────────────────────────────
 
   Future<void> _importSpotify({

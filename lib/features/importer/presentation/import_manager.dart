@@ -122,6 +122,24 @@ class ImportManager extends StateNotifier<ImportJob?> {
             tracks: tracks, onProgress: onProgress, control: control),
       );
 
+  /// По названию и исполнителю — «Слушать в Protogenix» для своих файлов
+  /// друга (listen_link.dart): запись ищется на YouTube.
+  Future<void> importSearchedTrack({
+    required String title,
+    required String artist,
+    Duration? duration,
+  }) =>
+      enqueue(
+        title,
+        (control, onProgress) => ImporterService.instance.importSearchedTrack(
+          title: title,
+          artist: artist,
+          duration: duration,
+          onProgress: onProgress,
+          control: control,
+        ),
+      );
+
   /// Запустить импорт, а если что-то уже идёт — поставить в очередь. Future
   /// завершается, когда пройдёт вся очередь; у поставленного в очередь — сразу.
   @visibleForTesting

@@ -1,6 +1,10 @@
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
+#include <shellapi.h>
+#include <wchar.h>
+
+#include <string>
 
 #include "flutter_window.h"
 #include "utils.h"
@@ -15,12 +19,40 @@ namespace {
 constexpr wchar_t kSingleInstanceMutex[] =
     L"Z43Studios.Protogenix.SingleInstance";
 
-// Brings the already running Protogenix window to the front.
+// Hands a protogenix:// link from this launch's command line to the running
+// copy: the browser starts a new process for every link, but the app keeps a
+// single window (lib/features/listen/presentation/listen_links.dart).
+void ForwardListenLink(HWND window) {
+  int argc = 0;
+  LPWSTR* argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
+  if (argv == nullptr) {
+    return;
+  }
+  for (int i = 1; i < argc; i++) {
+    if (::_wcsnicmp(argv[i], L"protogenix:", 11) != 0) {
+      continue;
+    }
+    std::string link = Utf8FromUtf16(argv[i]);
+    if (!link.empty()) {
+      COPYDATASTRUCT data{};
+      data.dwData = kListenLinkCopyDataId;
+      data.cbData = static_cast<DWORD>(link.size());
+      data.lpData = link.data();
+      ::SendMessageW(window, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data));
+    }
+    break;
+  }
+  ::LocalFree(argv);
+}
+
+// Brings the already running Protogenix window to the front and hands it the
+// link this launch was started with, if any.
 void ActivateExistingWindow() {
   HWND window = ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"Protogenix");
   if (window == nullptr) {
     return;
   }
+  ForwardListenLink(window);
   if (::IsIconic(window)) {
     ::ShowWindow(window, SW_RESTORE);
   }

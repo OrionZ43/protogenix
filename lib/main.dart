@@ -10,10 +10,14 @@ import 'app/app.dart';
 import 'app/demo_mode.dart';
 import 'core/services/app_paths.dart';
 import 'features/importer/data/local_tags_migration.dart';
+import 'features/listen/presentation/listen_links.dart';
 import 'features/player/data/audio_handler.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Windows: ссылка «Слушать в Protogenix» приходит аргументом запуска
+  setLaunchArguments(args);
 
   if (Platform.isWindows || Platform.isLinux) {
     sqfliteFfiInit();
