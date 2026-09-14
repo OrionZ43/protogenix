@@ -67,7 +67,8 @@ void main() {
 
   UpdateDownloader downloader() => UpdateDownloader(directory: tmp);
 
-  File partOf(UpdateAsset a) => File(p.join(tmp.path, '${a.fileName}.part'));
+  File partOf(UpdateAsset a) => File(
+      p.join(tmp.path, '${a.fileName}.${a.sha256.substring(0, 12)}.part'));
 
   test('скачивает файл и сверяет SHA-256', () async {
     final progress = <double>[];
@@ -88,6 +89,23 @@ void main() {
 
     expect(ranges.single, 'bytes=100000-');
     expect(await file.readAsBytes(), payload);
+  });
+
+  test('кусок другой версии не продолжается, а удаляется', () async {
+    final a = asset(['/protogenix.bin']);
+    // Старое имя куска (до 1.0.1) и кусок другой версии с новой пометкой
+    final legacy = File(p.join(tmp.path, '${a.fileName}.part'));
+    final otherVersion =
+        File(p.join(tmp.path, '${a.fileName}.0123456789ab.part'));
+    await legacy.writeAsBytes(List.filled(100000, 7));
+    await otherVersion.writeAsBytes(List.filled(50000, 9));
+
+    final file = await downloader().download(a);
+
+    expect(ranges.single, isNull, reason: 'качать с нуля, без Range');
+    expect(await file.readAsBytes(), payload);
+    expect(legacy.existsSync(), isFalse);
+    expect(otherVersion.existsSync(), isFalse);
   });
 
   test('если сервер игнорирует Range — качает заново', () async {

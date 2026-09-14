@@ -51,7 +51,8 @@ class UpdateDownloader {
       return target;
     }
 
-    final part = File('${target.path}.part');
+    final part = File('${target.path}.${_partTag(asset)}.part');
+    await _deleteStaleParts(target, keep: part);
     Object? lastError;
     for (final url in asset.urls) {
       try {
@@ -123,6 +124,34 @@ class UpdateDownloader {
       }
     } finally {
       await sink.close();
+    }
+  }
+
+  /// Недокачанный файл помечен началом хэша своей версии. Имя файла в релизах
+  /// одинаковое (`Protogenix-Setup.exe`), и без пометки загрузка новой версии
+  /// продолжала бы кусок прошлой: хэш не сходился, и первая попытка обновиться
+  /// падала. Такой кусок остался после прерванного обновления до 1.0.0.
+  static String _partTag(UpdateAsset asset) => asset.sha256.length > 12
+      ? asset.sha256.substring(0, 12)
+      : asset.sha256;
+
+  /// Удаляет куски других версий того же файла, в том числе старого вида
+  /// `<имя>.part`.
+  Future<void> _deleteStaleParts(File target, {required File keep}) async {
+    final prefix = '${p.basename(target.path)}.';
+    await for (final entity in directory.list()) {
+      final name = p.basename(entity.path);
+      if (entity is! File ||
+          !name.startsWith(prefix) ||
+          !name.endsWith('.part') ||
+          p.equals(entity.path, keep.path)) {
+        continue;
+      }
+      try {
+        await entity.delete();
+      } catch (e) {
+        debugPrint('[Updater] Не удалось удалить старый кусок $name: $e');
+      }
     }
   }
 
