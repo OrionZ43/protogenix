@@ -13,6 +13,7 @@ import '../playlist_provider.dart';
 import '../widgets/track_context_menu.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
+import '../../../../core/theme/cover_placeholder.dart';
 
 class FavoritesScreen extends ConsumerWidget {
   const FavoritesScreen({super.key});
@@ -222,7 +223,7 @@ class _FavoriteTile extends ConsumerWidget {
               child: Image(
                 image: track.coverPath != null
                     ? FileImage(File(track.coverPath!)) as ImageProvider
-                    : const AssetImage('assets/images/mock_cover.jpg'),
+                    : kCoverPlaceholder,
                 width: 50,
                 height: 50,
                 fit: BoxFit.cover,

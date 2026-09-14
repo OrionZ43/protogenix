@@ -12,8 +12,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:protogenix/core/utils/system_insets.dart';
+import 'package:protogenix/core/widgets/accent_button.dart';
 import '../../domain/track_model.dart';
 import '../providers/karaoke_provider.dart';
+import '../providers/palette_provider.dart';
 import '../../../../features/library/data/lyrics_service.dart';
 import '../../../../features/library/domain/lyrics_models.dart';
 import '../../../../features/player/domain/advanced_lrc_parser.dart';
@@ -145,9 +148,7 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
         content: Text(
           'Текст применён: ${scored.metadata.artistName} — ${scored.metadata.trackName}',
         ),
-        backgroundColor: Colors.black87,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        // Вид плашки — из темы (AppTheme.snackBarTheme)
       ),
     );
   }
@@ -157,6 +158,7 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
     final viewInsets = MediaQuery.of(context).viewInsets;
     final maxHeight = MediaQuery.of(context).size.height * 0.88;
     final hasContent = _error != null || _results.isNotEmpty || _isSearching;
+    final accent = ref.watch(paletteProvider.select((p) => p.primary));
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -222,6 +224,7 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
                     children: [
                       _SearchField(
                         controller: _titleCtrl,
+                        accent: accent,
                         hint: 'Название песни',
                         icon: Icons.music_note_rounded,
                         onSubmitted: (_) => _search(),
@@ -229,39 +232,20 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
                       const SizedBox(height: 10),
                       _SearchField(
                         controller: _artistCtrl,
+                        accent: accent,
                         hint: 'Артист',
                         icon: Icons.person_rounded,
                         onSubmitted: (_) => _search(),
                       ),
                       const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _isSearching ? null : _search,
-                          icon: _isSearching
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.search_rounded),
-                          label: Text(_isSearching ? 'Ищу...' : 'Найти'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF7B5EA7),
-                            foregroundColor: Colors.white,
-                            padding:
-                                const Duration(milliseconds: 300) > Duration.zero
-                                    ? const EdgeInsets.symmetric(vertical: 14)
-                                    : EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            elevation: 0,
-                          ),
-                        ),
+                      // Цвет — от обложки, как у главной кнопки импорта
+                      // (был зашит фиолетовый)
+                      AccentButton(
+                        label: _isSearching ? 'Ищу…' : 'Найти',
+                        icon: Icons.search_rounded,
+                        busy: _isSearching,
+                        accent: accent,
+                        onTap: _isSearching ? null : _search,
                       ),
                     ],
                   ),
@@ -275,7 +259,8 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
                   Flexible(
                     child: _error != null
                         ? Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+                            padding: EdgeInsets.fromLTRB(
+                                24, 24, 24, bottomSafePadding(context, min: 40)),
                             child: Center(
                               child: Text(
                                 _error!,
@@ -303,7 +288,8 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
                               )
                             : ListView.separated(
                                 shrinkWrap: true,
-                                padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+                                padding: EdgeInsets.fromLTRB(
+                                    24, 8, 24, bottomSafePadding(context, min: 40)),
                                 itemCount: _results.length,
                                 separatorBuilder: (_, __) =>
                                     Divider(color: Colors.white.withAlpha(12)),
@@ -335,12 +321,14 @@ class _LyricsSearchSheetState extends ConsumerState<LyricsSearchSheet> {
 class _SearchField extends StatelessWidget {
   const _SearchField({
     required this.controller,
+    required this.accent,
     required this.hint,
     required this.icon,
     this.onSubmitted,
   });
 
   final TextEditingController controller;
+  final Color accent;
   final String hint;
   final IconData icon;
   final ValueChanged<String>? onSubmitted;
@@ -356,6 +344,7 @@ class _SearchField extends StatelessWidget {
       child: TextField(
         controller: controller,
         onSubmitted: onSubmitted,
+        cursorColor: accent,
         style: const TextStyle(color: Colors.white, fontSize: 15),
         decoration: InputDecoration(
           hintText: hint,

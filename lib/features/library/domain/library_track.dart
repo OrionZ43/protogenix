@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../player/domain/track_model.dart';
+import '../../../core/theme/cover_placeholder.dart';
 
 class LibraryTrack {
   final String id;
@@ -65,7 +66,7 @@ class LibraryTrack {
       duration: duration,
       coverImage: coverPath != null
           ? FileImage(File(coverPath!))
-          : const AssetImage('assets/images/mock_cover.jpg') as ImageProvider,
+          : kCoverPlaceholder as ImageProvider,
       filePath: filePath,
       lrcPath: lrcPath,
     );

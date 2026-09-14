@@ -12,6 +12,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:protogenix/core/utils/system_insets.dart';
 
 import '../../domain/player_state.dart'; // <-- ИСПРАВЛЕНИЕ: Добавлен импорт
 import '../providers/palette_provider.dart';
@@ -71,7 +72,7 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+          padding: EdgeInsets.fromLTRB(24, 0, 24, bottomSafePadding(context)),
           decoration: BoxDecoration(
             color: Colors.black.withAlpha(200),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),

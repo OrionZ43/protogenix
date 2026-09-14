@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:protogenix/core/utils/system_insets.dart';
 import 'package:protogenix/features/player/presentation/providers/player_provider.dart';
 
 void showSleepTimerSheet(BuildContext context, WidgetRef ref) {
@@ -39,7 +40,8 @@ class _SleepTimerSheet extends ConsumerWidget {
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
+          padding: EdgeInsets.fromLTRB(
+              24, 0, 24, bottomSafePadding(context, min: 40)),
           decoration: BoxDecoration(
             color: Colors.black.withAlpha(200),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),

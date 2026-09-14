@@ -1,23 +1,26 @@
 // lib/core/widgets/chip_button.dart
 //
 // Кнопка-«таблетка» в стиле плеера: иконка и подпись в полупрозрачной рамке.
-// С accent — заливка и рамка в цвет обложки, для главного действия.
+// С accent — заливка и рамка в цвет обложки, для главного действия (красный —
+// для удаления). Можно только иконку или только подпись.
 
 import 'package:flutter/material.dart';
 
 class ChipButton extends StatelessWidget {
   const ChipButton({
     super.key,
-    required this.label,
-    required this.icon,
+    this.label,
+    this.icon,
     required this.onTap,
     this.accent,
-  });
+    this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+  }) : assert(label != null || icon != null);
 
-  final String label;
-  final IconData icon;
+  final String? label;
+  final IconData? icon;
   final VoidCallback? onTap;
   final Color? accent;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +34,7 @@ class ChipButton extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           child: Ink(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            padding: padding,
             decoration: BoxDecoration(
               color: color.withAlpha(strong ? 40 : 16),
               borderRadius: BorderRadius.circular(14),
@@ -39,17 +42,21 @@ class ChipButton extends StatelessWidget {
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              // По центру — если кнопку растянули (Expanded в диалоге)
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 16, color: strong ? color : Colors.white70),
-                const SizedBox(width: 7),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: strong ? color : Colors.white.withAlpha(215),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                if (icon != null)
+                  Icon(icon, size: 16, color: strong ? color : Colors.white70),
+                if (icon != null && label != null) const SizedBox(width: 7),
+                if (label != null)
+                  Text(
+                    label!,
+                    style: TextStyle(
+                      color: strong ? color : Colors.white.withAlpha(215),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
