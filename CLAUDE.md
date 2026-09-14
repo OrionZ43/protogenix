@@ -8,7 +8,7 @@ Protogenix is a Flutter music player by Z43 Studios. It streams and downloads fr
 
 - Release targets are **Android and Windows**. Linux builds but has never been tested. iOS and macOS are out of scope: the `ios/` and `macos/` folders are template leftovers, don't spend effort on them. The `web/` folder exists too, but the app does not run on web, because `dart:io` `Platform` checks are used unguarded (starting in `main.dart`).
 - **The repository is public** (since 2026-09-11). Never commit secrets — keystores, `key.properties`, tokens, API keys. Anything compiled into the app (`const` strings, assets) is public as well.
-- The UI is dark-only (`AppTheme.dark()`, background `0xFF080810`). The accent colour is the cover palette (`paletteProvider`), not `colorScheme.primary` (a fixed purple seed). Shared styled widgets live in `lib/core/widgets/`: `GlassPanel` (dark glass for overlays), `showGlassConfirm` (confirmations — don't use `AlertDialog`), `AccentButton` (primary full-width action — don't use `ElevatedButton`), `ChipButton` (pills). Don't put a `Tooltip` in anything placed in `MaterialApp.builder` (the import overlay): there is no `Overlay` above the `Navigator`.
+- The UI is dark-only (`AppTheme.dark()`, background `0xFF080810`). The accent colour is the cover palette (`paletteProvider`), not `colorScheme.primary` (a fixed purple seed). Shared styled widgets live in `lib/core/widgets/`: `GlassPanel` (dark glass for overlays), `showGlassConfirm` (confirmations — don't use `AlertDialog`), `AccentButton` (primary full-width action — don't use `ElevatedButton`), `ChipButton` (pills), `SectionCard` (titled cards on the Settings and Info pages), `GlassBackButton` (back button on full-screen pages). Don't put a `Tooltip` in anything placed in `MaterialApp.builder` (the import overlay): there is no `Overlay` above the `Navigator`.
 - There is no l10n. All user-facing strings are hardcoded in Russian, and most code comments are Russian as well. Keep new strings consistent with that.
 - Most changes arrive as PRs from the Jules bot (`google-labs-jules[bot]`). Its learning logs live in `.jules/`; their rules are folded into `.claude/rules/`.
 - `repomix-output.xml` in the repo root, if present, is a generated snapshot of the whole repo. Ignore it when searching.
@@ -58,7 +58,7 @@ flutter test test/features/player/domain/advanced_lrc_parser_test.dart
 flutter test --plain-name "detects YRC format"
 flutter build apk --release       # release key from android/key.properties; without it the debug key + a warning — read release.md first
 flutter build windows --release
-powershell -ExecutionPolicy Bypass -File tool/build_windows_installer.ps1   # installer → build/installer/ (needs Inno Setup 6)
+powershell -ExecutionPolicy Bypass -File tool/build_windows_installer.ps1   # clean Windows build + installer → build/installer/ (needs Inno Setup 6; -SkipFlutterBuild reuses the build)
 powershell -ExecutionPolicy Bypass -File tool/release.ps1 -NotesFile docs/release-notes/vX.Y.Z.md   # full release build → build/release/vX.Y.Z/; -Publish uploads it — see release.md
 powershell -ExecutionPolicy Bypass -File tool/release.ps1 -Bump patch -NotesFile docs/release-notes/vX.Y.Z.md -Publish   # bump the version, build, commit, push and publish in one go
 powershell -ExecutionPolicy Bypass -File tool/youtube_health_check.ps1   # does YouTube downloading still work? -Install = daily task on Orion's PC — see dependencies.md
@@ -71,7 +71,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and push to master: `flutter an
 
 ## Architecture
 
-The code is split into `lib/app/` (root widget and navigation shells), `lib/core/` (theme, shared widgets, utils, services such as app paths and the YouTube clients), and `lib/features/<feature>/{data,domain,presentation}`. The features are player, library, search, importer, home, and updater. The layering is loose. For example, `library_provider.dart` sits directly in `presentation/`, and the lyrics code lives under `library/`.
+The code is split into `lib/app/` (root widget and navigation shells), `lib/core/` (theme, shared widgets, utils, services such as app paths and the YouTube clients), and `lib/features/<feature>/{data,domain,presentation}`. The features are player, library, search, importer, home, updater, settings, discord (Discord status on Windows) and listen («Слушать в Protogenix» links). The layering is loose. For example, `library_provider.dart` sits directly in `presentation/`, and the lyrics code lives under `library/`.
 
 ### Startup (`lib/main.dart`)
 
@@ -130,3 +130,9 @@ Two separate sqflite databases: `LibraryDatabase` (`protogenix.db`, tracks) and 
 
 - `searchProvider` (an `AsyncNotifier`) debounces by 450ms and searches YouTube only, via youtube_explode. It returns `SearchTrack` objects so the UI is decoupled from youtube_explode types.
 - The updater (`lib/features/updater/`): `UpdateChecker` downloads the signed manifest `protogenix-update.json` from the latest GitHub Release, verifies its Ed25519 signature against `kUpdateSigningKeys` (updates stay disabled while that map is empty), compares `build`, and picks the asset for the platform/ABI. `UpdateDownloader` resumes downloads and verifies SHA-256; `UpdateInstaller` opens the system APK installer on Android and silently runs the Inno Setup installer on Windows. `tool/update_signing.dart` creates the key and signs manifests. The Info page (`library/presentation/screens/info_screen.dart`) shows the real version and the update status and can re-check (`UpdateNotifier.checkNow`; `UpdateChecker.checkDetailed` tells «up to date» from «couldn't check»). Release format, keys, hosting and the rest of the plan: `release.md`.
+
+### Settings, Discord status and «Слушать в Protogenix»
+
+- **Settings** (`features/settings/presentation/settings_screen.dart`) open from the gear on the phone home screen and from «Настройки» at the bottom of the desktop sidebar. They hold «Слоги / Строки», the Discord switch (Windows), the equalizer (Android) and «О приложении», which opens the Info page. Values live in `settings.json` (`data.md`).
+- **Discord status** (`features/discord/`, Windows only): `DiscordIpc` talks to the local Discord client over `\\?\pipe\discord-ipc-N`. `discordPresenceProvider` (watched in `app.dart`) listens to `playerProvider` and sends a «Listening» activity with a «Слушать в Protogenix» button, at most once every 4 s. Android and the other limits: `known-issues.md`.
+- **Listen links** (`features/listen/`): `protogenix://listen?v=&t=&a=&d=`, reached from the Discord button through the Z43 Studios site page `/listen`. `main(List<String> args)` hands launch arguments to `setLaunchArguments`; a running app receives links over the `z43.studios.protogenix/links` channel (Windows: a second launch forwards them via `WM_COPYDATA`; Android: `MainActivity`). `handleListenLink` always asks before playing or downloading. Links are external input — `security.md`; scheme registration in the installer and deploying the site before the app release — `release.md`.
