@@ -55,12 +55,26 @@ class KugouKrc {
       final m = _line.firstMatch(raw.trimRight());
       if (m == null) continue;
       final start = int.parse(m.group(1)!);
-      final words = _word.allMatches(m.group(3)!).toList();
-      if (words.isEmpty) continue;
+      // (абсолютное начало, длительность, текст)
+      final entries = <(int, String, String)>[];
+      for (final w in _word.allMatches(m.group(3)!)) {
+        final text = w.group(3)!;
+        // Пробел в KRC — отдельное «слово» со своим временем, а в YRC он
+        // в конце слога. Без переноса строка склеивалась в одно слово
+        // (найдено 2026-09-13 на «Intelligency — It Is All about Love»).
+        if (text.trim().isEmpty) {
+          if (entries.isNotEmpty && !entries.last.$3.endsWith(' ')) {
+            final last = entries.removeLast();
+            entries.add((last.$1, last.$2, '${last.$3} '));
+          }
+          continue;
+        }
+        entries.add((start + int.parse(w.group(1)!), w.group(2)!, text));
+      }
+      if (entries.isEmpty) continue;
       out.write('[$start,${m.group(2)}]');
-      for (final w in words) {
-        out.write(
-            '(${start + int.parse(w.group(1)!)},${w.group(2)},0)${w.group(3)}');
+      for (final (time, duration, text) in entries) {
+        out.write('($time,$duration,0)$text');
       }
       out.write('\n');
     }

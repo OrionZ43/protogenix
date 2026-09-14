@@ -288,8 +288,25 @@ class AdvancedLrcParser {
       final dur = int.parse(m.group(2)!);
       final rawText = _cleanYrcText(m.group(3) ?? '');
 
-      // Пробел-граница слова не содержит скобок → просто пробрасываем состояние
-      if (rawText.trim().isEmpty) continue;
+      // Слог из одних пробелов — граница слова. Так было в текстах с Kugou
+      // (kugou_krc.dart до 2026-09-13 и уже сохранённые файлы): пробел —
+      // отдельное «слово» со своим временем. Если его просто пропустить,
+      // вся строка склеивается в одно слово. Пробел отдаём предыдущему
+      // слогу: _groupSyllablesIntoWords смотрит на пробел в конце слога.
+      if (rawText.trim().isEmpty) {
+        if (rawText.isNotEmpty &&
+            rawSyls.isNotEmpty &&
+            !rawSyls.last.text.endsWith(' ')) {
+          final last = rawSyls.removeLast();
+          rawSyls.add((
+            start: last.start,
+            dur: last.dur,
+            text: '${last.text} ',
+            isBackground: last.isBackground,
+          ));
+        }
+        continue;
+      }
 
       final r = _processWithState(rawText, bgState);
       bgState = r.nextState;
