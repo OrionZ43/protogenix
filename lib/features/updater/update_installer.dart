@@ -13,7 +13,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
-import 'package:permission_handler/permission_handler.dart';
+
+import '../../core/services/android_permissions.dart';
 
 class UpdateInstallException implements Exception {
   const UpdateInstallException(this.message);
@@ -38,9 +39,9 @@ class UpdateInstaller {
   }
 
   static Future<void> _installAndroid(File apk) async {
-    var status = await Permission.requestInstallPackages.status;
+    var status = await androidPermissionStatus(Permission.requestInstallPackages);
     if (!status.isGranted) {
-      status = await Permission.requestInstallPackages.request();
+      status = await requestAndroidPermission(Permission.requestInstallPackages);
     }
     if (!status.isGranted) {
       throw const UpdateInstallException(

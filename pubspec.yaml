@@ -24,7 +24,11 @@ dependencies:
   dynamic_color: ^1.7.0
   path_provider: ^2.1.4
   dio: ^5.6.0
-  permission_handler: ^11.3.1
+  # Разрешения — только Android. Пакет permission_handler тянул на Windows
+  # permission_handler_windows, а тот при запуске включал отслеживание
+  # местоположения (core/services/android_permissions.dart, known-issues.md).
+  permission_handler_android: ^12.1.0
+  permission_handler_platform_interface: ^4.3.0
   palette_generator: ^0.3.3+3
 
   # База данных

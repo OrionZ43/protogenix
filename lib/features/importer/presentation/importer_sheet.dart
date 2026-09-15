@@ -5,11 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../data/device_music.dart';
 import '../data/importer_service.dart';
 import '../data/local_tags.dart';
 import 'import_manager.dart';
+import '../../../core/services/android_permissions.dart';
 import '../../../core/widgets/accent_button.dart';
 import '../../../core/widgets/chip_button.dart';
 import '../../player/presentation/providers/palette_provider.dart';
@@ -247,7 +247,7 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
     setState(() => _notice = null);
     final status = await DeviceMusic.requestPermission();
     if (!status.isGranted && !status.isLimited) {
-      if (status.isPermanentlyDenied) await openAppSettings();
+      if (status.isPermanentlyDenied) await openAndroidAppSettings();
       if (mounted) {
         setState(() => _notice = const ImportProgress(
               status: ImportStatus.error,

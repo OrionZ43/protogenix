@@ -8,7 +8,8 @@
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
+
+import '../../../core/services/android_permissions.dart';
 
 class DeviceTrack {
   const DeviceTrack({
@@ -56,7 +57,8 @@ class DeviceMusic {
   /// ниже (оба объявлены в AndroidManifest.xml).
   static Future<PermissionStatus> requestPermission() async {
     final sdk = (await DeviceInfoPlugin().androidInfo).version.sdkInt;
-    return (sdk >= 33 ? Permission.audio : Permission.storage).request();
+    return requestAndroidPermission(
+        sdk >= 33 ? Permission.audio : Permission.storage);
   }
 
   /// Музыка не короче 30 секунд, новые сверху (фильтр — в MainActivity.kt).
