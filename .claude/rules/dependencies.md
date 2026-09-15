@@ -51,6 +51,13 @@ paths:
 
 0.8.4, издатель mixin.dev. На Windows — один C++ файл (`cmake_minimum_required(3.15)`), без Rust и внешних библиотек. На Android плагин только вешает `OnDragListener`, разрешений не добавляет; AGP 8 поддерживается с 0.8.2 при Kotlin Gradle Plugin 2.x (у нас 2.2.20). `super_drag_and_drop` не брать: Rust через cargokit, без Rust он качает готовые бинарники прямо во время сборки.
 
+## `permission_handler` → Android-реализация напрямую (2026-09-14)
+
+Пакет `permission_handler` тянул на Windows `permission_handler_windows`, а тот при каждом запуске включал отслеживание местоположения (`known-issues.md`, «Геолокация на Windows…»). Разрешения нужны только на Android, поэтому в `pubspec.yaml` — `permission_handler_android` и `permission_handler_platform_interface`, а код ходит через `lib/core/services/android_permissions.dart`.
+- В `pubspec.lock` после замены ушли `permission_handler` 11.4.0, `permission_handler_apple`, `permission_handler_html` и `permission_handler_windows`; версии остальных пакетов не менялись.
+- Android-реализация (`implements: permission_handler`) регистрируется сама; Dart-класса у неё нет, вызовы идут через канал интерфейса по умолчанию.
+- Не возвращать `permission_handler` целиком. Обновляя эти два пакета, проверить разрешения на телефоне: «Найти музыку на телефоне» и установку обновления.
+
 ## `youtube_explode_dart` — рабочий клиент YouTube объявлен у нас
 
 С 2026-09-12 версия `^3.1.0` (обновление с 3.0.5 поменяло в `pubspec.lock` только сам пакет). Клиент visionOS, через который сейчас работают скачивание и воспроизведение, объявлен в нашем коде (`lib/core/services/youtube_clients.dart`), а не в библиотеке: на 2026-09-12 он есть только в неслитых PR #390/#391, а релизов библиотеки нет с мая 2026. Почему так и что сломал YouTube — `known-issues.md`, раздел про YouTube.
