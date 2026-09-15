@@ -20,11 +20,11 @@ import '../../library/data/library_database.dart';
 import '../../library/data/playlist_database.dart';
 import '../../library/data/lyrics_service.dart';
 import '../../library/domain/library_track.dart';
-import '../../library/domain/lyrics_text.dart';
 import '../../../core/services/app_paths.dart';
 import '../../../core/services/youtube_clients.dart';
 import 'device_music.dart';
 import 'local_tags.dart';
+import 'spotify_page.dart';
 import 'yandex_library_index.dart';
 import 'yandex_music.dart';
 import 'youtube_match.dart';
@@ -375,41 +375,39 @@ class ImporterService {
     }
   }
 
-  /// Ролик для трека из Яндекс Музыки или Spotify; что подходит — решает
-  /// youtube_match.dart. Сначала запрос «Артист - Название», не нашлось
-  /// подходящего — ещё один, с «topic»: он выводит в выдачу записи с канала
-  /// исполнителя. Нет и там — _NoMatchException: лучше пропустить трек,
-  /// чем скачать чужую запись.
+  /// Ролик для трека из Яндекс Музыки, Spotify или по названию. Какие
+  /// запросы и какой ролик подходит — youtube_match.dart
+  /// (findYoutubeUpload). Нет подходящего — _NoMatchException: лучше
+  /// пропустить трек, чем скачать чужую запись.
   Future<Video> _findOnYouTube(
     YoutubeExplode yt, {
     required String title,
     required String artist,
     int? durationMs,
   }) async {
-    final matcher = YoutubeTrackMatcher(
-        title: title, artist: artist, durationMs: durationMs);
-    final artists = splitArtists(artist);
-    final mainArtist = artists.isEmpty ? '' : artists.first;
-    final queries = mainArtist.isEmpty
-        ? [title]
-        : ['$mainArtist - $title', '$mainArtist $title topic'];
-    for (final query in queries) {
-      final results = await _throttledSearch(yt, query);
-      final byId = <String, Video>{
-        for (final v in results.take(15)) v.id.value: v,
-      };
-      final picked = matcher.pick([
-        for (final v in byId.values)
-          YoutubeCandidate(
+    final videos = <String, Video>{};
+    final picked = await findYoutubeUpload(
+      matcher: YoutubeTrackMatcher(
+          title: title, artist: artist, durationMs: durationMs),
+      title: title,
+      artist: artist,
+      search: (query) async {
+        final results = await _throttledSearch(yt, query);
+        final candidates = <YoutubeCandidate>[];
+        for (final v in results) {
+          videos.putIfAbsent(v.id.value, () => v);
+          candidates.add(YoutubeCandidate(
             id: v.id.value,
             title: v.title,
             author: v.author,
             durationMs: v.duration?.inMilliseconds,
-          ),
-      ]);
-      if (picked != null) return byId[picked.id]!;
-    }
-    throw const _NoMatchException();
+          ));
+        }
+        return candidates;
+      },
+    );
+    if (picked == null) throw const _NoMatchException();
+    return videos[picked.id]!;
   }
 
   /// Поиск с одной паузой на минуту, если YouTube ограничил запросы.
@@ -508,9 +506,9 @@ class ImporterService {
     } on _NoMatchException {
       onProgress(const ImportProgress(
         status: ImportStatus.error,
-        message: 'На YouTube нет подходящей записи',
-        error: 'Нашлись только другие версии — клипы, концерты, каверы. '
-            'Попробуй найти трек через поиск.',
+        message: 'На YouTube не нашлось той же записи',
+        error: 'Подходящих роликов нет или там только другие версии — '
+            'клипы, концерты, каверы. Попробуй найти трек через поиск.',
       ));
     } catch (e) {
       debugPrint('Ошибка импорта по названию: $e');
@@ -549,35 +547,18 @@ class ImporterService {
         throw Exception('Ошибка загрузки страницы Spotify');
       }
 
-      final html = response.data.toString();
-      final titleMatch = RegExp(r'<meta property="og:title" content="([^"]+)"')
-          .firstMatch(html);
-      final descMatch = RegExp(r'<meta name="description" content="([^"]+)"')
-          .firstMatch(html);
-
-      if (titleMatch == null || descMatch == null) {
-        throw Exception('Не удалось извлечь метаданные Spotify');
+      // Метатеги страницы: сущности раскодированы, версия — в скобках, есть
+      // длительность (spotify_page.dart). Плейлисты и альбомы — null.
+      final track = parseSpotifyTrackPage(response.data.toString());
+      if (track == null) {
+        throw Exception('Не страница трека Spotify или нет метаданных');
       }
-
-      final pageTitle = titleMatch.group(1)!;
-      final pageDesc = descMatch.group(1)!;
-      String trackTitle = pageTitle;
-      String artist = 'Unknown Artist';
-
-      if (pageDesc.contains('Song ·')) {
-        final parts = pageDesc.split('·');
-        if (parts.length >= 2) artist = parts[1].trim();
-      } else if (pageDesc.contains('Playlist ·') ||
-          pageDesc.contains('Album ·')) {
-        throw Exception(
-            'Поддерживается только импорт одиночных треков Spotify');
-      }
-
-      final query = '$artist - $trackTitle';
+      final trackTitle = track.matchTitle;
+      final artist = track.artist;
 
       onProgress(ImportProgress(
         status: ImportStatus.fetchingMeta,
-        message: 'Поиск: $query',
+        message: 'Поиск: ${artist.isEmpty ? trackTitle : '$artist - $trackTitle'}',
         progress: 0.30,
       ));
 
@@ -586,14 +567,15 @@ class ImporterService {
         final video = await _findOnYouTube(
           yt,
           title: trackTitle,
-          artist: artist == 'Unknown Artist' ? '' : artist,
+          artist: artist,
+          durationMs: track.durationMs,
         );
         await _downloadYouTubeVideo(
           yt: yt,
           video: video,
           cleanTitle: trackTitle,
           albumName: 'Spotify Import',
-          artistOverride: artist,
+          artistOverride: artist.isEmpty ? null : artist,
           onProgress: (p) => onProgress(ImportProgress(
             status: p.status,
             message: p.message,
@@ -614,9 +596,9 @@ class ImporterService {
     } on _NoMatchException {
       onProgress(const ImportProgress(
         status: ImportStatus.error,
-        message: 'На YouTube нет подходящей записи',
-        error: 'Нашлись только другие версии — клипы, концерты, каверы. '
-            'Попробуй найти трек через поиск.',
+        message: 'На YouTube не нашлось той же записи',
+        error: 'Подходящих роликов нет или там только другие версии — '
+            'клипы, концерты, каверы. Попробуй найти трек через поиск.',
       ));
     } catch (e) {
       debugPrint('Ошибка импорта Spotify: $e');
@@ -804,11 +786,11 @@ class ImporterService {
       onProgress(ImportProgress(
         status: ImportStatus.error,
         message: notFound > 0
-            ? 'На YouTube нет подходящей записи'
+            ? 'На YouTube не нашлось тех же записей'
             : 'Не удалось скачать с YouTube',
         error: notFound > 0
-            ? 'Нашлись только другие версии — клипы, концерты, каверы. '
-                'Попробуй найти трек через поиск.'
+            ? 'Подходящих роликов нет или там только другие версии — '
+                'клипы, концерты, каверы. Попробуй найти треки через поиск.'
             : 'YouTube не отдал аудио. Попробуй ещё раз позже.',
         label: label,
       ));

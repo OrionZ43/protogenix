@@ -19,8 +19,10 @@
 //   3. Длительность, если известна, расходится не больше чем на 45 с —
 //      отсекает «1 HOUR» и записи с передач.
 // Порядок среди подходящих: длительность (±3 с → неизвестна → ±15 с →
-// дальше) → официальный источник (канал исполнителя, «Артист - Topic»,
-// VEVO) → сходство и точность длительности.
+// дальше) → официальный источник (канал исполнителя, «Артист Official»,
+// «Артист - Topic», VEVO) → сходство и точность длительности.
+// Запросы — findYoutubeUpload (в конце файла): второй, с «topic», если
+// лучший ролик первого не с официального канала.
 
 import '../../library/domain/lyrics_text.dart';
 import '../../library/domain/track_query.dart';
@@ -55,6 +57,8 @@ class YoutubeTrackMatcher {
   static const _goodDiffMs = 3000;
   static const _okDiffMs = 15000;
   static const _maxDiffMs = 45000;
+  static final _officialSuffix =
+      RegExp(r'\s*\bofficial\s*$', caseSensitive: false);
 
   final List<ParsedTrack> _query;
   final int? _durationMs;
@@ -127,14 +131,21 @@ class YoutubeTrackMatcher {
     );
   }
 
+  /// Ролик с канала самого исполнителя, «Артист - Topic» или VEVO.
+  bool isOfficial(YoutubeCandidate candidate) => _isOfficial(candidate.author);
+
   /// Канал самого исполнителя (в том числе «Артист - Topic» — там альбомные
   /// записи) или VEVO.
   bool _isOfficial(String author) {
     if (author.toLowerCase().contains('vevo')) return true;
     final ourArtists = _query.first.artists;
     if (ourArtists.isEmpty) return false;
-    // parse с пустым названием отдаёт артистов из имени канала без « - Topic»
-    final uploader = TrackQueryParser.parse('-', author).artists;
+    // «Queen Official» — тоже канал исполнителя (живая проверка 2026-09-14:
+    // без этого его ролики проигрывали перезаливу фаната). parse с пустым
+    // названием отдаёт артистов из имени канала без « - Topic»
+    final uploader = TrackQueryParser.parse(
+            '-', author.replaceFirst(_officialSuffix, ''))
+        .artists;
     return uploader.isNotEmpty &&
         artistSimilarity(ourArtists, uploader) >= _officialArtist;
   }
@@ -145,6 +156,43 @@ class YoutubeTrackMatcher {
     if (a.official != b.official) return a.official ? -1 : 1;
     return b.score.compareTo(a.score);
   }
+}
+
+/// Ролик для трека: запрос «Артист - Название», а если подходящего нет или
+/// он не с официального канала (перезалив фаната, канал с текстами) — ещё
+/// «Артист Название topic»: он выводит записи с канала исполнителя. Из обеих
+/// выдач вместе выбирает [YoutubeTrackMatcher.pick] — длительность, потом
+/// официальный канал; первый же ролик официальный — второго запроса нет.
+/// [search] — поиск YouTube, в тестах подменяется. Упал добавочный запрос —
+/// остаётся то, что уже нашлось. null — подходящей записи нет.
+Future<YoutubeCandidate?> findYoutubeUpload({
+  required YoutubeTrackMatcher matcher,
+  required String title,
+  required String artist,
+  required Future<List<YoutubeCandidate>> Function(String query) search,
+}) async {
+  final artists = splitArtists(artist);
+  final mainArtist = artists.isEmpty ? '' : artists.first;
+  final queries = mainArtist.isEmpty
+      ? [title]
+      : ['$mainArtist - $title', '$mainArtist $title topic'];
+  final seen = <String, YoutubeCandidate>{};
+  YoutubeCandidate? picked;
+  for (final query in queries) {
+    final List<YoutubeCandidate> results;
+    try {
+      results = await search(query);
+    } catch (_) {
+      if (picked != null) break;
+      rethrow;
+    }
+    for (final c in results.take(15)) {
+      seen.putIfAbsent(c.id, () => c);
+    }
+    picked = matcher.pick(seen.values);
+    if (picked != null && matcher.isOfficial(picked)) break;
+  }
+  return picked;
 }
 
 class _Match {
