@@ -41,12 +41,10 @@ class QueuePanel extends ConsumerWidget {
                 index: index,
                 palette: palette,
                 isPlaying: player.isPlaying,
-                onTap: () {
-                  ref.read(playerProvider.notifier).loadPlaylist(
-                        queue,
-                        initialIndex: index,
-                      );
-                },
+                // Переход внутри очереди, без перезагрузки: иначе при
+                // перемешивании очередь перемешалась бы заново
+                onTap: () =>
+                    ref.read(playerProvider.notifier).skipToIndex(index),
               )
                   .animate(delay: Duration(milliseconds: 80 * index))
                   .fadeIn(duration: 400.ms)

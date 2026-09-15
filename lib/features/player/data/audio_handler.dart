@@ -60,13 +60,15 @@ class ProtogenixAudioHandler extends BaseAudioHandler
   @override
   Future<void> skipToPrevious() => _player.seekToPrevious();
 
+  /// Перемешивание делает PlayerNotifier — перестановкой очереди
+  /// (queue_shuffle.dart); у плеера оно всегда выключено. На Windows
+  /// just_audio_media_kit передаёт его в mpv (playlist-shuffle), mpv
+  /// переставляет свой плейлист, и индекс текущего трека приходит уже в
+  /// перемешанном порядке: название и обложка разъезжались со звуком.
+  /// Здесь режим только отражается в медиасессии.
   @override
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
-    final enabled = shuffleMode != AudioServiceShuffleMode.none;
-    await _player.setShuffleModeEnabled(enabled);
-    if (enabled) {
-      await _player.shuffle();
-    }
+    playbackState.add(playbackState.value.copyWith(shuffleMode: shuffleMode));
   }
 
   @override
@@ -84,10 +86,12 @@ class ProtogenixAudioHandler extends BaseAudioHandler
     required List<MediaItem> items,
     required List<AudioSource> sources,
     int initialIndex = 0,
+    Duration? initialPosition,
   }) async {
     queue.add(items);
     final playlist = ConcatenatingAudioSource(children: sources);
-    await _player.setAudioSource(playlist, initialIndex: initialIndex);
+    await _player.setAudioSource(playlist,
+        initialIndex: initialIndex, initialPosition: initialPosition);
   }
 
   void _broadcastState(PlaybackEvent event) {

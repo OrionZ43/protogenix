@@ -16,6 +16,7 @@ import '../../../../core/services/app_visibility.dart';
 import '../../data/audio_handler.dart';
 import '../../data/eq_settings_store.dart';
 import '../../domain/player_state.dart';
+import '../../domain/queue_shuffle.dart';
 import '../../domain/track_model.dart';
 import 'palette_provider.dart';
 import '../../../library/data/library_database.dart';
@@ -151,7 +152,8 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
 
     final insertIndex = state.currentIndex + 1;
     newQueue.insert(insertIndex, track);
-    await loadPlaylist(newQueue, initialIndex: insertIndex);
+    _addToUnshuffled(track, after: state.currentTrack);
+    await _load(newQueue, initialIndex: insertIndex);
   }
 
   /// Добавить трек в конец очереди без прерывания воспроизведения.
@@ -165,28 +167,56 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     }
 
     newQueue.add(track);
+    _addToUnshuffled(track);
     final currentIdx = state.currentIndex;
     final currentPos = state.position;
-    await loadPlaylist(newQueue, initialIndex: currentIdx);
+    await _load(newQueue, initialIndex: currentIdx);
     await seekTo(currentPos);
   }
 
   // ── Загрузка плейлиста (Оптимизировано Bolt) ──────────────────────────────
 
+  /// Новая очередь (медиатека, плейлист, избранное, «Играть»). При включённом
+  /// перемешивании трек [initialIndex] встаёт первым, остальные — вразброс, а
+  /// исходный порядок запоминается до выключения (queue_shuffle.dart).
   Future<void> loadPlaylist(Iterable<TrackModel> tracks,
-      {int initialIndex = 0}) async {
+          {int initialIndex = 0}) =>
+      _load(tracks, initialIndex: initialIndex, applyShuffle: true);
+
+  /// Номер последней начатой загрузки очереди. Пока одна загрузка собирает
+  /// источники, может начаться другая (перемешивание во время загрузки
+  /// медиатеки при запуске) — в плеер уходит только самая новая.
+  int _loadGeneration = 0;
+
+  /// Загрузка очереди в плеер. [applyShuffle] — только для новой очереди:
+  /// playNext, addToQueue и само перемешивание передают порядок как есть.
+  Future<void> _load(
+    Iterable<TrackModel> tracks, {
+    int initialIndex = 0,
+    Duration? initialPosition,
+    bool applyShuffle = false,
+  }) async {
+    final generation = ++_loadGeneration;
     state = state.copyWith(isLoading: true);
 
     // Уступаем поток UI для предотвращения джанка (Jank)
     await Future.microtask(() {});
 
     // Ленивое преобразование в список
-    final tracksList = tracks is List<TrackModel> ? tracks : tracks.toList();
+    var tracksList = tracks is List<TrackModel> ? tracks : tracks.toList();
+    var index = initialIndex;
+    if (applyShuffle) {
+      _unshuffledQueue = state.isShuffle ? List.of(tracksList) : null;
+      if (state.isShuffle && tracksList.length > 1) {
+        tracksList = shuffleAround(tracksList, index);
+        index = 0;
+      }
+    }
 
     state = state.copyWith(
       queue: tracksList,
-      currentIndex: initialIndex,
-      currentTrack: tracksList.isNotEmpty ? tracksList[initialIndex] : null,
+      currentIndex: index,
+      currentTrack: tracksList.isNotEmpty ? tracksList[index] : null,
     );
 
     if (tracksList.isEmpty) {
@@ -205,22 +235,27 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
         .toList();
 
     final audioSources = await Future.wait(tracksList.map((t) => t.toAudioSource()));
+    // Пока собирались источники, началась загрузка новее — в плеер уйдёт она
+    if (generation != _loadGeneration) return;
 
     try {
       await _handler.loadPlaylist(
         items: mediaItems,
         sources: audioSources,
-        initialIndex: initialIndex,
+        initialIndex: index,
+        initialPosition: initialPosition,
       );
       unawaited(_restoreEq());
       if (tracksList.isNotEmpty) {
-        _updatePalette(tracksList[initialIndex]);
+        _updatePalette(tracksList[index]);
       }
     } catch (e) {
       debugPrint('loadPlaylist error: $e');
     }
 
-    if (mounted) state = state.copyWith(isLoading: false);
+    if (mounted && generation == _loadGeneration) {
+      state = state.copyWith(isLoading: false);
+    }
   }
 
   // ── Плавное изменение громкости (Fade) ────────────────────────────────────
@@ -290,12 +325,71 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     if (mounted) state = state.copyWith(speed: speed);
   }
 
-  void toggleShuffle() {
-    final newShuffle = !state.isShuffle;
-    _handler.setShuffleMode(
-      newShuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
-    );
-    if (mounted) state = state.copyWith(isShuffle: newShuffle);
+  /// Порядок очереди до включения перемешивания; null — перемешивание
+  /// выключено.
+  List<TrackModel>? _unshuffledQueue;
+
+  /// Перемешивание — перестановкой нашей очереди, а не режимом плеера
+  /// (queue_shuffle.dart, known-issues.md). Текущий трек продолжает играть с
+  /// того же места; очередь перезагружается, поэтому возможна короткая
+  /// заминка звука — как у «Добавить в очередь».
+  Future<void> toggleShuffle() async {
+    final shuffle = !state.isShuffle;
+    unawaited(_handler.setShuffleMode(
+      shuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
+    ));
+    final queue = List<TrackModel>.from(state.queue.cast<TrackModel>());
+    final current = state.currentTrack;
+    final currentIndex = state.currentIndex;
+    final position = state.position;
+    if (mounted) state = state.copyWith(isShuffle: shuffle);
+    if (queue.length < 2 || current is! TrackModel) {
+      _unshuffledQueue = shuffle ? queue : null;
+      return;
+    }
+
+    final List<TrackModel> ordered;
+    final int index;
+    if (shuffle) {
+      _unshuffledQueue = queue;
+      ordered = shuffleAround(queue, currentIndex);
+      index = 0;
+    } else {
+      final restored = unshuffle(
+        original: _unshuffledQueue ?? queue,
+        shuffled: queue,
+        current: current,
+        key: (t) => t.id,
+      );
+      _unshuffledQueue = null;
+      ordered = restored.queue;
+      index = restored.index;
+    }
+    // «Остановить после трека» помнит индекс, а трек переехал
+    if (_stopAfterTrackIndex != null) _stopAfterTrackIndex = index;
+    await _load(ordered, initialIndex: index, initialPosition: position);
+  }
+
+  /// Трек, добавленный в перемешанную очередь, — и в исходный порядок: после
+  /// [after] (играющего) или в конец, чтобы после выключения перемешивания он
+  /// оказался на своём месте.
+  void _addToUnshuffled(TrackModel track, {Object? after}) {
+    final original = _unshuffledQueue;
+    if (original == null) return;
+    final i =
+        after == null ? -1 : original.indexWhere((t) => identical(t, after));
+    if (i < 0) {
+      original.add(track);
+    } else {
+      original.insert(i + 1, track);
+    }
+  }
+
+  /// Перейти к треку очереди (панель «Далее») — без перезагрузки очереди.
+  Future<void> skipToIndex(int index) async {
+    if (index < 0 || index >= state.queue.length) return;
+    await _player.seek(Duration.zero, index: index);
+    if (!_player.playing) await _handler.play();
   }
 
   void toggleRepeat() {
