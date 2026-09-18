@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -8,10 +9,12 @@ import 'package:file_picker/file_picker.dart';
 import '../data/device_music.dart';
 import '../data/importer_service.dart';
 import '../data/local_tags.dart';
+import '../data/spotify_page.dart';
 import 'import_manager.dart';
 import '../../../core/services/android_permissions.dart';
 import '../../../core/widgets/accent_button.dart';
 import '../../../core/widgets/chip_button.dart';
+import '../../../core/widgets/glass_dialog.dart';
 import '../../player/presentation/providers/palette_provider.dart';
 
 class ImporterSheet extends ConsumerStatefulWidget {
@@ -28,11 +31,49 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
   ImportProgress? _notice;
   bool _scanning = false;
 
+  /// Вставили ссылку на плейлист Spotify — под полем предупреждение
+  /// (_SpotifyLimitHint): без входа в аккаунт Spotify отдаёт не весь список.
+  bool _spotifyPlaylist = false;
+  late final TapGestureRecognizer _whyTap;
+
+  @override
+  void initState() {
+    super.initState();
+    _whyTap = TapGestureRecognizer()..onTap = _showSpotifyLimitInfo;
+    _controller.addListener(_onUrlChanged);
+  }
+
   @override
   void dispose() {
+    _whyTap.dispose();
     _controller.dispose();
     super.dispose();
   }
+
+  void _onUrlChanged() {
+    // Альбом приходит целиком, предупреждать не о чем — только плейлист
+    // (spotify_page.dart).
+    final isPlaylist =
+        parseSpotifyLink(_controller.text)?.kind == SpotifyLinkKind.playlist;
+    if (isPlaylist != _spotifyPlaylist) {
+      setState(() => _spotifyPlaylist = isPlaylist);
+    }
+  }
+
+  void _showSpotifyLimitInfo() => showGlassInfo(
+        context,
+        title: 'Почему только $kSpotifyEmbedTrackLimit?',
+        message:
+            'Без входа в аккаунт Spotify показывает чужому приложению только '
+            'начало плейлиста — первые $kSpotifyEmbedTrackLimit треков. '
+            'Их Protogenix и скачает.\n\n'
+            'Войти за тебя приложение не может: такой доступ Spotify выдаёт '
+            'только компаниям по договору, обычным разработчикам — нет.\n\n'
+            'Альбомов это не касается, они приходят целиком. А большой '
+            'плейлист можно разбить на несколько поменьше.',
+        icon: Icons.info_outline_rounded,
+        color: ref.read(paletteProvider).primary,
+      );
 
   void _startImport() {
     final url = _controller.text.trim();
@@ -133,6 +174,35 @@ class _ImporterSheetState extends ConsumerState<ImporterSheet> {
                             ],
                           ),
                         ),
+                        if (_spotifyPlaylist)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10, left: 4),
+                            child: Text.rich(
+                              TextSpan(
+                                style: TextStyle(
+                                  color: Colors.white.withAlpha(140),
+                                  fontSize: 12,
+                                  height: 1.35,
+                                ),
+                                children: [
+                                  const TextSpan(
+                                    text: 'Из плейлиста Spotify скачаются '
+                                        'только первые '
+                                        '$kSpotifyEmbedTrackLimit треков. ',
+                                  ),
+                                  TextSpan(
+                                    text: 'Почему?',
+                                    style: TextStyle(
+                                      color: accent,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: accent,
+                                    ),
+                                    recognizer: _whyTap,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         const SizedBox(height: 16),
 
                         // Кнопка импорта — единый акцентный цвет

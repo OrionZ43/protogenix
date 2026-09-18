@@ -163,7 +163,7 @@ class _JobCardState extends ConsumerState<_JobCard> {
               const SizedBox(height: 10),
               Text(
                 importText(progress),
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: error

@@ -2,7 +2,8 @@
 //
 // Подтверждение в стиле приложения: тёмное стекло, иконка в круге, кнопки-
 // таблетки. Вместо стандартного AlertDialog: тот с кнопками-надписями
-// выбивался из шторок и плашек.
+// выбивался из шторок и плашек. showGlassInfo — то же окно с одной кнопкой,
+// для объяснений.
 
 import 'package:flutter/material.dart';
 
@@ -33,6 +34,29 @@ Future<bool> showGlassConfirm(
   return confirmed ?? false;
 }
 
+/// То же окно, но с одной кнопкой: объяснение, а не выбор. [color] — иконка
+/// и кнопка; для акцента передавать цвет обложки (paletteProvider).
+Future<void> showGlassInfo(
+  BuildContext context, {
+  required String title,
+  required String message,
+  String buttonLabel = 'Понятно',
+  IconData icon = Icons.info_outline_rounded,
+  Color? color,
+}) =>
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withAlpha(120),
+      builder: (_) => _GlassConfirm(
+        title: title,
+        message: message,
+        confirmLabel: buttonLabel,
+        icon: icon,
+        color: color ?? Colors.white,
+        withCancel: false,
+      ),
+    );
+
 class _GlassConfirm extends StatelessWidget {
   const _GlassConfirm({
     required this.title,
@@ -40,6 +64,7 @@ class _GlassConfirm extends StatelessWidget {
     required this.confirmLabel,
     required this.icon,
     required this.color,
+    this.withCancel = true,
   });
 
   final String title;
@@ -47,6 +72,7 @@ class _GlassConfirm extends StatelessWidget {
   final String confirmLabel;
   final IconData icon;
   final Color color;
+  final bool withCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -87,26 +113,34 @@ class _GlassConfirm extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(150),
-                      fontSize: 14,
-                      height: 1.4,
+                  // Длинное объяснение (showGlassInfo) прокручивается: без
+                  // Flexible оно вылезало за экран на невысоких окнах
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withAlpha(150),
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
                   Row(
                     children: [
-                      Expanded(
-                        child: ChipButton(
-                          label: 'Отмена',
-                          padding: buttonPadding,
-                          onTap: () => Navigator.of(context).pop(false),
+                      if (withCancel) ...[
+                        Expanded(
+                          child: ChipButton(
+                            label: 'Отмена',
+                            padding: buttonPadding,
+                            onTap: () => Navigator.of(context).pop(false),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
+                        const SizedBox(width: 12),
+                      ],
                       Expanded(
                         child: ChipButton(
                           label: confirmLabel,
