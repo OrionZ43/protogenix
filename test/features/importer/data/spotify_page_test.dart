@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:protogenix/features/importer/data/spotify_page.dart';
 import 'package:protogenix/features/importer/data/youtube_match.dart';
@@ -123,5 +125,149 @@ void main() {
           durationMs: 220000),
     ]);
     expect(picked?.id, 'remix');
+  });
+
+  // ── Ссылка ────────────────────────────────────────────────────────────────
+
+  test('ссылка: трек, альбом, плейлист, язык в пути, хвост si=', () {
+    final track = parseSpotifyLink(
+        'https://open.spotify.com/track/4u7EnebtmKWzUH433cf5Qv?si=abc')!;
+    expect(track.kind, SpotifyLinkKind.track);
+    expect(track.id, '4u7EnebtmKWzUH433cf5Qv');
+    expect(track.isCollection, isFalse);
+    expect(track.pageUrl,
+        'https://open.spotify.com/track/4u7EnebtmKWzUH433cf5Qv');
+
+    final playlist = parseSpotifyLink(
+        'https://open.spotify.com/playlist/3qDD9XgaWAKwMaQ89uzcIc')!;
+    expect(playlist.kind, SpotifyLinkKind.playlist);
+    expect(playlist.isCollection, isTrue);
+    expect(playlist.embedUrl,
+        'https://open.spotify.com/embed/playlist/3qDD9XgaWAKwMaQ89uzcIc');
+
+    final album = parseSpotifyLink(
+        'https://open.spotify.com/intl-ru/album/3T4tUhGYeRNVUGevb0wThu')!;
+    expect(album.kind, SpotifyLinkKind.album);
+    expect(album.id, '3T4tUhGYeRNVUGevb0wThu');
+  });
+
+  test('ссылка: чужой адрес, исполнитель и мусорный id — не импортируем', () {
+    expect(parseSpotifyLink('https://music.yandex.ru/album/123'), isNull);
+    expect(
+        parseSpotifyLink(
+            'https://open.spotify.com/artist/1dfeR4HaWDbWqFHLkxsg1d'),
+        isNull);
+    expect(parseSpotifyLink('https://open.spotify.com/playlist/../secret'),
+        isNull);
+    expect(parseSpotifyLink('https://open.spotify.com/'), isNull);
+  });
+
+  // ── Встраиваемая страница ─────────────────────────────────────────────────
+
+  /// Встраиваемая страница в том виде, в каком её отдаёт Spotify: разметка
+  /// и __NEXT_DATA__ сняты с настоящей страницы 2026-09-18.
+  String embed(Map<String, Object?> entity) {
+    final data = jsonEncode({
+      'props': {
+        'pageProps': {
+          'state': {
+            'data': {'entity': entity}
+          }
+        }
+      }
+    });
+    return '<html><body><div id="__next"></div>'
+        '<script id="__NEXT_DATA__" type="application/json">$data</script>'
+        '</body></html>';
+  }
+
+  Map<String, Object?> spotifyItem(
+    String id,
+    String title,
+    String subtitle,
+    int duration, {
+    bool playable = true,
+  }) =>
+      {
+        'uri': 'spotify:track:$id',
+        'title': title,
+        'subtitle': subtitle,
+        'duration': duration,
+        'isPlayable': playable,
+      };
+
+  test('плейлист: название, треки, версия в скобках', () {
+    final collection = parseSpotifyEmbedCollection(embed({
+      'type': 'playlist',
+      'name': 'Ня',
+      'title': 'Ня',
+      'trackList': [
+        spotifyItem('a1', 'Under Pressure - Remastered 2011',
+            'Queen, David Bowie', 248000),
+        spotifyItem('a2', 'Кукла', 'Кино', 205000),
+      ],
+    }))!;
+
+    expect(collection.title, 'Ня');
+    expect(collection.sourceName, 'Spotify');
+    expect(collection.tracks.length, 2);
+    expect(collection.tracks.first.title, 'Under Pressure (Remastered 2011)');
+    expect(collection.tracks.first.artists, 'Queen, David Bowie');
+    expect(collection.tracks.first.durationMs, 248000);
+    expect(collection.tracks.last.artists, 'Кино');
+    expect(collection.unavailable, 0);
+  });
+
+  test('недоступные треки считаются, подкасты пропускаются', () {
+    final collection = parseSpotifyEmbedCollection(embed({
+      'type': 'playlist',
+      'name': 'Смесь',
+      'trackList': [
+        spotifyItem('a1', 'Believer', 'Imagine Dragons', 204000),
+        spotifyItem('a2', 'Удалённый трек', 'Кто-то', 200000, playable: false),
+        {
+          'uri': 'spotify:episode:e1',
+          'title': 'Выпуск подкаста',
+          'subtitle': 'Подкаст',
+          'duration': 3600000,
+          'isPlayable': true,
+        },
+      ],
+    }))!;
+
+    expect(collection.tracks.length, 1);
+    expect(collection.tracks.single.title, 'Believer');
+    expect(collection.unavailable, 1);
+  });
+
+  test('не та страница или пустой список — null', () {
+    expect(parseSpotifyEmbedCollection('<html></html>'), isNull);
+    expect(
+        parseSpotifyEmbedCollection(
+            '<script id="__NEXT_DATA__">не json</script>'),
+        isNull);
+    expect(
+        parseSpotifyEmbedCollection(
+            embed({'type': 'playlist', 'name': 'Пусто', 'trackList': []})),
+        isNull);
+  });
+
+  test('сколько треков в коллекции — из описания обычной страницы', () {
+    expect(
+        parseSpotifyCollectionSize(page(
+            'Ня', 'Listen to Ня on Spotify. Playlist · Ня · 446 items')),
+        446);
+    expect(
+        parseSpotifyCollectionSize(page('Divide',
+            'Listen to Divide on Spotify. Ed Sheeran · Album · 2017 · 16 songs.')),
+        16);
+    expect(
+        parseSpotifyCollectionSize(page('Большой',
+            'Listen on Spotify. Playlist · Spotify · 1,234 items')),
+        1234);
+    expect(
+        parseSpotifyCollectionSize(
+            page('Кукла', 'Слушай «Кукла» на Spotify. Песня · Кино · 1988')),
+        isNull);
   });
 }

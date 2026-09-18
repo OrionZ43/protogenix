@@ -24,8 +24,9 @@ import '../../../core/services/app_paths.dart';
 import '../../../core/services/youtube_clients.dart';
 import 'device_music.dart';
 import 'local_tags.dart';
+import '../domain/import_collection.dart';
 import 'spotify_page.dart';
-import 'yandex_library_index.dart';
+import 'imported_tracks_index.dart';
 import 'yandex_music.dart';
 import 'youtube_match.dart';
 
@@ -117,7 +118,8 @@ class ImporterService {
       }
 
       if (_isSpotify(url)) {
-        await _importSpotify(url: url, onProgress: onProgress);
+        await _importSpotify(
+            url: url, onProgress: onProgress, control: control);
       } else if (_isYandexMusic(url)) {
         await _importYandexMusic(
             url: url, onProgress: onProgress, control: control);
@@ -415,7 +417,7 @@ class ImporterService {
   /// наверх как RequestLimitExceededException.
   Future<Video?> _findWithBackoff(
     YoutubeExplode yt,
-    YandexTrack track,
+    ImportTrack track,
     ImportControl? control, {
     required void Function() onPause,
   }) async {
@@ -527,6 +529,43 @@ class ImporterService {
   Future<void> _importSpotify({
     required String url,
     required void Function(ImportProgress) onProgress,
+    ImportControl? control,
+  }) async {
+    final link = parseSpotifyLink(url);
+    if (link == null) {
+      onProgress(const ImportProgress(
+        status: ImportStatus.error,
+        message: 'Эту ссылку Spotify импорт не понимает',
+        error: 'Подойдёт ссылка на трек, альбом или плейлист.',
+      ));
+      return;
+    }
+    if (link.isCollection) {
+      await _importSpotifyCollection(
+          link: link, onProgress: onProgress, control: control);
+      return;
+    }
+    await _importSpotifyTrack(link: link, onProgress: onProgress);
+  }
+
+  /// Страница Spotify как есть: списка треков в ней нет, но метатеги на месте.
+  Future<String> _fetchSpotifyPage(String url) async {
+    final response = await _dio.get(
+      url,
+      options: Options(headers: {
+        'User-Agent': 'curl/7.81.0',
+        'Accept': '*/*',
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Spotify ответил ${response.statusCode}');
+    }
+    return response.data.toString();
+  }
+
+  Future<void> _importSpotifyTrack({
+    required SpotifyLink link,
+    required void Function(ImportProgress) onProgress,
   }) async {
     onProgress(const ImportProgress(
       status: ImportStatus.fetchingMeta,
@@ -535,21 +574,9 @@ class ImporterService {
     ));
 
     try {
-      final response = await _dio.get(
-        url,
-        options: Options(headers: {
-          'User-Agent': 'curl/7.81.0',
-          'Accept': '*/*',
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Ошибка загрузки страницы Spotify');
-      }
-
       // Метатеги страницы: сущности раскодированы, версия — в скобках, есть
-      // длительность (spotify_page.dart). Плейлисты и альбомы — null.
-      final track = parseSpotifyTrackPage(response.data.toString());
+      // длительность (spotify_page.dart).
+      final track = parseSpotifyTrackPage(await _fetchSpotifyPage(link.pageUrl));
       if (track == null) {
         throw Exception('Не страница трека Spotify или нет метаданных');
       }
@@ -610,6 +637,70 @@ class ImporterService {
     }
   }
 
+  /// Альбом или плейлист Spotify. Список треков — со встраиваемой страницы
+  /// (spotify_page.dart), дальше всё как у Яндекса: поиск и скачивание
+  /// с YouTube, плейлист в медиатеке.
+  Future<void> _importSpotifyCollection({
+    required SpotifyLink link,
+    required void Function(ImportProgress) onProgress,
+    ImportControl? control,
+  }) async {
+    onProgress(const ImportProgress(
+      status: ImportStatus.fetchingMeta,
+      message: 'Получение данных со Spotify...',
+      progress: 0.05,
+    ));
+
+    ImportCollection? collection;
+    try {
+      collection =
+          parseSpotifyEmbedCollection(await _fetchSpotifyPage(link.embedUrl));
+    } catch (e) {
+      debugPrint('[Spotify] ${link.embedUrl}: $e');
+      onProgress(const ImportProgress(
+        status: ImportStatus.error,
+        message: 'Ошибка импорта Spotify',
+        error: 'Spotify не отдал список треков. Проверь ссылку — плейлист '
+            'должен быть открытым — или попробуй ещё раз позже.',
+      ));
+      return;
+    }
+
+    if (collection == null) {
+      onProgress(const ImportProgress(
+        status: ImportStatus.error,
+        message: 'Ошибка импорта Spotify',
+        error: 'Здесь нет доступных треков.',
+      ));
+      return;
+    }
+
+    // Плейлист Spotify отдаёт обрезанным (spotify_page.dart). Сколько в нём
+    // треков на самом деле, знает обычная страница — спрашиваем её только
+    // тогда, когда список упёрся в предел.
+    if (collection.tracks.length + collection.unavailable >=
+        kSpotifyEmbedTrackLimit) {
+      final total = await _spotifyCollectionSize(link);
+      final got = collection.tracks.length + collection.unavailable;
+      collection = collection.withNote(total != null && total > got
+          ? 'Spotify без входа отдаёт только первые $got из $total'
+          : 'Spotify без входа отдаёт только первые $got');
+    }
+
+    await _importCollection(collection, onProgress, control);
+  }
+
+  /// Сколько треков в плейлисте или альбоме по описанию обычной страницы.
+  /// null — страница не ответила или числа в описании нет.
+  Future<int?> _spotifyCollectionSize(SpotifyLink link) async {
+    try {
+      return parseSpotifyCollectionSize(await _fetchSpotifyPage(link.pageUrl));
+    } catch (e) {
+      debugPrint('[Spotify] ${link.pageUrl}: $e');
+      return null;
+    }
+  }
+
   // ── Yandex Music ──────────────────────────────────────────────────────────
 
   // Список треков — из API Яндекса (yandex_music.dart), сами треки — с YouTube.
@@ -634,7 +725,7 @@ class ImporterService {
       return;
     }
 
-    final YandexCollection collection;
+    final ImportCollection collection;
     try {
       collection = await YandexMusicApi().fetch(link);
     } on YandexMusicException catch (e) {
@@ -655,17 +746,18 @@ class ImporterService {
       return;
     }
 
-    await _importYandexCollection(collection, onProgress, control);
+    await _importCollection(collection, onProgress, control);
   }
 
-  /// Треки из Яндекса ищутся и качаются с YouTube. Альбом или плейлист
+  /// Общий путь для Яндекс Музыки и Spotify: треки коллекции ищутся
+  /// и качаются с YouTube. Альбом или плейлист
   /// становится плейлистом Protogenix (_playlistNamed), отдельный трек —
   /// просто трек медиатеки. Уже скачанные треки не ищутся и не качаются
-  /// заново (YandexLibraryIndex): повторный импорт той же ссылки — после
+  /// заново (ImportedTracksIndex): повторный импорт той же ссылки — после
   /// прерванного или когда в плейлист добавили песен — сразу переходит к
   /// недостающим. Остановка — между треками (ImportControl).
-  Future<void> _importYandexCollection(
-    YandexCollection collection,
+  Future<void> _importCollection(
+    ImportCollection collection,
     void Function(ImportProgress) onProgress, [
     ImportControl? control,
   ]) async {
@@ -679,7 +771,7 @@ class ImporterService {
     var stopped = false;
     var rateLimited = false;
     final known =
-        YandexLibraryIndex(await LibraryDatabase.instance.getAllTracks());
+        ImportedTracksIndex(await LibraryDatabase.instance.getAllTracks());
 
     final yt = YoutubeExplode();
     try {
@@ -695,7 +787,7 @@ class ImporterService {
         final ofTotal = single ? '' : ' (${i + 1} из ${tracks.length})';
         final base = i / tracks.length;
         final step = 1 / tracks.length;
-        // То же, что уходит в альбом трека: по нему YandexLibraryIndex
+        // То же, что уходит в альбом трека: по нему ImportedTracksIndex
         // узнаёт трек при повторном импорте
         final album = track.album ?? collection.title;
 
@@ -773,9 +865,9 @@ class ImporterService {
           break;
         } on _NoMatchException {
           notFound++;
-          debugPrint('[Yandex] Нет подходящей записи: "$query"');
+          debugPrint('[Импорт] Нет подходящей записи: "$query"');
         } catch (e) {
-          debugPrint('[Yandex] Пропуск "$query": $e');
+          debugPrint('[Импорт] Пропуск "$query": $e');
         }
       }
     } finally {
@@ -801,7 +893,8 @@ class ImporterService {
       if (alreadyHad > 0) 'уже были: $alreadyHad',
       if (notFound > 0) 'не нашлось на YouTube: $notFound',
       if (collection.unavailable > 0)
-        'недоступны в самом Яндексе: ${collection.unavailable}',
+        'недоступны в самом ${collection.sourceName}: ${collection.unavailable}',
+      if (collection.note != null) collection.note!,
     ];
     final tail = notes.isEmpty ? '' : ', ${notes.join(', ')}';
     onProgress(ImportProgress(
@@ -1095,7 +1188,9 @@ class ImporterService {
   bool _isYouTube(String url) =>
       url.contains('youtube.com') || url.contains('youtu.be');
   bool _isSoundCloud(String url) => url.contains('soundcloud.com');
-  bool _isSpotify(String url) => url.contains('open.spotify.com');
+  // Любой домен Spotify: непонятный вид ссылки (исполнитель, подкаст) получит
+  // своё сообщение в _importSpotify, а не «неизвестный формат»
+  bool _isSpotify(String url) => url.contains('spotify.com');
   // Любой домен Яндекс Музыки; непонятный вид ссылки (исполнитель) получит
   // своё сообщение в _importYandexMusic, а не «неизвестный формат»
   bool _isYandexMusic(String url) =>

@@ -13,6 +13,7 @@
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../domain/import_collection.dart';
 
 enum YandexLinkKind { track, album, userPlaylist, playlistUuid }
 
@@ -69,41 +70,6 @@ class YandexLink {
   }
 }
 
-class YandexTrack {
-  const YandexTrack({
-    required this.title,
-    required this.artists,
-    this.durationMs,
-    this.coverUrl,
-    this.album,
-  });
-
-  /// Название вместе с версией: «Believer (Remix)».
-  final String title;
-
-  /// Все исполнители через запятую; пусто, если Яндекс их не отдал.
-  final String artists;
-  final int? durationMs;
-  final String? coverUrl;
-  final String? album;
-}
-
-class YandexCollection {
-  const YandexCollection({
-    required this.title,
-    required this.tracks,
-    this.isSingleTrack = false,
-    this.unavailable = 0,
-  });
-
-  final String title;
-  final List<YandexTrack> tracks;
-  final bool isSingleTrack;
-
-  /// Сколько треков пропущено: в самом Яндексе они недоступны.
-  final int unavailable;
-}
-
 /// [message] — готовый текст для пользователя; подробности — в логе.
 class YandexMusicException implements Exception {
   const YandexMusicException(this.message);
@@ -131,7 +97,7 @@ class YandexMusicApi {
       'Яндекс Музыка не открывается через VPN. Выключи VPN на время импорта '
       'и вставь ссылку ещё раз.';
 
-  Future<YandexCollection> fetch(YandexLink link) async {
+  Future<ImportCollection> fetch(YandexLink link) async {
     switch (link.kind) {
       case YandexLinkKind.track:
         final result = await _get('/tracks/${link.id}');
@@ -141,7 +107,8 @@ class YandexMusicApi {
               'Этот трек недоступен в Яндекс Музыке');
         }
         final track = parsed.tracks.first;
-        return YandexCollection(
+        return ImportCollection(
+          sourceName: 'Яндексе',
           title: track.album ?? track.title,
           tracks: [track],
           isSingleTrack: true,
@@ -186,7 +153,7 @@ class YandexMusicApi {
 
   // ── Разбор ответов API (без сети, покрыт тестами) ─────────────────────────
 
-  static YandexCollection parseAlbum(Object? result) {
+  static ImportCollection parseAlbum(Object? result) {
     if (result is! Map) {
       throw const YandexMusicException('Не удалось прочитать альбом');
     }
@@ -197,14 +164,15 @@ class YandexMusicApi {
           if (volume is List) ...volume,
     ];
     final parsed = parseTracks(items);
-    return YandexCollection(
+    return ImportCollection(
+      sourceName: 'Яндексе',
       title: _text(result['title']) ?? 'Альбом Яндекс Музыки',
       tracks: parsed.tracks,
       unavailable: parsed.unavailable,
     );
   }
 
-  static YandexCollection parsePlaylist(Object? result) {
+  static ImportCollection parsePlaylist(Object? result) {
     // Старый вид ответа заворачивал плейлист в {"playlist": {…}}
     final playlist =
         result is Map && result['playlist'] is Map ? result['playlist'] : result;
@@ -213,7 +181,8 @@ class YandexMusicApi {
     }
     final tracks = playlist['tracks'];
     final parsed = parseTracks(tracks is List ? tracks : const []);
-    return YandexCollection(
+    return ImportCollection(
+      sourceName: 'Яндексе',
       title: _text(playlist['title']) ?? 'Плейлист Яндекс Музыки',
       tracks: parsed.tracks,
       unavailable: parsed.unavailable,
@@ -221,9 +190,9 @@ class YandexMusicApi {
   }
 
   /// Элемент списка — сам трек или обёртка `{id, track: {…}}` (в плейлистах).
-  static ({List<YandexTrack> tracks, int unavailable}) parseTracks(
+  static ({List<ImportTrack> tracks, int unavailable}) parseTracks(
       Iterable<Object?> items) {
-    final tracks = <YandexTrack>[];
+    final tracks = <ImportTrack>[];
     var unavailable = 0;
     for (final item in items) {
       if (item is! Map) continue;
@@ -238,7 +207,7 @@ class YandexMusicApi {
     return (tracks: tracks, unavailable: unavailable);
   }
 
-  static YandexTrack? parseTrack(Map json) {
+  static ImportTrack? parseTrack(Map json) {
     final title = _text(json['title']);
     if (title == null) return null;
     final version = _text(json['version']);
@@ -249,7 +218,7 @@ class YandexMusicApi {
             ? albums.first as Map
             : null;
     final duration = json['durationMs'];
-    return YandexTrack(
+    return ImportTrack(
       title: version == null ? title : '$title ($version)',
       artists: [
         if (artists is List)

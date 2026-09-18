@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:protogenix/features/importer/data/yandex_library_index.dart';
-import 'package:protogenix/features/importer/data/yandex_music.dart';
+import 'package:protogenix/features/importer/data/imported_tracks_index.dart';
+import 'package:protogenix/features/importer/domain/import_collection.dart';
 import 'package:protogenix/features/library/domain/library_track.dart';
 
-// Трек в медиатеке — так, как его сохраняет импорт из Яндекса
-// (_importYandexCollection → _downloadYouTubeVideo): название с версией,
+// Трек в медиатеке — так, как его сохраняет импорт коллекции
+// (_importCollection → _downloadYouTubeVideo): название с версией,
 // все исполнители, альбом трека.
 LibraryTrack stored(String id, String title, String artist, String album,
         {DateTime? addedAt}) =>
@@ -20,28 +20,28 @@ LibraryTrack stored(String id, String title, String artist, String album,
     );
 
 void main() {
-  const believer = YandexTrack(
+  const believer = ImportTrack(
     title: 'Believer',
     artists: 'Imagine Dragons',
     album: 'Evolve',
   );
 
   test('узнаёт скачанный трек по названию, исполнителям и альбому', () {
-    final index = YandexLibraryIndex([
+    final index = ImportedTracksIndex([
       stored('vid1', 'Believer', 'Imagine Dragons', 'Evolve'),
     ]);
     expect(index.find(believer, album: 'Evolve'), 'vid1');
   });
 
   test('регистр и лишние пробелы не мешают', () {
-    final index = YandexLibraryIndex([
+    final index = ImportedTracksIndex([
       stored('vid1', ' believer ', 'Imagine  Dragons', 'EVOLVE'),
     ]);
     expect(index.find(believer, album: 'Evolve'), 'vid1');
   });
 
   test('другая версия, альбом или исполнитель — другой трек', () {
-    final index = YandexLibraryIndex([
+    final index = ImportedTracksIndex([
       stored('vid1', 'Believer (Kaskade Remix)', 'Imagine Dragons', 'Evolve'),
       stored('vid2', 'Believer', 'Imagine Dragons', 'Believer (Single)'),
       stored('vid3', 'Believer', 'Other Band', 'Evolve'),
@@ -50,11 +50,11 @@ void main() {
   });
 
   test('без исполнителей не угадывает: в медиатеке тогда имя канала', () {
-    final index = YandexLibraryIndex([
+    final index = ImportedTracksIndex([
       stored('vid1', 'Believer', '', 'Evolve'),
     ]);
     const noArtists =
-        YandexTrack(title: 'Believer', artists: '', album: 'Evolve');
+        ImportTrack(title: 'Believer', artists: '', album: 'Evolve');
     expect(index.find(noArtists, album: 'Evolve'), isNull);
   });
 
@@ -67,13 +67,13 @@ void main() {
       [older, newer],
       [newer, older],
     ]) {
-      expect(YandexLibraryIndex(library).find(believer, album: 'Evolve'),
+      expect(ImportedTracksIndex(library).find(believer, album: 'Evolve'),
           'new');
     }
   });
 
   test('скачанный в этом же импорте дальше находится без поиска', () {
-    final index = YandexLibraryIndex(const []);
+    final index = ImportedTracksIndex(const []);
     expect(index.find(believer, album: 'Evolve'), isNull);
     index.add(believer, album: 'Evolve', id: 'vid1');
     expect(index.find(believer, album: 'Evolve'), 'vid1');

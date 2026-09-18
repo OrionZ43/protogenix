@@ -1,12 +1,13 @@
-// lib/features/importer/data/yandex_library_index.dart
+// lib/features/importer/data/imported_tracks_index.dart
 
 import '../../library/domain/library_track.dart';
-import 'yandex_music.dart';
+import '../domain/import_collection.dart';
 
-/// Какие треки из Яндекса уже есть в медиатеке — без поиска на YouTube.
+/// Какие треки из альбома или плейлиста уже есть в медиатеке — без поиска
+/// на YouTube.
 ///
-/// Импорт сохраняет трек из Яндекса с его же названием (с версией в скобках),
-/// всеми исполнителями и альбомом (`_importYandexCollection`, `data.md`). По
+/// Импорт сохраняет трек с его же названием (с версией в скобках),
+/// всеми исполнителями и альбомом (`_importCollection`, `data.md`). По
 /// этим трём полям повторный импорт узнаёт скачанное сразу. Раньше он искал на
 /// YouTube каждый уже скачанный трек, чтобы узнать id ролика: сотня поисков
 /// подряд — ровно то, на чём YouTube ограничивает запросы, а «Продолжить»
@@ -16,8 +17,8 @@ import 'yandex_music.dart';
 /// файл с такими тегами: это та же песня, качать её незачем. Треки, скачанные
 /// до нового подбора записи (`youtube_match.dart`), тоже считаются скачанными —
 /// неправильные удаляются руками (`known-issues.md`).
-class YandexLibraryIndex {
-  YandexLibraryIndex(Iterable<LibraryTrack> library) {
+class ImportedTracksIndex {
+  ImportedTracksIndex(Iterable<LibraryTrack> library) {
     final addedAt = <String, DateTime>{};
     for (final t in library) {
       final key = _key(t.title, t.artist, t.album);
@@ -33,14 +34,14 @@ class YandexLibraryIndex {
 
   /// id трека в медиатеке или null. [album] — то, что импорт пишет в альбом:
   /// альбом трека, а без него название плейлиста.
-  String? find(YandexTrack track, {required String album}) {
+  String? find(ImportTrack track, {required String album}) {
     // Без исполнителей импорт пишет в исполнителя имя канала YouTube
     if (track.artists.isEmpty) return null;
     return _ids[_key(track.title, track.artists, album)];
   }
 
   /// Скачан в этом же импорте: повтор трека дальше по плейлисту — без поиска.
-  void add(YandexTrack track, {required String album, required String id}) {
+  void add(ImportTrack track, {required String album, required String id}) {
     if (track.artists.isEmpty) return;
     _ids[_key(track.title, track.artists, album)] = id;
   }
