@@ -32,6 +32,7 @@
 //         Теперь main и bg рендерятся раздельно через Column, аналогично
 //         _InactiveLine и _SpringLineWidget.
 
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
@@ -43,6 +44,8 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../domain/advanced_lrc_parser.dart';
 import '../../domain/spring.dart';
+import 'audio_visualizer.dart';
+import 'glow_letter.dart';
 import '../../../../core/utils/haptic_patterns.dart';
 import '../providers/karaoke_provider.dart';
 import '../providers/lyrics_display_provider.dart';
@@ -52,7 +55,16 @@ import '../providers/player_provider.dart';
 // ── Глобальные константы UI ────────────────────────────────────────────────
 const _kDistanceToMaxBlur = 4;
 const _kBlurScale = 1.25;
-const _kUserScrollStopMs = 750;
+
+/// Сколько текст стоит неподвижно после того, как пользователь пролистал, —
+/// и только потом караоке снова начинает вести его за строкой.
+///
+/// Раньше здесь было 750 мс, причём отсчёт шёл от момента, когда палец
+/// оторвался от экрана: список ещё доезжал по инерции, а его уже насильно
+/// возвращало к активной строке. Отзыв Orion: «текст очень сложно листать».
+/// Теперь отсчёт начинается, когда список полностью остановился, и до
+/// возврата есть время прочитать. Вернуться сразу — кнопка «К текущей строке».
+const _kUserScrollResume = Duration(seconds: 6);
 
 // ── Цели пружин для каждого состояния ─────────────────────────────────────
 const _kWaitingScale = 1.00;
@@ -104,9 +116,18 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
   bool _userScrolling = false;
   bool _autoScrolling = false;
 
+  /// Отсчёт до возврата к активной строке после ручной прокрутки.
+  Timer? _resumeTimer;
+
   /// Позиция плеера — обновляется каждый кадр через SchedulerBinding.
   /// Только ValueNotifier.value меняется → нет setState → нет rebuild дерева.
   final ValueNotifier<double> _positionMs = ValueNotifier(0.0);
+
+  /// Общий такт для пружин: номер кадра. Раньше у каждой строки и каждого
+  /// слога был свой `Ticker` — на экране их набиралось несколько десятков
+  /// (`performance.md`). Значение меняется каждый кадр, даже когда позиция
+  /// стоит: пружинам надо доехать и на паузе.
+  final ValueNotifier<int> _frame = ValueNotifier(0);
   bool _frameCallbackScheduled = false;
 
   @override
@@ -126,14 +147,38 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
     if (!mounted) return;
     _positionMs.value =
         ref.read(playerProvider).position.inMilliseconds.toDouble();
+    _frame.value++;
     _scheduleFrame();
   }
 
   @override
   void dispose() {
     _frameCallbackScheduled = false;
+    _resumeTimer?.cancel();
     _positionMs.dispose();
+    _frame.dispose();
     super.dispose();
+  }
+
+  /// Пользователь взялся листать: караоке перестаёт вести текст за строкой.
+  void _beginUserScroll() {
+    _resumeTimer?.cancel();
+    if (!_userScrolling) setState(() => _userScrolling = true);
+  }
+
+  /// Список остановился — с этого момента отсчитываем паузу до возврата.
+  void _scheduleResume() {
+    _resumeTimer?.cancel();
+    _resumeTimer = Timer(_kUserScrollResume, _returnToCurrentLine);
+  }
+
+  void _returnToCurrentLine() {
+    _resumeTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _userScrolling = false);
+    // Индекс читаем сейчас, а не тот, что был при подписке: пока листали,
+    // строка уже сменилась
+    _scrollTo(ref.read(karaokeProvider).currentIndex, force: true);
   }
 
   Future<void> _scrollTo(int index, {bool force = false}) async {
@@ -206,20 +251,14 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
           _AmbientBackground(palette: palette),
           NotificationListener<ScrollNotification>(
             onNotification: (n) {
-              if (n is UserScrollNotification) {
-                if (n.direction != ScrollDirection.idle) {
-                  if (!_autoScrolling && !_userScrolling) {
-                    setState(() => _userScrolling = true);
-                  }
-                } else if (_userScrolling) {
-                  Future.delayed(
-                      const Duration(milliseconds: _kUserScrollStopMs), () {
-                    if (mounted) {
-                      setState(() => _userScrolling = false);
-                      _scrollTo(activeIndex, force: true);
-                    }
-                  });
-                }
+              // Автопрокрутка тоже шлёт уведомления — её не считаем за ручную
+              if (_autoScrolling) return false;
+              if (n is UserScrollNotification &&
+                  n.direction != ScrollDirection.idle) {
+                _beginUserScroll();
+              } else if (n is ScrollEndNotification && _userScrolling) {
+                // Список доехал и встал — отсюда и отсчитываем паузу
+                _scheduleResume();
               }
               return false;
             },
@@ -236,6 +275,12 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
               child: ScrollablePositionedList.builder(
                 itemScrollController: _scroll,
                 itemPositionsListener: _positions,
+                // Открыли плеер посреди песни — текст сразу стоит на текущей
+                // строке. Раньше список начинался с первой и прыгал к нужной
+                // только со следующей строкой (отзыв Orion)
+                initialScrollIndex:
+                    activeIndex <= 0 ? 0 : activeIndex.clamp(0, karaoke.lines.length - 1),
+                initialAlignment: 0.45,
                 padding: EdgeInsets.symmetric(
                   vertical: MediaQuery.of(context).size.height * 0.42,
                   horizontal: 24.0,
@@ -263,6 +308,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
                       palette: palette,
                       userScrolling: _userScrolling,
                       positionMs: _positionMs,
+                      frame: _frame,
                       hasWordSync: hasWordSync,
                       baseFontSize: baseFontSize,
                     ),
@@ -298,10 +344,7 @@ class _BeautifulLyricsViewState extends ConsumerState<BeautifulLyricsView> {
             right: 0,
             child: Center(
               child: GestureDetector(
-                onTap: () {
-                  setState(() => _userScrolling = false);
-                  _scrollTo(activeIndex, force: true);
-                },
+                onTap: _returnToCurrentLine,
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
@@ -389,6 +432,7 @@ class _LineItem extends StatelessWidget {
     required this.palette,
     required this.userScrolling,
     required this.positionMs,
+    required this.frame,
     required this.hasWordSync,
     required this.baseFontSize,
   });
@@ -400,6 +444,9 @@ class _LineItem extends StatelessWidget {
   final PaletteState palette;
   final bool userScrolling;
   final ValueNotifier<double> positionMs;
+
+  /// Общий такт пружин — один на весь вид текста
+  final Listenable frame;
   final bool hasWordSync;
   final double baseFontSize;
 
@@ -414,6 +461,7 @@ class _LineItem extends StatelessWidget {
           key: ValueKey('spring_${line.startMs}'),
           line: line,
           positionMs: positionMs,
+          frame: frame,
           palette: palette,
           baseFontSize: baseFontSize,
         );
@@ -422,6 +470,7 @@ class _LineItem extends StatelessWidget {
           key: ValueKey('highlight_${line.startMs}'),
           line: line,
           positionMs: positionMs,
+          frame: frame,
           palette: palette,
           baseFontSize: baseFontSize,
         );
@@ -502,12 +551,16 @@ class _SpringLineWidget extends StatefulWidget {
     super.key,
     required this.line,
     required this.positionMs,
+    required this.frame,
     required this.palette,
     required this.baseFontSize,
   });
 
   final LyricLine line;
   final ValueListenable<double> positionMs;
+
+  /// Общий такт: шагаем пружины на нём, своего `Ticker` у строки больше нет.
+  final Listenable frame;
   final PaletteState palette;
   final double baseFontSize;
 
@@ -515,9 +568,7 @@ class _SpringLineWidget extends StatefulWidget {
   State<_SpringLineWidget> createState() => _SpringLineWidgetState();
 }
 
-class _SpringLineWidgetState extends State<_SpringLineWidget>
-    with SingleTickerProviderStateMixin {
-  late final Ticker _ticker;
+class _SpringLineWidgetState extends State<_SpringLineWidget> {
   Duration? _lastElapsed;
 
   late final List<LyricSyllable> _allSyls;
@@ -527,8 +578,9 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
   late final Map<LyricSyllable, SyllableSprings> _springs;
   final Map<LyricSyllable, _SylState> _states = {};
 
-  final Map<LyricSyllable, ({double scale, double yOffset, double glow})>
-      _vals = {};
+  /// Значения пружин каждого слога. Меняются каждый кадр, но перекрашивают
+  /// только сам слог — дерево не перестраивается (`glow_letter.dart`).
+  final Map<LyricSyllable, ValueNotifier<GlowValues>> _vals = {};
 
   @override
   void initState() {
@@ -545,26 +597,26 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
 
     for (final syl in _allSyls) {
       _states[syl] = _SylState.waiting;
-      _vals[syl] = (
+      _vals[syl] = ValueNotifier(const GlowValues(
         scale: _kWaitingScale,
         yOffset: _kWaitingYOffset,
         glow: _kWaitingGlow,
-      );
+      ));
     }
 
-    _ticker = createTicker(_onTick)..start();
+    widget.frame.addListener(_onTick);
   }
 
-  void _onTick(Duration elapsed) {
+  void _onTick() {
     if (!mounted) return;
 
+    final elapsed = SchedulerBinding.instance.currentFrameTimeStamp;
     final dt = _lastElapsed == null
         ? 0.0
         : (elapsed - _lastElapsed!).inMicroseconds / 1e6;
     _lastElapsed = elapsed;
 
     final ms = widget.positionMs.value;
-    var anyActive = false;
 
     for (final syl in _allSyls) {
       final springs = _springs[syl]!;
@@ -591,10 +643,9 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
 
       if (dt > 0) {
         final (s, y, g) = springs.step(dt.clamp(0.0, 0.1));
-        _vals[syl] = (scale: s, yOffset: y, glow: g);
-        if (!springs.isSleeping) anyActive = true;
+        _vals[syl]!.value = GlowValues(scale: s, yOffset: y, glow: g);
       } else {
-        _vals[syl] = (
+        _vals[syl]!.value = GlowValues(
           scale: springs.scale.position,
           yOffset: springs.yOffset.position,
           glow: springs.glow.position,
@@ -602,12 +653,16 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
       }
     }
 
-    if (anyActive || dt == 0) setState(() {});
+    // setState больше не нужен: каждый слог перекрашивается сам по своему
+    // ValueNotifier, а раскладка строки при этом не трогается
   }
 
   @override
   void dispose() {
-    _ticker.dispose();
+    widget.frame.removeListener(_onTick);
+    for (final notifier in _vals.values) {
+      notifier.dispose();
+    }
     super.dispose();
   }
 
@@ -620,6 +675,7 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
 
         if (syl.isEmphasized && !syl.isBackground) {
           child = _EmphasizedSyllable(
+            frame: widget.frame,
             key: ValueKey('emph_${syl.startMs}'),
             syllable: syl,
             positionMs: widget.positionMs,
@@ -627,18 +683,9 @@ class _SpringLineWidgetState extends State<_SpringLineWidget>
             baseFontSize: widget.baseFontSize,
           );
         } else {
-          final vals = _vals[syl] ??
-              (
-                scale: _kWaitingScale,
-                yOffset: _kWaitingYOffset,
-                glow: _kWaitingGlow
-              );
-
           child = _LetterWidget(
             text: syl.text,
-            scale: vals.scale,
-            yOffset: vals.yOffset,
-            glow: vals.glow,
+            values: _vals[syl]!,
             isBackground: syl.isBackground,
             palette: widget.palette,
             baseFontSize: widget.baseFontSize,
@@ -690,12 +737,16 @@ class _HighlightedLineWidget extends StatefulWidget {
     super.key,
     required this.line,
     required this.positionMs,
+    required this.frame,
     required this.palette,
     required this.baseFontSize,
   });
 
   final LyricLine line;
   final ValueListenable<double> positionMs;
+
+  /// Общий такт пружин
+  final Listenable frame;
   final PaletteState palette;
   final double baseFontSize;
 
@@ -703,12 +754,14 @@ class _HighlightedLineWidget extends StatefulWidget {
   State<_HighlightedLineWidget> createState() => _HighlightedLineWidgetState();
 }
 
-class _HighlightedLineWidgetState extends State<_HighlightedLineWidget>
-    with SingleTickerProviderStateMixin {
-  late final Ticker _ticker;
+class _HighlightedLineWidgetState extends State<_HighlightedLineWidget> {
   late final SyllableSprings _spring;
   _SylState _state = _SylState.waiting;
-  double _glow = 0.0;
+
+  /// Свечение строки: читается при отрисовке, дерево не перестраивается.
+  final _values = ValueNotifier<GlowValues>(
+    const GlowValues(scale: 1.0, yOffset: 0.0, glow: 0.0),
+  );
 
   // FIX: кешируем разбивку main/bg один раз — нет аллокаций в build()
   late final String _mainText;
@@ -730,10 +783,10 @@ class _HighlightedLineWidgetState extends State<_HighlightedLineWidget>
 
     _spring = SyllableSprings()
       ..setAllImmediate(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow);
-    _ticker = createTicker(_onTick)..start();
+    widget.frame.addListener(_onTick);
   }
 
-  void _onTick(Duration elapsed) {
+  void _onTick() {
     if (!mounted) return;
     final ms = widget.positionMs.value;
     final newState = _stateFor(
@@ -756,83 +809,55 @@ class _HighlightedLineWidgetState extends State<_HighlightedLineWidget>
 
     final stepResult = _spring.step(1 / 60.0);
     final g = stepResult.$3;
-    if (_glow != g) {
-      _glow = g;
-      setState(() {});
+    if (_values.value.glow != g) {
+      _values.value = GlowValues(scale: 1.0, yOffset: 0.0, glow: g);
     }
   }
 
   @override
   void dispose() {
-    _ticker.dispose();
+    widget.frame.removeListener(_onTick);
+    _values.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final g = _glow.clamp(0.0, 1.0);
+    final textScaler = MediaQuery.textScalerOf(context);
 
-    final mainColor = Color.lerp(Colors.white.withAlpha(75), Colors.white, g)!;
-    // FIX: bg использует собственный диапазон — тусклее основного текста
-    final bgColor = Color.lerp(
-      Colors.white.withAlpha(45),
-      Colors.white.withAlpha(160),
-      g,
-    )!;
-
-    final mainShadowAlpha = (g * 0.45 * 255).round();
-    final bgShadowAlpha = (g * 0.22 * 255).round();
-    final blurR = 4.0 + 6.0 * g;
-
-    final mainShadows = mainShadowAlpha > 8
-        ? [
-            Shadow(
-              color: Colors.white.withAlpha(mainShadowAlpha),
-              blurRadius: blurR,
-            ),
-            Shadow(
-              color: widget.palette.primary.withAlpha(mainShadowAlpha ~/ 2),
-              blurRadius: blurR * 2,
-            ),
-          ]
-        : null;
-
-    final bgShadows = bgShadowAlpha > 8
-        ? [
-            Shadow(
-              color: Colors.white.withAlpha(bgShadowAlpha),
-              blurRadius: blurR,
-            ),
-          ]
-        : null;
-
-    // FIX: Column вместо единого Text(plainText) — bg идёт отдельной строкой
+    // Цвета и тени те же, что были в стиле Text: теперь их по свечению
+    // считает GlowLetter при отрисовке, а строка на каждый кадр не
+    // пересобирается (`glow_letter.dart`)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_mainText.isNotEmpty)
-          Text(
-            _mainText,
-            style: TextStyle(
-              fontSize: widget.baseFontSize,
-              fontWeight: FontWeight.w800,
-              color: mainColor,
-              height: 1.25,
-              shadows: mainShadows,
-            ),
+          GlowLetter(
+            text: _mainText,
+            values: _values,
+            fontSize: widget.baseFontSize,
+            baseFontSize: widget.baseFontSize,
+            glowColor: widget.palette.primary,
+            textScaler: textScaler,
           ),
         if (_bgText.isNotEmpty) ...[
           const SizedBox(height: 5),
-          Text(
-            _bgText,
-            style: TextStyle(
-              fontSize: widget.baseFontSize * 0.62,
+          GlowLetter(
+            text: _bgText,
+            values: _values,
+            fontSize: widget.baseFontSize * 0.62,
+            baseFontSize: widget.baseFontSize,
+            glowColor: widget.palette.primary,
+            textScaler: textScaler,
+            // Бэк-вокал тусклее основного текста и без цветной тени
+            style: GlowStyle(
               fontWeight: FontWeight.w500,
-              fontStyle: FontStyle.italic,
-              color: bgColor,
-              height: 1.25,
-              shadows: bgShadows,
+              italic: true,
+              shadowScale: 0.22,
+              paletteShadow: false,
+              colorFrom: Colors.white.withAlpha(45),
+              colorTo: Colors.white.withAlpha(160),
             ),
           ),
         ],
@@ -853,19 +878,21 @@ class _LetterSlot {
   })  : springs = SyllableSprings()
           ..setAllImmediate(_kWaitingScale, _kWaitingYOffset, _kWaitingGlow),
         state = _SylState.waiting,
-        scale = _kWaitingScale,
-        yOffset = _kWaitingYOffset,
-        glow = _kWaitingGlow;
+        values = ValueNotifier(const GlowValues(
+          scale: _kWaitingScale,
+          yOffset: _kWaitingYOffset,
+          glow: _kWaitingGlow,
+        ));
 
   final String char;
   final double startMs;
   final double endMs;
   final SyllableSprings springs;
 
+  /// Значения пружин буквы: их читает GlowLetter при отрисовке.
+  final ValueNotifier<GlowValues> values;
+
   _SylState state;
-  double scale;
-  double yOffset;
-  double glow;
 }
 
 class _EmphasizedSyllable extends StatefulWidget {
@@ -873,12 +900,16 @@ class _EmphasizedSyllable extends StatefulWidget {
     super.key,
     required this.syllable,
     required this.positionMs,
+    required this.frame,
     required this.palette,
     required this.baseFontSize,
   });
 
   final LyricSyllable syllable;
   final ValueListenable<double> positionMs;
+
+  /// Общий такт пружин — свой Ticker у слога больше не нужен
+  final Listenable frame;
   final PaletteState palette;
   final double baseFontSize;
 
@@ -886,9 +917,7 @@ class _EmphasizedSyllable extends StatefulWidget {
   State<_EmphasizedSyllable> createState() => _EmphasizedSyllableState();
 }
 
-class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
-    with SingleTickerProviderStateMixin {
-  late final Ticker _ticker;
+class _EmphasizedSyllableState extends State<_EmphasizedSyllable> {
   Duration? _lastElapsed;
   late final List<_LetterSlot> _slots;
 
@@ -909,19 +938,19 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
       );
     });
 
-    _ticker = createTicker(_onTick)..start();
+    widget.frame.addListener(_onTick);
   }
 
-  void _onTick(Duration elapsed) {
+  void _onTick() {
     if (!mounted) return;
 
+    final elapsed = SchedulerBinding.instance.currentFrameTimeStamp;
     final dt = _lastElapsed == null
         ? 0.0
         : (elapsed - _lastElapsed!).inMicroseconds / 1e6;
     _lastElapsed = elapsed;
 
     final ms = widget.positionMs.value;
-    var anyActive = false;
 
     for (final slot in _slots) {
       final newState = _stateFor(ms, slot.startMs, slot.endMs);
@@ -945,23 +974,24 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
 
       if (dt > 0) {
         final (s, y, g) = slot.springs.step(dt.clamp(0.0, 0.1));
-        slot.scale = s;
-        slot.yOffset = y;
-        slot.glow = g;
-        if (!slot.springs.isSleeping) anyActive = true;
+        slot.values.value = GlowValues(scale: s, yOffset: y, glow: g);
       } else {
-        slot.scale = slot.springs.scale.position;
-        slot.yOffset = slot.springs.yOffset.position;
-        slot.glow = slot.springs.glow.position;
+        slot.values.value = GlowValues(
+          scale: slot.springs.scale.position,
+          yOffset: slot.springs.yOffset.position,
+          glow: slot.springs.glow.position,
+        );
       }
     }
-
-    if (anyActive || dt == 0) setState(() {});
+    // Каждая буква перекрашивается по своему ValueNotifier — setState нет
   }
 
   @override
   void dispose() {
-    _ticker.dispose();
+    widget.frame.removeListener(_onTick);
+    for (final slot in _slots) {
+      slot.values.dispose();
+    }
     super.dispose();
   }
 
@@ -974,9 +1004,7 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
       children: _slots.map((slot) {
         return _LetterWidget(
           text: slot.char,
-          scale: slot.scale,
-          yOffset: slot.yOffset,
-          glow: slot.glow,
+          values: slot.values,
           palette: widget.palette,
           baseFontSize: widget.baseFontSize,
         );
@@ -989,70 +1017,45 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable>
 // LETTER WIDGET — одна буква / слог
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Буква или слог: раскладка та же, что была у `Text` внутри `Baseline`,
+/// а подскок, масштаб и свечение рисует `GlowLetter` — без перестроения
+/// дерева на каждый кадр (`glow_letter.dart`).
 class _LetterWidget extends StatelessWidget {
   const _LetterWidget({
     required this.text,
-    required this.scale,
-    required this.yOffset,
-    required this.glow,
+    required this.values,
     required this.palette,
     required this.baseFontSize,
     this.isBackground = false,
   });
 
   final String text;
-  final double scale;
-  final double yOffset;
-  final double glow;
+  final ValueListenable<GlowValues> values;
   final PaletteState palette;
   final double baseFontSize;
   final bool isBackground;
 
   @override
   Widget build(BuildContext context) {
-    final g = glow.clamp(0.0, 1.0);
-    final color = Color.lerp(
-      Colors.white.withAlpha(75),
-      Colors.white,
-      g,
-    )!;
-
     final fontSize = isBackground ? baseFontSize * 0.62 : baseFontSize;
-    final shadowAlpha =
-        isBackground ? (g * 0.22 * 255).round() : (g * 0.45 * 255).round();
-    final blurRadius = 4.0 + 6.0 * g;
 
-    return Transform.translate(
-      offset: Offset(0, baseFontSize * yOffset),
-      child: Transform.scale(
-        scale: scale.clamp(0.8, 1.8),
-        alignment: Alignment.bottomCenter,
-        child: Baseline(
-          baseline: fontSize * 0.82,
-          baselineType: TextBaseline.alphabetic,
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: isBackground ? FontWeight.w500 : FontWeight.w800,
-              fontStyle: isBackground ? FontStyle.italic : FontStyle.normal,
-              color: color,
-              height: 1.25,
-              shadows: shadowAlpha > 8
-                  ? [
-                      Shadow(
-                        color: Colors.white.withAlpha(shadowAlpha),
-                        blurRadius: blurRadius,
-                      ),
-                      Shadow(
-                        color: palette.primary.withAlpha(shadowAlpha ~/ 2),
-                        blurRadius: blurRadius * 2.0,
-                      ),
-                    ]
-                  : null,
-            ),
-          ),
-        ),
+    return Baseline(
+      baseline: fontSize * 0.82,
+      baselineType: TextBaseline.alphabetic,
+      child: GlowLetter(
+        text: text,
+        values: values,
+        fontSize: fontSize,
+        baseFontSize: baseFontSize,
+        glowColor: palette.primary,
+        textScaler: MediaQuery.textScalerOf(context),
+        style: isBackground
+            ? const GlowStyle(
+                fontWeight: FontWeight.w500,
+                italic: true,
+                shadowScale: 0.22,
+              )
+            : const GlowStyle(),
       ),
     );
   }
@@ -1140,7 +1143,7 @@ class _PlainLyricsView extends StatelessWidget {
     return Stack(
       children: [
         CustomPaint(
-          painter: _AmbientPainter(
+          painter: _AmbientPainter.fixed(
             c1: palette.primary,
             c2: palette.secondary,
             pulse: 0.9,
@@ -1184,28 +1187,33 @@ class _PlainLyricsView extends StatelessWidget {
 // EMPTY STATE
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Текста у трека нет. Раньше здесь была только надпись, и на ПК оставалось
+/// большое пустое место (отзыв Кесса) — теперь его занимает визуализатор,
+/// который двигается по настоящему спектру трека. Стиль — в настройках.
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.palette});
   final PaletteState palette;
 
   @override
-  Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.lyrics_rounded,
-                size: 52, color: Colors.white.withAlpha(30)),
-            const SizedBox(height: 14),
-            Text(
-              'Текст не найден',
-              style: TextStyle(
-                color: Colors.white.withAlpha(45),
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+  Widget build(BuildContext context) => Stack(
+        children: [
+          const Positioned.fill(child: AudioVisualizer()),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 28,
+            child: Center(
+              child: Text(
+                'Текст не найден',
+                style: TextStyle(
+                  color: Colors.white.withAlpha(45),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
 }
 
@@ -1224,7 +1232,10 @@ class _AmbientBackground extends StatefulWidget {
 class _AmbientBackgroundState extends State<_AmbientBackground>
     with SingleTickerProviderStateMixin {
   late final Ticker _ticker;
-  double _pulse = 0.78;
+
+  /// Пульс уходит прямо в painter: у него нет setState, значит нет и
+  /// перестроения дерева каждый кадр (правило 3, `performance.md`).
+  final _pulse = ValueNotifier<double>(0.78);
 
   @override
   void initState() {
@@ -1236,14 +1247,13 @@ class _AmbientBackgroundState extends State<_AmbientBackground>
     if (!mounted) return;
     final phase = elapsed.inMilliseconds / 2400.0 * 2 * math.pi;
     final newPulse = 0.78 + 0.22 * (math.sin(phase) * 0.5 + 0.5);
-    if ((newPulse - _pulse).abs() > 0.002) {
-      setState(() => _pulse = newPulse);
-    }
+    if ((newPulse - _pulse.value).abs() > 0.002) _pulse.value = newPulse;
   }
 
   @override
   void dispose() {
     _ticker.dispose();
+    _pulse.dispose();
     super.dispose();
   }
 
@@ -1267,14 +1277,23 @@ class _AmbientBackgroundState extends State<_AmbientBackground>
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _AmbientPainter extends CustomPainter {
-  const _AmbientPainter(
-      {required this.c1, required this.c2, required this.pulse});
+  /// Пульс живёт в [pulse]: перерисовка идёт по нему, минуя build и layout.
+  _AmbientPainter({required this.c1, required this.c2, required this.pulse})
+      : _fixed = null,
+        super(repaint: pulse);
+
+  /// Неподвижный фон (простой текст без караоке) — без тикера вообще.
+  _AmbientPainter.fixed({required this.c1, required this.c2, required double pulse})
+      : _fixed = pulse,
+        pulse = null;
 
   final Color c1, c2;
-  final double pulse;
+  final ValueListenable<double>? pulse;
+  final double? _fixed;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final pulse = _fixed ?? this.pulse!.value;
     _blob(
       canvas,
       center: Offset(size.width * 0.18, size.height * 0.22 * pulse),
@@ -1309,6 +1328,6 @@ class _AmbientPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_AmbientPainter o) =>
-      o.pulse != pulse || o.c1 != c1 || o.c2 != c2;
+      o.c1 != c1 || o.c2 != c2 || o._fixed != _fixed;
 }
 

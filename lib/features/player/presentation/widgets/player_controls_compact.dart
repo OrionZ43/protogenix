@@ -4,6 +4,7 @@ import '../../domain/track_model.dart';
 import '../../domain/player_state.dart' as ps;
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
+import '../../../../core/widgets/track_cover.dart';
 import 'glass_card.dart';
 
 /// Компактная версия плеера для левой колонки Fold
@@ -60,7 +61,7 @@ class _PlayerControlsCompactState extends ConsumerState<PlayerControlsCompact> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Image(
-                  image: track.coverImage,
+                  image: sizedCover(context, track.coverImage, size.width * 0.35),
                   width: size.width * 0.35,
                   height: size.width * 0.35,
                   fit: BoxFit.cover,

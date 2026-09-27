@@ -16,8 +16,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/player_provider.dart';
 import '../providers/palette_provider.dart';
+import '../../../../core/widgets/track_cover.dart';
 import '../../domain/track_model.dart';
-import '../../domain/player_state.dart';
 
 class MiniPlayer extends ConsumerStatefulWidget {
   const MiniPlayer({
@@ -61,24 +61,25 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
 
   @override
   Widget build(BuildContext context) {
-    final player = ref.watch(playerProvider);
+    // Мини-плеер висит на экране всё время, поэтому смотрит только трек:
+    // позиция и пауза — у своих Consumer ниже. Раньше он пересобирался
+    // целиком, вместе с обложкой, несколько раз в секунду (performance.md)
+    final track = ref.watch(playerProvider.select(
+        (s) => s.queue.isEmpty ? null : s.currentTrack as TrackModel?));
     final palette = ref.watch(paletteProvider);
 
     // Если очередь пуста — ничего не показываем
-    if (player.queue.isEmpty || player.currentTrack == null) {
+    if (track == null) {
       _slideCtrl.reverse();
       return const SizedBox.shrink();
     }
 
     _slideCtrl.forward();
 
-    final track = player.currentTrack as TrackModel;
-
     return SlideTransition(
       position: _slideAnim,
       child: _MiniPlayerContent(
         track: track,
-        player: player,
         palette: palette,
         onTap: widget.onTap,
         notifier: ref.read(playerProvider.notifier),
@@ -90,14 +91,12 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
 class _MiniPlayerContent extends StatelessWidget {
   const _MiniPlayerContent({
     required this.track,
-    required this.player,
     required this.palette,
     required this.notifier,
     this.onTap,
   });
 
   final TrackModel track;
-  final ProtogenixPlayerState player;
   final PaletteState palette;
   final PlayerNotifier notifier;
   final VoidCallback? onTap;
@@ -125,15 +124,19 @@ class _MiniPlayerContent extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           child: Stack(
             children: [
-              // Прогресс-полоска снизу
+              // Прогресс-полоска снизу: единственное место мини-плеера,
+              // которому нужна позиция
               Positioned(
                 bottom: 0,
                 left: 0,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  height: 2,
-                  width: MediaQuery.of(context).size.width * player.progress,
-                  color: palette.primary.withAlpha(180),
+                child: Consumer(
+                  builder: (context, ref, _) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    height: 2,
+                    width: MediaQuery.of(context).size.width *
+                        ref.watch(playerProvider.select((s) => s.progress)),
+                    color: palette.primary.withAlpha(180),
+                  ),
                 ),
               ),
 
@@ -146,7 +149,7 @@ class _MiniPlayerContent extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: Image(
-                        image: track.coverImage,
+                        image: sizedCover(context, track.coverImage, 44),
                         width: 44,
                         height: 44,
                         fit: BoxFit.cover,
@@ -207,16 +210,22 @@ class _MiniPlayerContent extends StatelessWidget {
                           shape: BoxShape.circle,
                           color: palette.primary,
                         ),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child: Icon(
-                            player.isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            key: ValueKey(player.isPlaying),
-                            color: Colors.white,
-                            size: 22,
-                          ),
+                        child: Consumer(
+                          builder: (context, ref, _) {
+                            final playing = ref.watch(
+                                playerProvider.select((s) => s.isPlaying));
+                            return AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: Icon(
+                                playing
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                key: ValueKey(playing),
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),

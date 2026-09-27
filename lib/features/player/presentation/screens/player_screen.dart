@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../providers/karaoke_provider.dart';
-import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
 import '../../domain/track_model.dart';
 import '../widgets/protogenix_background.dart';
@@ -19,11 +18,16 @@ class PlayerScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player = ref.watch(playerProvider);
-    ref.watch(karaokeProvider);
-    ref.watch(paletteProvider);
+    // Караоке остаётся живым, но экран от него больше не перестраивается:
+    // karaokeProvider сам слушает playerProvider и ищет текст заранее, а
+    // watch заставлял пересобирать весь экран на каждую смену строки.
+    // Палитру смотрит сам ProtogenixBackground.
+    ref.listen(karaokeProvider, (_, __) {});
 
-    final track = player.currentTrack as TrackModel?;
+    // Только текущий трек: без select экран плеера целиком пересобирался
+    // на каждое обновление позиции, несколько раз в секунду (performance.md)
+    final track =
+        ref.watch(playerProvider.select((s) => s.currentTrack)) as TrackModel?;
 
     return Scaffold(
       backgroundColor: Colors.black,

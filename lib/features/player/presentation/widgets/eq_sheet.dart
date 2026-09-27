@@ -14,7 +14,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:protogenix/core/utils/system_insets.dart';
 
-import '../../domain/player_state.dart'; // <-- ИСПРАВЛЕНИЕ: Добавлен импорт
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
 
@@ -61,7 +60,12 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final player = ref.watch(playerProvider);
+    // select: шторке нужны только свои поля, не позиция (performance.md)
+    final player = ref.watch(playerProvider.select((s) => (
+          eqEnabled: s.eqEnabled,
+          eqBandGains: s.eqBandGains,
+          speed: s.speed,
+        )));
     final palette = ref.watch(paletteProvider);
     final notifier = ref.read(playerProvider.notifier);
 
@@ -248,7 +252,7 @@ class _EqSheetState extends ConsumerState<_EqSheet> {
   }
 
   Widget _buildSliders(
-    ProtogenixPlayerState player,
+    ({bool eqEnabled, List<double> eqBandGains, double speed}) player,
     PlayerNotifier notifier,
     Color accentColor,
   ) {

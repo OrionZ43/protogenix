@@ -6,7 +6,9 @@ import '../../../../core/utils/haptic_patterns.dart';
 import '../../domain/track_model.dart';
 import '../../domain/player_state.dart' as ps;
 import '../providers/palette_provider.dart';
+import '../providers/envelope_provider.dart';
 import '../providers/player_provider.dart';
+import '../../../../core/widgets/track_cover.dart';
 import '../../../library/presentation/playlist_provider.dart';
 import '../../../library/presentation/widgets/add_to_playlist_sheet.dart';
 import 'waveform_progress_bar.dart';
@@ -28,7 +30,15 @@ class DesktopBottomPlayer extends ConsumerWidget {
     final width = MediaQuery.sizeOf(context).width;
     final scale = (width / 1400).clamp(0.9, 1.2);
 
-    final player = ref.watch(playerProvider);
+    // Панель висит внизу всё время: позиция и громкость — у своих Consumer
+    // ниже, иначе обложка и кнопки пересобирались несколько раз в секунду
+    // (performance.md)
+    final player = ref.watch(playerProvider.select((s) => (
+          currentTrack: s.currentTrack,
+          isPlaying: s.isPlaying,
+          isShuffle: s.isShuffle,
+          repeatMode: s.repeatMode,
+        )));
     final palette = ref.watch(paletteProvider);
     final notifier = ref.read(playerProvider.notifier);
 
@@ -55,7 +65,7 @@ class DesktopBottomPlayer extends ConsumerWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8 * scale),
                   child: Image(
-                    image: track.coverImage,
+                    image: sizedCover(context, track.coverImage, 64 * scale),
                     width: 64 * scale,
                     height: 64 * scale,
                     fit: BoxFit.cover,
@@ -213,14 +223,25 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   ),
                   SizedBox(height: 8 * scale),
                   // Waveform
-                  LiveWaveformProgressBar(
-                    progress: player.progress,
-                    position: player.position,
-                    total: player.total,
-                    accentColor: palette.primary,
-                    height: 28 * scale,
-                    barCount: 100,
-                    onSeek: (p) => notifier.seekToProgress(p),
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final p = ref.watch(playerProvider.select((s) => (
+                            progress: s.progress,
+                            position: s.position,
+                            total: s.total,
+                          )));
+                      final envelope = ref.watch(currentEnvelopeProvider);
+                      return LiveWaveformProgressBar(
+                        envelope: envelope,
+                        progress: p.progress,
+                        position: p.position,
+                        total: p.total,
+                        accentColor: palette.primary,
+                        height: 28 * scale,
+                        barCount: 100,
+                        onSeek: (v) => notifier.seekToProgress(v),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -237,10 +258,13 @@ class DesktopBottomPlayer extends ConsumerWidget {
                   width: 140 * scale,
                   child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8 * scale),
-                    child: _VolumeSlider(
-                      volume: player.volume,
-                      accentColor: palette.primary,
-                      onChanged: (val) => notifier.setVolume(val),
+                    child: Consumer(
+                      builder: (context, ref, _) => _VolumeSlider(
+                        volume:
+                            ref.watch(playerProvider.select((s) => s.volume)),
+                        accentColor: palette.primary,
+                        onChanged: (val) => notifier.setVolume(val),
+                      ),
                     ),
                   ),
                 ),

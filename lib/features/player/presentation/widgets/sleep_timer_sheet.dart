@@ -30,7 +30,12 @@ class _SleepTimerSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(playerProvider);
+    // select: шторке нужны только поля таймера, не позиция (performance.md)
+    final state = ref.watch(playerProvider.select((s) => (
+          sleepTimerActive: s.sleepTimerActive,
+          sleepTimerRemaining: s.sleepTimerRemaining,
+          stopAfterTrack: s.stopAfterTrack,
+        )));
     final isActive = state.sleepTimerActive;
     final stopAfterTrack = state.stopAfterTrack;
 

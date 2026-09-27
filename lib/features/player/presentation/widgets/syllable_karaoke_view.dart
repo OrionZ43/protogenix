@@ -7,6 +7,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -16,6 +17,7 @@ import 'dart:ui';
 
 import '../../domain/lyric_spline.dart';
 import '../../domain/spring.dart';
+import 'glow_letter.dart';
 import '../../domain/advanced_lrc_parser.dart';
 import '../../domain/visualizer_engine.dart';
 import '../providers/karaoke_provider.dart';
@@ -24,7 +26,10 @@ import '../providers/player_provider.dart';
 
 const _kDistanceToMaxBlur = 4;
 const _kBlurScale = 1.25;
-const _kUserScrollStopSec = 0.75;
+
+/// Пауза перед возвратом к активной строке после ручной прокрутки — как
+/// в beautiful_lyrics_view.dart, там же и почему.
+const _kUserScrollResume = Duration(seconds: 6);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SYLLABLE KARAOKE VIEW
@@ -47,10 +52,15 @@ class _SyllableKaraokeViewState extends ConsumerState<SyllableKaraokeView>
   bool _userScrolling = false;
   bool _autoScrolling = false;
 
+  /// Отсчёт до возврата к активной строке после ручной прокрутки.
+  Timer? _resumeTimer;
+
   late final Ticker _ambientTicker;
-  double _ambientPulse = 0;
-  double _ambientPhase = 0;
-  double _bass = 0.0;
+  /// Пульс фона и бас уходят прямо в painter: раньше каждый кадр вызывался
+  /// setState, и весь вид караоке перестраивался по 60–120 раз в секунду
+  /// (`performance.md`, правило 3).
+  final _ambientPulse = ValueNotifier<double>(0);
+  final _bass = ValueNotifier<double>(0);
 
   StreamSubscription<VisualizerSnapshot>? _visSub;
 
@@ -60,23 +70,41 @@ class _SyllableKaraokeViewState extends ConsumerState<SyllableKaraokeView>
     _ambientTicker = createTicker(_onAmbientTick)..start();
     // Подписываемся на визуализатор для ambient-реакции фона
     _visSub = ref.read(visualizerEngineProvider).stream.listen((s) {
-      if (mounted) setState(() => _bass = s.bass);
+      if (mounted) _bass.value = s.bass;
     });
   }
 
   void _onAmbientTick(Duration elapsed) {
     if (!mounted) return;
-    setState(() {
-      _ambientPhase = elapsed.inMilliseconds / 2400.0 * 2 * math.pi;
-      _ambientPulse = 0.78 + 0.22 * (math.sin(_ambientPhase) * 0.5 + 0.5);
-    });
+    final phase = elapsed.inMilliseconds / 2400.0 * 2 * math.pi;
+    _ambientPulse.value = 0.78 + 0.22 * (math.sin(phase) * 0.5 + 0.5);
   }
 
   @override
   void dispose() {
     _visSub?.cancel();
+    _resumeTimer?.cancel();
     _ambientTicker.dispose();
+    _ambientPulse.dispose();
+    _bass.dispose();
     super.dispose();
+  }
+
+  void _beginUserScroll() {
+    _resumeTimer?.cancel();
+    if (!_userScrolling) setState(() => _userScrolling = true);
+  }
+
+  void _scheduleResume() {
+    _resumeTimer?.cancel();
+    _resumeTimer = Timer(_kUserScrollResume, _returnToCurrentLine);
+  }
+
+  void _returnToCurrentLine() {
+    _resumeTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _userScrolling = false);
+    _scrollTo(ref.read(karaokeProvider).currentIndex, force: true);
   }
 
   Future<void> _scrollTo(int index, {bool force = false}) async {
@@ -130,28 +158,24 @@ class _SyllableKaraokeViewState extends ConsumerState<SyllableKaraokeView>
         // Список строк
         NotificationListener<ScrollNotification>(
           onNotification: (n) {
-            if (n is UserScrollNotification) {
-              if (n.direction != ScrollDirection.idle) {
-                if (!_autoScrolling && !_userScrolling) {
-                  setState(() => _userScrolling = true);
-                }
-              } else if (_userScrolling) {
-                Future.delayed(
-                  Duration(milliseconds: (_kUserScrollStopSec * 1000).toInt()),
-                  () {
-                    if (mounted) {
-                      setState(() => _userScrolling = false);
-                      _scrollTo(activeIndex, force: true);
-                    }
-                  },
-                );
-              }
+            // Автопрокрутку за ручную не считаем
+            if (_autoScrolling) return false;
+            if (n is UserScrollNotification &&
+                n.direction != ScrollDirection.idle) {
+              _beginUserScroll();
+            } else if (n is ScrollEndNotification && _userScrolling) {
+              _scheduleResume();
             }
             return false;
           },
           child: ScrollablePositionedList.builder(
             itemScrollController: _scroll,
             itemPositionsListener: _positions,
+            // Открыли плеер посреди песни — сразу на текущей строке
+            initialScrollIndex: activeIndex <= 0
+                ? 0
+                : activeIndex.clamp(0, widget.lines.length - 1),
+            initialAlignment: 0.5,
             padding: EdgeInsets.symmetric(
               vertical: MediaQuery.of(context).size.height * 0.42,
               horizontal: 24,
@@ -190,10 +214,7 @@ class _SyllableKaraokeViewState extends ConsumerState<SyllableKaraokeView>
           right: 0,
           child: Center(
             child: GestureDetector(
-              onTap: () {
-                setState(() => _userScrolling = false);
-                _scrollTo(activeIndex, force: true);
-              },
+              onTap: _returnToCurrentLine,
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -342,8 +363,16 @@ class _ActiveLineWidgetState extends ConsumerState<_ActiveLineWidget>
   Duration? _lastTime;
 
   late final Map<LyricSyllable, SyllableSprings> _springs;
-  final Map<LyricSyllable, ({double scale, double yOffset, double glow})>
-      _values = {};
+
+  /// Значения пружин каждого слога: их читает GlowLetter при отрисовке, так
+  /// что строка на каждый кадр не пересобирается (`glow_letter.dart`).
+  final Map<LyricSyllable, ValueNotifier<GlowValues>> _values = {};
+
+  /// У слогов с акцентом своя буква — свой набор значений.
+  final Map<LyricSyllable, List<ValueNotifier<GlowValues>>> _letterValues = {};
+
+  /// Горизонтальный толчок от баса: тоже без setState.
+  final ValueNotifier<double> _resonance = ValueNotifier(0.0);
 
   // ── Бас-резонанс: горизонтальный «толчок» активной строки ─────────────────
   final LyricSpring _resonanceSpr = LyricSpring(
@@ -351,7 +380,6 @@ class _ActiveLineWidgetState extends ConsumerState<_ActiveLineWidget>
     dampingRatio: 0.35,
     frequency: 5.0,
   );
-  double _resonanceX = 0.0;
   double _prevBass = 0.0;
 
   StreamSubscription<VisualizerSnapshot>? _visSub;
@@ -364,6 +392,15 @@ class _ActiveLineWidgetState extends ConsumerState<_ActiveLineWidget>
     _springs = {
       for (final syl in widget.line.allSyllables) syl: SyllableSprings(),
     };
+    for (final syl in widget.line.allSyllables) {
+      _values[syl] = ValueNotifier(GlowValues.idle);
+      if (syl.isEmphasized) {
+        _letterValues[syl] = [
+          for (var i = 0; i < syl.text.characters.length; i++)
+            ValueNotifier(GlowValues.idle),
+        ];
+      }
+    }
 
     // Подписываемся на visualizer напрямую для минимальной задержки
     _visSub = ref.read(visualizerEngineProvider).stream.listen((snap) {
@@ -393,8 +430,6 @@ class _ActiveLineWidgetState extends ConsumerState<_ActiveLineWidget>
     final lineDur = widget.line.durationMs.toDouble();
     final lineTimeScale = ((currentMs - lineStart) / lineDur).clamp(0.0, 1.0);
 
-    bool anyChanged = false;
-
     for (final entry in _springs.entries) {
       final syl = entry.key;
       final springs = entry.value;
@@ -419,31 +454,61 @@ class _ActiveLineWidgetState extends ConsumerState<_ActiveLineWidget>
 
       if (dt > 0) {
         final (s, y, g) = springs.step(dt.clamp(0.0, 0.1));
-        _values[syl] = (scale: s, yOffset: y, glow: g);
-        if (!springs.isSleeping) anyChanged = true;
+        _values[syl]!.value = GlowValues(scale: s, yOffset: y, glow: g);
       } else {
-        _values[syl] = (
+        _values[syl]!.value = GlowValues(
           scale: springs.scale.position,
           yOffset: springs.yOffset.position,
           glow: springs.glow.position,
         );
+      }
+
+      // Слог с акцентом: у каждой буквы свой сдвинутый отрезок времени —
+      // тот самый «перекат» по буквам
+      final letters = _letterValues[syl];
+      if (letters != null && letters.isNotEmpty) {
+        final sylStart = (syl.startMs - lineStart) / lineDur;
+        final sylEnd = (syl.endMs - lineStart) / lineDur;
+        final rawSylTs =
+            ((lineTimeScale - sylStart) / (sylEnd - sylStart)).clamp(0.0, 1.0);
+        final timeAlpha = math.sin(rawSylTs * math.pi / 2);
+        final step = 1.0 / letters.length;
+        for (var li = 0; li < letters.length; li++) {
+          final lStart = li * step;
+          final lEnd = (li + 1) * step;
+          final letterTs =
+              ((timeAlpha - lStart) / (lEnd - lStart)).clamp(0.0, 1.0);
+          final glowTs =
+              ((timeAlpha - lStart) / (1.0 - lStart)).clamp(0.0, 1.0);
+          letters[li].value = GlowValues(
+            scale: kScaleSpline.at(letterTs),
+            yOffset: kYOffsetSpline.at(letterTs) * 2,
+            glow: kGlowSpline.at(glowTs),
+          );
+        }
       }
     }
 
     // Обновляем resonance-пружину
     // Цель = небольшое смещение пропорционально текущему bass (ambient)
     _resonanceSpr.goal = _bass * 2.0; // max 2px смещение при bass=1
-    final newRX = _resonanceSpr.update(dt.clamp(0.0, 0.1));
-    if ((newRX - _resonanceX).abs() > 0.01) anyChanged = true;
-    _resonanceX = newRX;
-
-    if (anyChanged || dt == 0) setState(() {});
+    _resonance.value = _resonanceSpr.update(dt.clamp(0.0, 0.1));
+    // setState не нужен: значения читают GlowLetter и ValueListenableBuilder
   }
 
   @override
   void dispose() {
     _visSub?.cancel();
     _ticker.dispose();
+    _resonance.dispose();
+    for (final v in _values.values) {
+      v.dispose();
+    }
+    for (final list in _letterValues.values) {
+      for (final v in list) {
+        v.dispose();
+      }
+    }
     super.dispose();
   }
 
@@ -451,39 +516,49 @@ class _ActiveLineWidgetState extends ConsumerState<_ActiveLineWidget>
   Widget build(BuildContext context) {
     const double fontSize = 32.0;
 
-    return Transform.translate(
-      offset: Offset(_resonanceX, 0), // ← горизонтальный толчок от баса
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 4,
-        children: widget.line.words.map((word) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: word.syllables.map((syl) {
-              final vals =
-                  _values[syl] ?? (scale: 1.0, yOffset: 0.0, glow: 0.0);
+    // Строка собирается один раз: дальше её слоги перекрашиваются сами
+    final line = Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: widget.line.words.map((word) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: word.syllables.map((syl) {
+            final letters = _letterValues[syl];
+            if (letters != null && letters.isNotEmpty) {
+              final chars = syl.text.characters.toList();
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < chars.length && i < letters.length; i++)
+                    _SyllableWidget(
+                      text: chars[i],
+                      values: letters[i],
+                      fontSize: fontSize,
+                      palette: widget.palette,
+                    ),
+                ],
+              );
+            }
+            return _SyllableWidget(
+              text: syl.text,
+              values: _values[syl]!,
+              fontSize: fontSize,
+              palette: widget.palette,
+            );
+          }).toList(),
+        );
+      }).toList(),
+    );
 
-              if (syl.isEmphasized) {
-                return _EmphasizedSyllable(
-                  syllable: syl,
-                  values: vals,
-                  fontSize: fontSize,
-                  palette: widget.palette,
-                  lineStartMs: widget.line.startMs.toDouble(),
-                  lineDurMs: widget.line.durationMs.toDouble(),
-                  currentMs: widget.currentMs,
-                );
-              } else {
-                return _SyllableWidget(
-                  text: syl.text,
-                  values: vals,
-                  fontSize: fontSize,
-                  palette: widget.palette,
-                );
-              }
-            }).toList(),
-          );
-        }).toList(),
+    // ← горизонтальный толчок от баса: перерисовывается только обёртка,
+    // сама строка не пересобирается (child проносится сквозь builder)
+    return ValueListenableBuilder<double>(
+      valueListenable: _resonance,
+      child: line,
+      builder: (context, dx, child) => Transform.translate(
+        offset: Offset(dx, 0),
+        child: child,
       ),
     );
   }
@@ -502,110 +577,34 @@ class _SyllableWidget extends StatelessWidget {
   });
 
   final String text;
-  final ({double scale, double yOffset, double glow}) values;
+  final ValueListenable<GlowValues> values;
   final double fontSize;
   final PaletteState palette;
 
-  @override
-  Widget build(BuildContext context) {
-    final glowAlpha = values.glow.clamp(0.0, 1.0);
-    final color =
-        Color.lerp(Colors.white.withAlpha(110), Colors.white, glowAlpha)!;
-    final blurRadius = 4.0 + 2.0 * glowAlpha;
-    final shadowAlpha = (glowAlpha * 0.35 * 255).round();
-
-    return Transform(
-      transform: Matrix4.translationValues(0, fontSize * values.yOffset, 0),
-      alignment: Alignment.center,
-      child: Transform.scale(
-        scale: values.scale.clamp(0.5, 1.5),
-        alignment: Alignment.bottomCenter,
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w800,
-            color: color,
-            height: 1.25,
-            shadows: shadowAlpha > 5
-                ? [
-                    Shadow(
-                      color: Colors.white.withAlpha(shadowAlpha),
-                      blurRadius: blurRadius,
-                    ),
-                    Shadow(
-                      color: palette.primary.withAlpha(shadowAlpha ~/ 2),
-                      blurRadius: blurRadius * 2,
-                    ),
-                  ]
-                : null,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// EMPHASIZED SYLLABLE
-// ═══════════════════════════════════════════════════════════════════════════
-
-class _EmphasizedSyllable extends StatelessWidget {
-  const _EmphasizedSyllable({
-    required this.syllable,
-    required this.values,
-    required this.fontSize,
-    required this.palette,
-    required this.lineStartMs,
-    required this.lineDurMs,
-    required this.currentMs,
-  });
-
-  final LyricSyllable syllable;
-  final ({double scale, double yOffset, double glow}) values;
-  final double fontSize;
-  final PaletteState palette;
-  final double lineStartMs;
-  final double lineDurMs;
-  final double currentMs;
+  /// Тот же вид, что был у Text с тенями, только рисуется без перестроения
+  /// дерева на каждый кадр (`glow_letter.dart`).
+  static const _style = GlowStyle(
+    colorFrom: Color(0x6EFFFFFF), // белый 110
+    shadowScale: 0.35,
+    shadowThreshold: 5,
+    blurBase: 4.0,
+    blurSlope: 2.0,
+    minScale: 0.5,
+    maxScale: 1.5,
+  );
 
   @override
   Widget build(BuildContext context) {
-    final letters = syllable.text.characters.toList();
-    if (letters.isEmpty) return const SizedBox.shrink();
-
-    final sylStart = (syllable.startMs - lineStartMs) / lineDurMs;
-    final sylEnd = (syllable.endMs - lineStartMs) / lineDurMs;
-    final lineTs = ((currentMs - lineStartMs) / lineDurMs).clamp(0.0, 1.0);
-    final rawSylTs =
-        ((lineTs - sylStart) / (sylEnd - sylStart)).clamp(0.0, 1.0);
-    final timeAlpha = math.sin(rawSylTs * math.pi / 2);
-    final step = 1.0 / letters.length;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(letters.length, (li) {
-        final lStart = li * step;
-        final lEnd = (li + 1) * step;
-        final letterTs =
-            ((timeAlpha - lStart) / (lEnd - lStart)).clamp(0.0, 1.0);
-        final glowTs = ((timeAlpha - lStart) / (1.0 - lStart)).clamp(0.0, 1.0);
-
-        return _SyllableWidget(
-          text: letters[li],
-          values: (
-            scale: kScaleSpline.at(letterTs),
-            yOffset: kYOffsetSpline.at(letterTs) * 2,
-            glow: kGlowSpline.at(glowTs),
-          ),
-          fontSize: fontSize,
-          palette: palette,
-        );
-      }),
+    return GlowLetter(
+      text: text,
+      values: values,
+      fontSize: fontSize,
+      glowColor: palette.primary,
+      textScaler: MediaQuery.textScalerOf(context),
+      style: _style,
     );
   }
 }
-
 // ═══════════════════════════════════════════════════════════════════════════
 // INACTIVE LINE
 // ═══════════════════════════════════════════════════════════════════════════
@@ -643,18 +642,23 @@ class _InactiveLineWidget extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _AmbientPainter extends CustomPainter {
-  const _AmbientPainter({
+  /// [pulse] и [bass] приходят значениями, а не полями виджета: перерисовка
+  /// идёт по ним, без setState и перестроения дерева (`performance.md`).
+  _AmbientPainter({
     required this.c1,
     required this.c2,
     required this.pulse,
     required this.bass,
-  });
+  }) : super(repaint: Listenable.merge([pulse, bass]));
+
   final Color c1, c2;
-  final double pulse;
-  final double bass;
+  final ValueListenable<double> pulse;
+  final ValueListenable<double> bass;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final pulse = this.pulse.value;
+    final bass = this.bass.value;
     // Радиус blob-а растёт с bass
     final r1 = size.width * (0.72 + bass * 0.18);
     final r2 = size.width * (0.58 + bass * 0.14);
@@ -686,6 +690,5 @@ class _AmbientPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_AmbientPainter o) =>
-      o.pulse != pulse || o.c1 != c1 || o.c2 != c2 || o.bass != bass;
+  bool shouldRepaint(_AmbientPainter o) => o.c1 != c1 || o.c2 != c2;
 }
