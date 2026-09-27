@@ -31,6 +31,8 @@ A workaround is fine only when you name it as one and say what it defers.
 
 After any significant task, add an entry at the top of `docs/CHANGELOG_CLAUDE.md` (date, what, why, what you deliberately left alone); `.jules/` is Jules's topic-based lesson log — read it, never write to it.
 
+**`docs/BACKLOG.md` — what users ask for and what was decided.** The player has users now and requests arrive faster than they get built, so they are collected in one place instead of scattered across chats. Read it before proposing new work: a request may already be there, already done, or already turned down for a reason. A new request goes in as a fact-checked entry, not a retelling — users describe the symptom and are usually wrong about the cause. Nothing moves into work without Orion's say-so; he decides what gets built.
+
 ## Topic rules (`.claude/rules/`)
 
 Written in Russian. Each file has `paths:` frontmatter, so it loads automatically only when you read a matching file — not every session. Commands that read no files (building, `pub upgrade`) don't trigger that, so read the file yourself before:
