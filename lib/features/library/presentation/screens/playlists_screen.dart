@@ -16,6 +16,7 @@ import '../../../player/presentation/widgets/protogenix_background.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/cover_placeholder.dart';
+import '../../../../core/widgets/track_cover.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // PLAYLISTS SCREEN
@@ -932,10 +933,10 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       icon: Icons.play_arrow_rounded,
                       label: 'Слушать',
                       onTap: () {
-                        ref.read(playerProvider.notifier).loadPlaylist(
+                        ref.read(playerProvider.notifier).playFromList(
                           tracks.map((t) => t.toTrackModel()).toList(),
+                          0,
                         );
-                        ref.read(playerProvider.notifier).play();
                       },
                     ),
                   ),
@@ -1238,8 +1239,10 @@ class _ReorderableTrackTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player = ref.watch(playerProvider);
-    final isPlaying = player.currentTrack?.id == track.id;
+    // select: без него строка списка перестраивалась на каждое обновление
+    // позиции (несколько раз в секунду, performance.md)
+    final isPlaying = ref.watch(
+        playerProvider.select((s) => s.currentTrack?.id == track.id));
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1267,9 +1270,7 @@ class _ReorderableTrackTile extends ConsumerWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image(
-              image: track.coverPath != null
-                  ? FileImage(File(track.coverPath!)) as ImageProvider
-                  : kCoverPlaceholder,
+              image: coverFromPath(context, track.coverPath, 44),
               width: 44,
               height: 44,
               fit: BoxFit.cover,
@@ -1336,10 +1337,7 @@ class _ReorderableTrackTile extends ConsumerWidget {
           : InkWell(
         onTap: () {
           final models = allTracks.map((t) => t.toTrackModel()).toList();
-          ref
-              .read(playerProvider.notifier)
-              .loadPlaylist(models, initialIndex: index);
-          ref.read(playerProvider.notifier).play();
+          ref.read(playerProvider.notifier).playFromList(models, index);
         },
         child: content,
       ),
@@ -1606,7 +1604,7 @@ class _AddTrackToPlaylistSheetState extends ConsumerState<_AddTrackToPlaylistShe
                         leading: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image(
-                            image: track.toTrackModel().coverImage,
+                            image: sizedCover(context, track.toTrackModel().coverImage, 40),
                             width: 40,
                             height: 40,
                             fit: BoxFit.cover,

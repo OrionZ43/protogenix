@@ -7,6 +7,7 @@ import '../../../settings/presentation/settings_screen.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
+import '../../../../core/widgets/track_cover.dart';
 
 import 'dart:io';
 import 'dart:math' as math;
@@ -222,9 +223,9 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
 
   @override
   Widget build(BuildContext context) {
-    final player = ref.watch(playerProvider);
-    final isPlaying =
-        player.isPlaying && player.currentTrack?.id == widget.track.id;
+    // select: карточка не перестраивается на каждое обновление позиции
+    final isPlaying = ref.watch(playerProvider.select(
+        (s) => s.isPlaying && s.currentTrack?.id == widget.track.id));
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -253,7 +254,8 @@ class _RecentTrackCardState extends ConsumerState<_RecentTrackCard> {
                   fit: StackFit.expand,
                   children: [
                     Image(
-                      image: widget.track.toTrackModel().coverImage,
+                      image: sizedCover(
+                          context, widget.track.toTrackModel().coverImage, 88 * widget.scale),
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: Colors.white10,

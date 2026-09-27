@@ -4,15 +4,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/track_model.dart';
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
+import '../../../../core/widgets/track_cover.dart';
 
 class QueuePanel extends ConsumerWidget {
   const QueuePanel({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player = ref.watch(playerProvider);
+    // select: панели нужны очередь, текущий трек и пауза, но не позиция —
+    // иначе весь список перестраивался несколько раз в секунду
+    // (performance.md)
+    final state = ref.watch(playerProvider.select((s) => (
+          queue: s.queue,
+          currentIndex: s.currentIndex,
+          isPlaying: s.isPlaying,
+        )));
     final palette = ref.watch(paletteProvider);
-    final queue = player.queue.cast<TrackModel>();
+    final queue = state.queue.cast<TrackModel>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -33,20 +41,24 @@ class QueuePanel extends ConsumerWidget {
             itemCount: queue.length,
             itemBuilder: (context, index) {
               final track = queue[index];
-              final isCurrent = index == player.currentIndex;
+              final isCurrent = index == state.currentIndex;
 
               return _QueueItem(
                 track: track,
                 isCurrent: isCurrent,
                 index: index,
                 palette: palette,
-                isPlaying: player.isPlaying,
+                isPlaying: state.isPlaying,
                 // Переход внутри очереди, без перезагрузки: иначе при
                 // перемешивании очередь перемешалась бы заново
                 onTap: () =>
                     ref.read(playerProvider.notifier).skipToIndex(index),
               )
-                  .animate(delay: Duration(milliseconds: 80 * index))
+                  // Задержка — только у первых строк: при задержке 80 мс
+                  // на каждую сотый трек очереди появлялся бы через 8 секунд,
+                  // а вся очередь — это вся медиатека
+                  .animate(
+                      delay: Duration(milliseconds: 80 * index.clamp(0, 8)))
                   .fadeIn(duration: 400.ms)
                   .slideX(begin: 0.2, end: 0);
             },
@@ -103,7 +115,7 @@ class _QueueItem extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image(
-                    image: track.coverImage,
+                    image: sizedCover(context, track.coverImage, 52),
                     width: 52,
                     height: 52,
                     fit: BoxFit.cover,

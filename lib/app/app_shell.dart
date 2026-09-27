@@ -133,14 +133,24 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
   /// Bug 3 fix: useSafeArea: true — BottomSheet не заползает под статус-бар.
   /// Bug 2 fix: _FullPlayerSheet больше не добавляет Positioned-кнопку «вниз»,
   ///            т.к. PlayerScreen._TopBar теперь сам обрабатывает навигацию.
+  /// Плеер открыт поверх оболочки: её анимации на это время останавливаются
+  /// (TickerMode ниже). Шторка закрывает экран целиком, но оболочка под ней
+  /// продолжала рисовать свой анимированный фон — второй полноэкранный
+  /// `saveLayer` с четырьмя градиентами на каждый кадр, как раз пока едет
+  /// анимация открытия (`performance.md`).
+  bool _playerOpen = false;
+
   void _openPlayer(BuildContext context) {
+    setState(() => _playerOpen = true);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       useSafeArea: true, // ← Bug 3: было false
       builder: (_) => const _FullPlayerSheet(),
-    );
+    ).whenComplete(() {
+      if (mounted) setState(() => _playerOpen = false);
+    });
   }
 
   /// Bug 4 fix: при разложении телефона в планшетный режим (compact→expanded)
@@ -171,10 +181,14 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF080810),
-      body: UpdateBannerLayout(
-        child: IndexedStack(
-          index: tabIndex,
-          children: _tabScreens(tabIndex),
+      body: TickerMode(
+        // Плеер открыт поверх — под ним анимировать нечего
+        enabled: !_playerOpen,
+        child: UpdateBannerLayout(
+          child: IndexedStack(
+            index: tabIndex,
+            children: _tabScreens(tabIndex),
+          ),
         ),
       ),
 

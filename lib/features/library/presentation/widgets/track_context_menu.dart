@@ -3,13 +3,11 @@
 // Контекстное меню трека (BottomSheet).
 // Действия: избранное, добавить в плейлист, найти текст, удалить.
 
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/cover_placeholder.dart';
 import '../../../../core/widgets/glass_dialog.dart';
 
 import '../../domain/library_track.dart';
@@ -18,6 +16,7 @@ import '../playlist_provider.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/lyrics_search_sheet.dart';
 import 'add_to_playlist_sheet.dart';
+import '../../../../core/widgets/track_cover.dart';
 import 'track_edit_sheet.dart';
 
 // ── Точка входа ───────────────────────────────────────────────────────────────
@@ -82,9 +81,7 @@ class _TrackContextMenu extends ConsumerWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: Image(
-                      image: track.coverPath != null
-                          ? FileImage(File(track.coverPath!)) as ImageProvider
-                          : kCoverPlaceholder,
+                      image: coverFromPath(context, track.coverPath, 48),
                       width: 48,
                       height: 48,
                       fit: BoxFit.cover,

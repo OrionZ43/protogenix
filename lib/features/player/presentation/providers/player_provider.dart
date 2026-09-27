@@ -386,6 +386,35 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   }
 
   /// Перейти к треку очереди (панель «Далее») — без перезагрузки очереди.
+  /// Включить трек из готового списка: медиатека, избранное, плейлист.
+  ///
+  /// Если в очереди уже ровно этот список, она не пересобирается — плеер
+  /// просто переходит к нужному треку. Пересборка при сотнях треков стоит
+  /// дорого: столько же MediaItem уходит в медиасессию Android, собирается
+  /// новый ConcatenatingAudioSource и у каждого трека проверяется файл
+  /// (`performance.md`). При включённом перемешивании порядок очереди свой,
+  /// поэтому там всегда полная загрузка — она заново перемешивает очередь
+  /// вокруг выбранного трека.
+  Future<void> playFromList(Iterable<TrackModel> tracks, int index) async {
+    final list = tracks is List<TrackModel> ? tracks : tracks.toList();
+    if (!state.isShuffle && _sameQueue(list)) {
+      await skipToIndex(index);
+      return;
+    }
+    await loadPlaylist(list, initialIndex: index);
+    await play();
+  }
+
+  /// Та же очередь и в том же порядке — сравнение по id, без обхода файлов.
+  bool _sameQueue(List<TrackModel> tracks) {
+    final queue = state.queue;
+    if (queue.length != tracks.length || queue.isEmpty) return false;
+    for (var i = 0; i < queue.length; i++) {
+      if (queue[i].id != tracks[i].id) return false;
+    }
+    return true;
+  }
+
   Future<void> skipToIndex(int index) async {
     if (index < 0 || index >= state.queue.length) return;
     await _player.seek(Duration.zero, index: index);

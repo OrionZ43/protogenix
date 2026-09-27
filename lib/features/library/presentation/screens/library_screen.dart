@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -17,8 +16,8 @@ import '../../../player/presentation/providers/palette_provider.dart';
 import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
-import '../../../../core/theme/cover_placeholder.dart';
 import '../../../../core/widgets/chip_button.dart';
+import '../../../../core/widgets/track_cover.dart';
 import '../../../../core/widgets/glass_dialog.dart';
 
 class LibraryScreen extends ConsumerWidget {
@@ -800,11 +799,10 @@ class _TrackTile extends ConsumerWidget {
           : () {
         // Оптимизация производительности: используем Iterable (map) без toList(),
         // чтобы избежать блокировки UI-потока перед запуском плеера.
+        // playFromList: если очередь уже ровно этот список, она не
+        // пересобирается (performance.md)
         final models = tracks.map((t) => t.toTrackModel());
-        ref.read(playerProvider.notifier).loadPlaylist(
-              models,
-              initialIndex: index,
-            );
+        ref.read(playerProvider.notifier).playFromList(models, index);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -833,9 +831,7 @@ class _TrackTile extends ConsumerWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: Image(
-                    image: track.coverPath != null
-                        ? FileImage(File(track.coverPath!)) as ImageProvider
-                        : kCoverPlaceholder,
+                    image: coverFromPath(context, track.coverPath, 50),
                     width: 50,
                     height: 50,
                     fit: BoxFit.cover,
@@ -957,7 +953,7 @@ class _PlayAllButton extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         final models = tracks.map((t) => t.toTrackModel());
-        ref.read(playerProvider.notifier).loadPlaylist(models);
+        ref.read(playerProvider.notifier).playFromList(models, 0);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1037,16 +1033,15 @@ class _FavoriteTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player = ref.watch(playerProvider);
-    final isPlaying = player.currentTrack?.id == track.id;
+    // select: без него строка списка перестраивалась на каждое обновление
+    // позиции (несколько раз в секунду, performance.md)
+    final isPlaying = ref.watch(
+        playerProvider.select((s) => s.currentTrack?.id == track.id));
 
     return InkWell(
       onTap: () {
         final models = allTracks.map((t) => t.toTrackModel());
-        ref.read(playerProvider.notifier).loadPlaylist(
-              models,
-              initialIndex: index,
-            );
+        ref.read(playerProvider.notifier).playFromList(models, index);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1071,9 +1066,7 @@ class _FavoriteTile extends ConsumerWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Image(
-                image: track.coverPath != null
-                    ? FileImage(File(track.coverPath!)) as ImageProvider
-                    : kCoverPlaceholder,
+                image: coverFromPath(context, track.coverPath, 50),
                 width: 50,
                 height: 50,
                 fit: BoxFit.cover,

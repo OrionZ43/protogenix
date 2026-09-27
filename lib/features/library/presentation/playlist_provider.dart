@@ -60,16 +60,20 @@ final playlistTracksProvider =
   (ref, playlistId) async {
     final ids =
         await PlaylistDatabase.instance.getTrackIdsForPlaylist(playlistId);
-    final db = LibraryDatabase.instance;
-    final result = <LibraryTrack>[];
+    if (ids.isEmpty) return const <LibraryTrack>[];
 
-    for (final id in ids) {
-      // Получаем трек из библиотеки по id
-      final tracks = await db.getAllTracks();
-      final match = tracks.where((t) => t.id == id).toList();
-      if (match.isNotEmpty) result.add(match.first);
-    }
-    return result;
+    // Одно чтение таблицы и Map по id. Раньше здесь на каждый трек плейлиста
+    // читалась вся таблица треков: при 300 треках и плейлисте на 50 — 50
+    // запросов и 15 000 разобранных строк, и так на каждую плитку плейлиста
+    // (performance.md). Рядом PlaylistTracksNotifier._load делает так же.
+    final byId = {
+      for (final track in await LibraryDatabase.instance.getAllTracks())
+        track.id: track
+    };
+    return [
+      for (final id in ids)
+        if (byId[id] case final track?) track,
+    ];
   },
 );
 
