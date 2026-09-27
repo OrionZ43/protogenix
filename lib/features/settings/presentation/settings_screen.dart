@@ -17,8 +17,10 @@ import '../../../core/widgets/section_card.dart';
 import '../../discord/presentation/discord_presence.dart';
 import '../../library/presentation/screens/info_screen.dart';
 import '../../player/presentation/providers/lyrics_display_provider.dart';
+import '../../player/presentation/providers/visualizer_style_provider.dart';
 import '../../player/presentation/providers/palette_provider.dart';
 import '../../player/presentation/providers/player_provider.dart';
+import '../../player/presentation/widgets/audio_visualizer.dart';
 import '../../player/presentation/widgets/eq_sheet.dart';
 import '../../player/presentation/widgets/protogenix_background.dart';
 import '../../updater/update_provider.dart';
@@ -60,6 +62,8 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 24),
                           _LyricsCard(accent: accent),
+                          const SizedBox(height: 16),
+                          _VisualizerCard(accent: accent),
                           if (Platform.isWindows) ...[
                             const SizedBox(height: 16),
                             _DiscordCard(accent: accent),
@@ -127,6 +131,66 @@ class _LyricsCard extends ConsumerWidget {
               accent: linesOnly ? accent : null,
               onTap: linesOnly ? () {} : notifier.toggle,
             ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Какой визуализатор показывать вместо текста, когда его нет
+/// (visualizer_style_provider.dart, audio_visualizer.dart).
+class _VisualizerCard extends ConsumerWidget {
+  const _VisualizerCard({required this.accent});
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final style = ref.watch(visualizerStyleProvider);
+    final notifier = ref.read(visualizerStyleProvider.notifier);
+
+    return SectionCard(
+      icon: Icons.graphic_eq_rounded,
+      title: 'ВИЗУАЛИЗАТОР',
+      accent: accent,
+      children: [
+        const Text(
+          'Когда у трека нет текста, вместо пустого места двигается '
+          'визуализатор. Он идёт по частотам самой песни: «Свет» — мягкие '
+          'пятна цвета обложки, «Столбики» — обычный анализатор.',
+          style: _bodyStyle,
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Спектр считается один раз при первом прослушивании трека.',
+          style: _hintStyle,
+        ),
+        const SizedBox(height: 12),
+        // Живой предпросмотр: выбирать удобнее глазами, а на паузе
+        // визуализатор просто ровно дышит
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            height: 104,
+            color: Colors.white.withAlpha(10),
+            child: const AudioVisualizer(compact: true),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in VisualizerStyle.values)
+              ChipButton(
+                label: option.label,
+                icon: switch (option) {
+                  VisualizerStyle.glow => Icons.blur_on_rounded,
+                  VisualizerStyle.bars => Icons.bar_chart_rounded,
+                },
+                accent: style == option ? accent : null,
+                onTap: () => notifier.select(option),
+              ),
           ],
         ),
       ],

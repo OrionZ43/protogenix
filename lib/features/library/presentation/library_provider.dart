@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../player/data/envelope_store.dart';
+import '../../player/data/spectrum_store.dart';
 import '../data/library_database.dart';
 import '../domain/library_track.dart';
 
@@ -70,6 +72,11 @@ class LibraryNotifier extends StateNotifier<List<LibraryTrack>> {
         debugPrint('[Library] Не удалось удалить обложку: $e');
       }
     }
+
+    // Посчитанные по звуку волна и спектр (waveforms/<id>): без этого они
+    // остались бы лежать, а у спектра это десятки килобайт на трек
+    await EnvelopeStore.instance.forget(track.id);
+    await SpectrumStore.instance.forget(track.id);
   }
 
   // ── Устаревший метод без удаления файлов (для обратной совместимости) ────

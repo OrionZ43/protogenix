@@ -59,6 +59,10 @@ dependencies:
   file_picker: ^11.0.2
   url_launcher: ^6.3.2
   crypto: ^3.0.7
+  # Спектр трека считается по PCM от libmpv через FFI
+  # (player/data/pcm_decoder.dart). Пакет команды Dart, чистый Dart,
+  # без нативной сборки; до этого шёл транзитивно той же версией 2.2.0.
+  ffi: ^2.1.0
   cryptography: ^2.9.0
   audio_metadata_reader: ^1.8.0
   desktop_drop: ^0.8.4
