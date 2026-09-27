@@ -6,6 +6,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 class ChipButton extends StatelessWidget {
   const ChipButton({
     super.key,
@@ -24,7 +26,11 @@ class ChipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = accent ?? Colors.white;
+    // Акцент идёт на текст, иконку и рамку, поэтому он обязан быть светлее
+    // фона: тёмный цвет обложки делал выделенную таблетку бледнее обычной
+    // (`AppColors.readableAccent`)
+    final color =
+        accent == null ? Colors.white : AppColors.readableAccent(accent!);
     final strong = accent != null;
     return Opacity(
       opacity: onTap == null ? 0.4 : 1,

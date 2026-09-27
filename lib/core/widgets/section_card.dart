@@ -7,6 +7,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 class SectionCard extends StatelessWidget {
   const SectionCard({
     super.key,
@@ -39,7 +41,9 @@ class SectionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: accent, size: 18),
+              // Та же беда, что у таблеток: тёмную обложку на тёмной
+              // карточке просто не видно (`AppColors.readableAccent`)
+              Icon(icon, color: AppColors.readableAccent(accent), size: 18),
               const SizedBox(width: 10),
               Text(
                 title,
