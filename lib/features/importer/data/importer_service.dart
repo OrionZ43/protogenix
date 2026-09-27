@@ -26,6 +26,7 @@ import '../../../core/services/youtube_clients.dart';
 import 'device_music.dart';
 import 'local_tags.dart';
 import '../domain/import_collection.dart';
+import '../domain/youtube_playlist_link.dart';
 import 'spotify_page.dart';
 import 'imported_tracks_index.dart';
 import 'yandex_music.dart';
@@ -129,6 +130,11 @@ class ImporterService {
 
   final _dio = Dio();
 
+  /// Предохранитель для плейлистов YouTube: у миксов и радио список бывает
+  /// бесконечным, а у обычного плейлиста столько треков не бывает. Это не
+  /// продуктовое ограничение — остановить импорт можно кнопкой в любой момент.
+  static const kYoutubePlaylistMax = 500;
+
   // Порядок клиентов YouTube и почему именно такой — youtube_clients.dart.
   static final _clientFallbackOrder = kYoutubeClientFallbackOrder;
 
@@ -157,8 +163,16 @@ class ImporterService {
         await _importYandexMusic(
             url: url, onProgress: onProgress, control: control);
       } else if (_isYouTube(url)) {
-        await _importYouTube(
-            url: url, onProgress: onProgress, control: control);
+        // `watch?v=…&list=…` — это ролик внутри плейлиста, и качаем мы ролик
+        // (`youtube_playlist_link.dart`)
+        final list = youtubePlaylistId(url);
+        if (list != null) {
+          await _importYouTubePlaylist(
+              playlistId: list, onProgress: onProgress, control: control);
+        } else {
+          await _importYouTube(
+              url: url, onProgress: onProgress, control: control);
+        }
       } else if (_isSoundCloud(url)) {
         await _importSoundCloud(url: url, onProgress: onProgress);
       } else if (_isDirectAudio(url)) {
@@ -829,6 +843,156 @@ class ImporterService {
     }
 
     await _importCollection(collection, onProgress, control);
+  }
+
+  /// Плейлист YouTube целиком. Просил Elian (2026-09-27).
+  ///
+  /// Отличие от Spotify и Яндекса (`_importCollection`): там мы знаем только
+  /// название с исполнителем и **ищем** подходящий ролик на каждый трек —
+  /// отсюда и ограничение YouTube на частоту запросов, и пропуски «не нашлось».
+  /// Здесь ролики известны сразу, поиска нет вообще, поэтому и быстрее, и
+  /// надёжнее.
+  ///
+  /// Плейлист Protogenix называется так же; повторный импорт той же ссылки
+  /// дополняет его, а не плодит копии, и уже скачанные ролики пропускает.
+  /// Остановка — между треками (`ImportControl`).
+  Future<void> _importYouTubePlaylist({
+    required String playlistId,
+    required void Function(ImportProgress) onProgress,
+    ImportControl? control,
+  }) async {
+    onProgress(const ImportProgress(
+      status: ImportStatus.fetchingMeta,
+      message: 'Получение плейлиста с YouTube...',
+      progress: 0.02,
+    ));
+
+    final yt = YoutubeExplode();
+    try {
+      final playlist = await yt.playlists.get(playlistId);
+      // Предохранитель: у миксов и радио список бывает бесконечным
+      final videos = await yt.playlists
+          .getVideos(playlist.id)
+          .take(kYoutubePlaylistMax)
+          .toList();
+
+      if (videos.isEmpty) {
+        onProgress(const ImportProgress(
+          status: ImportStatus.error,
+          message: 'В плейлисте нечего скачивать',
+          error: 'YouTube не отдал ни одного ролика. Плейлист может быть '
+              'приватным или пустым.',
+        ));
+        return;
+      }
+
+      final name = _playlistTitle(playlist.title);
+      String? listId;
+      var saved = 0;
+      var alreadyHad = 0;
+      var failed = 0;
+      var stopped = false;
+
+      for (var i = 0; i < videos.length; i++) {
+        if (control?.cancelled ?? false) {
+          stopped = true;
+          break;
+        }
+        final video = videos[i];
+        final title = _cleanYouTubeTitle(video.title);
+        final ofTotal = ' (${i + 1} из ${videos.length})';
+        final base = i / videos.length;
+        final step = 1 / videos.length;
+
+        try {
+          final existing =
+              await LibraryDatabase.instance.getTrackById(video.id.value);
+          final String trackId;
+          if (existing != null) {
+            trackId = existing.id;
+            alreadyHad++;
+            onProgress(ImportProgress(
+              status: ImportStatus.fetchingMeta,
+              message: 'Уже в медиатеке: $title$ofTotal',
+              progress: base + step,
+              label: name,
+            ));
+          } else {
+            trackId = await _downloadYouTubeVideo(
+              yt: yt,
+              video: video,
+              cleanTitle: title,
+              albumName: name,
+              onProgress: (p) => onProgress(ImportProgress(
+                status: p.status,
+                message: '${p.message}$ofTotal',
+                progress: base + step * p.progress,
+                label: name,
+              )),
+            );
+          }
+
+          listId ??= await _playlistNamed(name);
+          await PlaylistDatabase.instance.addTrackToPlaylist(
+            playlistId: listId,
+            trackId: trackId,
+          );
+          saved++;
+          control?.onTrackSaved?.call();
+        } catch (e) {
+          failed++;
+          debugPrint('[Импорт] Плейлист: пропуск "$title": $e');
+        }
+      }
+
+      if (saved == 0 && !stopped) {
+        onProgress(const ImportProgress(
+          status: ImportStatus.error,
+          message: 'Не удалось скачать с YouTube',
+          error: 'YouTube не отдал аудио ни для одного ролика. '
+              'Попробуй ещё раз позже.',
+        ));
+        return;
+      }
+
+      final notes = [
+        if (alreadyHad > 0) 'уже были: $alreadyHad',
+        if (failed > 0) 'не скачалось: $failed',
+        if (playlist.videoCount != null &&
+            playlist.videoCount! > videos.length)
+          'YouTube отдал ${videos.length} из ${playlist.videoCount}',
+        if (videos.length >= kYoutubePlaylistMax)
+          'взяли первые $kYoutubePlaylistMax',
+      ];
+      final tail = notes.isEmpty ? '' : ', ${notes.join(', ')}';
+      onProgress(ImportProgress(
+        status: ImportStatus.done,
+        message: stopped
+            ? '■ Остановлено: $saved из ${videos.length}$tail'
+            : '✓ Готово: $saved из ${videos.length}$tail',
+        progress: 1.0,
+        label: name,
+      ));
+    } catch (e) {
+      // Своего исключения на «плейлист недоступен» у библиотеки нет, поэтому
+      // и приватный, и удалённый, и сетевой сбой приходят сюда одинаково
+      debugPrint('[Импорт] Плейлист не удался: $e');
+      onProgress(const ImportProgress(
+        status: ImportStatus.error,
+        message: 'Не удалось получить плейлист',
+        error: 'YouTube не отдал список роликов. Плейлист может быть '
+            'приватным или удалённым — или попробуй ещё раз позже.',
+      ));
+    } finally {
+      yt.close();
+    }
+  }
+
+  /// Имя плейлиста из названия на YouTube: без управляющих символов
+  /// (`security.md`) и не пустое.
+  String _playlistTitle(String raw) {
+    final clean = raw.replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '').trim();
+    return clean.isEmpty ? 'Плейлист YouTube' : clean;
   }
 
   /// Общий путь для Яндекс Музыки и Spotify: треки коллекции ищутся

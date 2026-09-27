@@ -41,7 +41,7 @@ dependencies:
   youtube_explode_dart:
     git:
       url: https://github.com/OrionZ43/youtube_explode_dart.git
-      ref: 4dee1fcd033cbffe7a18ec7a17de38e02a8aeea2
+      ref: cf8f881ae059220bb37f7358b465babd54021b1a
 
   scrollable_positioned_list: ^0.3.8
   string_similarity: ^2.0.0
