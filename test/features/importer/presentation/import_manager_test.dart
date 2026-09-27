@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:protogenix/core/services/app_paths.dart';
 import 'package:protogenix/features/importer/data/importer_service.dart';
 import 'package:protogenix/features/importer/presentation/import_manager.dart';
+import 'package:protogenix/features/library/domain/library_track.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Плеер в тестах не создать: audioHandler есть только в main()
@@ -106,5 +107,76 @@ void main() {
     expect(job().progress.status, ImportStatus.error);
     expect(job().progress.error,
         'Не получилось: «Песня A». Остальное добавлено.');
+  });
+
+  // ── Вопрос про дубль ──────────────────────────────────────────────────────
+  //
+  // Импорт останавливается и ждёт ответа из плашки (`_askDuplicate`). Самое
+  // важное здесь — чтобы он не завис, если ответить некому.
+
+  final existing = LibraryTrack(
+    id: 'a',
+    title: 'Cheat Codes',
+    artist: 'Nitro Fun',
+    album: 'Monstercat',
+    filePath: 'x',
+    durationMs: 1000,
+    source: 'youtube',
+    addedAt: DateTime(2026),
+  );
+
+  test('дубль: вопрос виден в плашке, «Добавить» отвечает да', () async {
+    bool? answer;
+    final run = manager.enqueue('Песня', (control, onProgress) async {
+      answer = await control.confirmDuplicate!(existing);
+      onProgress(
+          const ImportProgress(status: ImportStatus.done, message: '✓'));
+    });
+
+    // Дать импорту дойти до вопроса
+    await Future<void>.delayed(Duration.zero);
+    expect(job().question, isNotNull);
+    expect(job().question!.title, 'Cheat Codes');
+    expect(job().question!.artist, 'Nitro Fun');
+
+    manager.answerDuplicate(true);
+    await run;
+
+    expect(answer, isTrue);
+    expect(job().question, isNull, reason: 'вопрос убран после ответа');
+  });
+
+  test('дубль: «Пропустить» отвечает нет', () async {
+    bool? answer;
+    final run = manager.enqueue('Песня', (control, onProgress) async {
+      answer = await control.confirmDuplicate!(existing);
+      onProgress(
+          const ImportProgress(status: ImportStatus.done, message: '✓'));
+    });
+
+    await Future<void>.delayed(Duration.zero);
+    manager.answerDuplicate(false);
+    await run;
+
+    expect(answer, isFalse);
+  });
+
+  test('«Остановить» с висящим вопросом не подвешивает импорт', () async {
+    bool? answer;
+    final run = manager.enqueue('Песня', (control, onProgress) async {
+      answer = await control.confirmDuplicate!(existing);
+      onProgress(
+          const ImportProgress(status: ImportStatus.done, message: '✓'));
+    });
+
+    await Future<void>.delayed(Duration.zero);
+    expect(job().question, isNotNull);
+
+    manager.stop();
+    // Если бы ответа не было, здесь бы всё повисло навсегда
+    await run.timeout(const Duration(seconds: 5));
+
+    expect(answer, isFalse, reason: 'остановились — значит не добавляем');
+    expect(job().question, isNull);
   });
 }

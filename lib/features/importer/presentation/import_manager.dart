@@ -27,11 +27,25 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/app_settings_store.dart';
+import '../../library/domain/library_track.dart';
 import '../../library/presentation/library_provider.dart';
 import '../../library/presentation/playlist_provider.dart';
 import '../../player/presentation/providers/player_provider.dart';
 import '../data/device_music.dart';
 import '../data/importer_service.dart';
+
+/// «Такой трек уже есть» — импорт ждёт ответа.
+///
+/// Спрашиваем прямо в плашке импорта, а не диалогом: плашка живёт в
+/// `MaterialApp.builder`, где нет `Navigator` (`CLAUDE.md`), да и модалка
+/// поверх чужого экрана посреди фонового импорта — так себе.
+class DuplicateQuestion {
+  const DuplicateQuestion({required this.title, required this.artist});
+
+  /// Что уже лежит в медиатеке.
+  final String title;
+  final String artist;
+}
 
 class ImportJob {
   const ImportJob({
@@ -41,6 +55,7 @@ class ImportJob {
     this.stopping = false,
     this.url,
     this.queue = const [],
+    this.question,
   });
 
   /// Что импортируется: «Яндекс Музыка», «Свои файлы», название трека из
@@ -59,10 +74,15 @@ class ImportJob {
   /// Ждут своей очереди: ссылки, у импорта без ссылки — null.
   final List<String?> queue;
 
+  /// Импорт остановился и ждёт ответа: добавлять дубль или нет.
+  final DuplicateQuestion? question;
+
   ImportJob copyWith({
     ImportProgress? progress,
     bool? stopping,
     List<String?>? queue,
+    DuplicateQuestion? question,
+    bool clearQuestion = false,
   }) =>
       ImportJob(
         title: title,
@@ -71,6 +91,7 @@ class ImportJob {
         stopping: stopping ?? this.stopping,
         url: url,
         queue: queue ?? this.queue,
+        question: clearQuestion ? null : (question ?? this.question),
       );
 }
 
@@ -95,6 +116,9 @@ class ImportManager extends StateNotifier<ImportJob?> {
   final _settings = AppSettingsStore();
   final _queue = <_Queued>[];
   ImportControl? _control;
+
+  /// Ждёт ответа на вопрос про дубль (`_askDuplicate`).
+  Completer<bool>? _answer;
   bool _stopRequested = false;
   Timer? _refreshThrottle;
   bool _refreshQueued = false;
@@ -162,7 +186,42 @@ class ImportManager extends StateNotifier<ImportJob?> {
     _stopRequested = true;
     _queue.clear();
     _control?.cancel();
-    state = job.copyWith(stopping: true, queue: const []);
+    // Висит вопрос — отвечаем за человека «не добавлять», иначе импорт
+    // останется ждать ответа, которого уже не будет
+    final answer = _answer;
+    _answer = null;
+    if (answer != null && !answer.isCompleted) answer.complete(false);
+    state = job.copyWith(
+        stopping: true, queue: const [], clearQuestion: true);
+  }
+
+  /// Импорт наткнулся на такой же трек: показать вопрос в плашке и ждать.
+  ///
+  /// Никакого таймаута: человек мог отойти. Зато «Остановить» отвечает за
+  /// него «не добавлять», иначе импорт висел бы вечно.
+  Future<bool> _askDuplicate(LibraryTrack existing) {
+    final job = state;
+    if (!mounted || job == null) return Future.value(true);
+
+    _answer?.complete(true); // на всякий случай: второго вопроса быть не должно
+    final answer = Completer<bool>();
+    _answer = answer;
+    state = job.copyWith(
+      question: DuplicateQuestion(
+        title: existing.title,
+        artist: existing.artist,
+      ),
+    );
+    return answer.future;
+  }
+
+  /// Ответ на вопрос из плашки: true — добавлять, false — пропустить.
+  void answerDuplicate(bool add) {
+    final answer = _answer;
+    _answer = null;
+    if (answer != null && !answer.isCompleted) answer.complete(add);
+    final job = state;
+    if (mounted && job != null) state = job.copyWith(clearQuestion: true);
   }
 
   /// Убрать итог с экрана.
@@ -230,7 +289,10 @@ class ImportManager extends StateNotifier<ImportJob?> {
   }
 
   Future<ImportProgress> _runOne(_Queued task) async {
-    final control = ImportControl(onTrackSaved: _scheduleRefresh);
+    final control = ImportControl(
+      onTrackSaved: _scheduleRefresh,
+      confirmDuplicate: _askDuplicate,
+    );
     _control = control;
     var last = const ImportProgress(
       status: ImportStatus.fetchingMeta,

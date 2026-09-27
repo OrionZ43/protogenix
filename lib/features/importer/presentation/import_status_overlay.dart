@@ -104,20 +104,24 @@ class _JobCardState extends ConsumerState<_JobCard> {
     final manager = ref.read(importManagerProvider.notifier);
     final value = progress.progress.clamp(0.0, 1.0).toDouble();
 
-    final (IconData icon, String caption) = job.running
-        ? (
-            Icons.downloading_rounded,
-            job.stopping
-                ? 'ОСТАНАВЛИВАЮ…'
-                : job.queue.isEmpty
-                    ? 'ИМПОРТ'
-                    : 'ИМПОРТ · ЕЩЁ ${job.queue.length} В ОЧЕРЕДИ',
-          )
-        : error
-            ? (Icons.error_outline_rounded, 'НЕ ПОЛУЧИЛОСЬ')
-            : paused
-                ? (Icons.pause_rounded, 'ИМПОРТ НА ПАУЗЕ')
-                : (Icons.check_rounded, 'ИМПОРТ ЗАВЕРШЁН');
+    final question = job.question;
+
+    final (IconData icon, String caption) = question != null
+        ? (Icons.help_outline_rounded, 'УЖЕ ЕСТЬ В МЕДИАТЕКЕ')
+        : job.running
+            ? (
+                Icons.downloading_rounded,
+                job.stopping
+                    ? 'ОСТАНАВЛИВАЮ…'
+                    : job.queue.isEmpty
+                        ? 'ИМПОРТ'
+                        : 'ИМПОРТ · ЕЩЁ ${job.queue.length} В ОЧЕРЕДИ',
+              )
+            : error
+                ? (Icons.error_outline_rounded, 'НЕ ПОЛУЧИЛОСЬ')
+                : paused
+                    ? (Icons.pause_rounded, 'ИМПОРТ НА ПАУЗЕ')
+                    : (Icons.check_rounded, 'ИМПОРТ ЗАВЕРШЁН');
 
     return GestureDetector(
       onTap: () => setState(() => _collapsed = !_collapsed),
@@ -140,7 +144,9 @@ class _JobCardState extends ConsumerState<_JobCard> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (job.running)
+                if (question != null)
+                  const SizedBox.shrink()
+                else if (job.running)
                   // Останавливает и очередь (import_manager.dart)
                   ChipButton(
                     icon: Icons.stop_rounded,
@@ -159,7 +165,7 @@ class _JobCardState extends ConsumerState<_JobCard> {
                   ),
               ],
             ),
-            if (!_collapsed || !job.running) ...[
+            if (question == null && (!_collapsed || !job.running)) ...[
               const SizedBox(height: 10),
               Text(
                 importText(progress),
@@ -174,7 +180,49 @@ class _JobCardState extends ConsumerState<_JobCard> {
                 ),
               ),
             ],
-            if (job.running) ...[
+            // Спрашиваем прямо здесь: диалог отсюда не открыть (нет
+            // `Navigator` над плашкой), а модалка поверх чужого экрана
+            // посреди фонового импорта — лишнее
+            if (question != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                '«${question.title}»'
+                '${question.artist.isEmpty ? '' : ' — ${question.artist}'}'
+                ' уже есть в медиатеке. Добавить ещё раз?',
+                style: TextStyle(
+                  color: Colors.white.withAlpha(200),
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Бывает, что это другая версия — концертная или ремикс.',
+                style: TextStyle(
+                  color: Colors.white.withAlpha(110),
+                  fontSize: 11,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  ChipButton(
+                    icon: Icons.add_rounded,
+                    label: 'Добавить',
+                    accent: accent,
+                    onTap: () => manager.answerDuplicate(true),
+                  ),
+                  const SizedBox(width: 8),
+                  ChipButton(
+                    icon: Icons.skip_next_rounded,
+                    label: 'Пропустить',
+                    onTap: () => manager.answerDuplicate(false),
+                  ),
+                ],
+              ),
+            ],
+            if (job.running && question == null) ...[
               const SizedBox(height: 10),
               // Процентов рядом нет: в тексте уже «37 из 500», а проценты
               // текущего трека рядом с общими только путали

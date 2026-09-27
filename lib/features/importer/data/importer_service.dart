@@ -18,6 +18,7 @@ import 'package:path/path.dart' as p;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../../library/data/library_database.dart';
 import '../../library/data/playlist_database.dart';
+import '../../library/domain/track_duplicates.dart';
 import '../../library/data/lyrics_service.dart';
 import '../../library/domain/library_track.dart';
 import '../../../core/services/app_paths.dart';
@@ -69,15 +70,47 @@ class ImportProgress {
 /// Управление долгим импортом из фона (import_manager.dart): остановка между
 /// треками и сигнал «трек сохранён» — по нему медиатека обновляется по ходу.
 class ImportControl {
-  ImportControl({this.onTrackSaved});
+  ImportControl({this.onTrackSaved, this.confirmDuplicate});
 
   final void Function()? onTrackSaved;
+
+  /// Спросить, добавлять ли трек, который уже есть в медиатеке. `true` —
+  /// добавлять, `false` — пропустить. null здесь значит «не спрашивать»:
+  /// так идут импорты альбомов и плейлистов, где вопрос на каждый трек из
+  /// сотни был бы издевательством — там дубли пропускает
+  /// `ImportedTracksIndex` (`imported_tracks_index.dart`).
+  final Future<bool> Function(LibraryTrack existing)? confirmDuplicate;
+
   bool _cancelled = false;
 
   bool get cancelled => _cancelled;
 
   /// Остановиться после трека, который обрабатывается сейчас.
   void cancel() => _cancelled = true;
+
+  /// Трек с таким названием и исполнителем уже есть? Спросить и вернуть
+  /// ответ. Спрашиваем **до скачивания**: отказ экономит и трафик.
+  ///
+  /// [candidates] — варианты написания «название, исполнитель». У ссылки
+  /// YouTube их два: как в заголовке ролика («WYR GEMI - IN THE JUNGLE»,
+  /// канал «Hyped! Records») и разобранный («IN THE JUNGLE», «WYR GEMI»).
+  /// Сравнивать только первым нельзя: трек, скачанный по Spotify или Яндексу,
+  /// лежит в медиатеке с нормальными названием и исполнителем, и сырой
+  /// заголовок ролика с ним никогда не совпадёт — то есть самый частый дубль
+  /// прошёл бы мимо (проверено живьём 2026-09-27).
+  ///
+  /// true — можно добавлять (дубля нет, или человек согласился).
+  Future<bool> allowDuplicate(
+      List<(String title, String artist)> candidates) async {
+    final ask = confirmDuplicate;
+    if (ask == null) return true;
+    final library = await LibraryDatabase.instance.getAllTracks();
+    for (final (title, artist) in candidates) {
+      final existing = findDuplicate(library, title: title, artist: artist);
+      if (existing != null) return ask(existing);
+    }
+    return true;
+  }
 }
 
 /// Среди роликов YouTube нет той же записи (youtube_match.dart).
@@ -124,11 +157,13 @@ class ImporterService {
         await _importYandexMusic(
             url: url, onProgress: onProgress, control: control);
       } else if (_isYouTube(url)) {
-        await _importYouTube(url: url, onProgress: onProgress);
+        await _importYouTube(
+            url: url, onProgress: onProgress, control: control);
       } else if (_isSoundCloud(url)) {
         await _importSoundCloud(url: url, onProgress: onProgress);
       } else if (_isDirectAudio(url)) {
-        await _importDirectUrl(url: url, onProgress: onProgress);
+        await _importDirectUrl(
+            url: url, onProgress: onProgress, control: control);
       } else {
         onProgress(const ImportProgress(
           status: ImportStatus.error,
@@ -152,6 +187,7 @@ class ImporterService {
   Future<void> _importYouTube({
     required String url,
     required void Function(ImportProgress) onProgress,
+    ImportControl? control,
   }) async {
     onProgress(const ImportProgress(
       status: ImportStatus.fetchingMeta,
@@ -171,6 +207,38 @@ class ImporterService {
         message: 'Найдено: $title',
         progress: 0.10,
       ));
+
+      // Тот же самый ролик уже скачан — просто выходим. Раньше проверки не
+      // было, и повторный импорт ссылки **затирал** метаданные: трек,
+      // добавленный со Spotify с нормальным названием и исполнителем,
+      // становился «WYR GEMI - IN THE JUNGLE» от канала «Hyped! Records»
+      // (поймано живьём 2026-09-27). У «В медиатеку» из поиска такая
+      // проверка была, у ссылки — нет.
+      final same = await LibraryDatabase.instance.getTrackById(video.id.value);
+      if (same != null) {
+        onProgress(ImportProgress(
+          status: ImportStatus.done,
+          message: '«${same.title}» уже есть в медиатеке',
+          progress: 1.0,
+        ));
+        return;
+      }
+
+      // Та же песня другим роликом? Спрашиваем до скачивания — отказ
+      // экономит и трафик
+      final (parsedArtist, parsedTitle) = splitArtistTitle(title);
+      if (!await (control?.allowDuplicate([
+            (title, video.author),
+            if (parsedArtist != null) (parsedTitle, parsedArtist),
+          ]) ??
+          Future.value(true))) {
+        onProgress(ImportProgress(
+          status: ImportStatus.done,
+          message: '«$title» уже есть в медиатеке — не добавлен',
+          progress: 1.0,
+        ));
+        return;
+      }
 
       await _downloadYouTubeVideo(
         yt: yt,
@@ -296,7 +364,8 @@ class ImporterService {
           b.bitrate.kiloBitsPerSecond.compareTo(a.bitrate.kiloBitsPerSecond));
 
     if (audioStreams.isEmpty) {
-      throw _NoStreamsException('${youtubeClientName(client)}: нет аудио-потоков');
+      throw _NoStreamsException(
+          '${youtubeClientName(client)}: нет аудио-потоков');
     }
 
     final streamInfo = audioStreams.first;
@@ -465,9 +534,21 @@ class ImporterService {
     required void Function(ImportProgress) onProgress,
     ImportControl? control,
   }) async {
+    // Название и исполнителя знаем сразу — спрашиваем даже до поиска
+    if (!await (control?.allowDuplicate([(title, artist)]) ??
+        Future.value(true))) {
+      onProgress(ImportProgress(
+        status: ImportStatus.done,
+        message: '«$title» уже есть в медиатеке — не добавлен',
+        progress: 1.0,
+      ));
+      return;
+    }
+
     onProgress(ImportProgress(
       status: ImportStatus.fetchingMeta,
-      message: 'Поиск на YouTube: ${artist.isEmpty ? title : '$artist - $title'}',
+      message:
+          'Поиск на YouTube: ${artist.isEmpty ? title : '$artist - $title'}',
       progress: 0.1,
     ));
     final yt = YoutubeExplode();
@@ -478,8 +559,7 @@ class ImporterService {
         artist: artist,
         durationMs: duration?.inMilliseconds,
       );
-      if (await LibraryDatabase.instance.getTrackById(video.id.value) !=
-          null) {
+      if (await LibraryDatabase.instance.getTrackById(video.id.value) != null) {
         onProgress(ImportProgress(
           status: ImportStatus.done,
           message: '✓ "$title" уже есть в медиатеке',
@@ -576,7 +656,8 @@ class ImporterService {
     try {
       // Метатеги страницы: сущности раскодированы, версия — в скобках, есть
       // длительность (spotify_page.dart).
-      final track = parseSpotifyTrackPage(await _fetchSpotifyPage(link.pageUrl));
+      final track =
+          parseSpotifyTrackPage(await _fetchSpotifyPage(link.pageUrl));
       if (track == null) {
         throw Exception('Не страница трека Spotify или нет метаданных');
       }
@@ -585,7 +666,8 @@ class ImporterService {
 
       onProgress(ImportProgress(
         status: ImportStatus.fetchingMeta,
-        message: 'Поиск: ${artist.isEmpty ? trackTitle : '$artist - $trackTitle'}',
+        message:
+            'Поиск: ${artist.isEmpty ? trackTitle : '$artist - $trackTitle'}',
         progress: 0.30,
       ));
 
@@ -782,8 +864,7 @@ class ImporterService {
         }
         final track = tracks[i];
         final artist = track.artists.split(', ').first;
-        final query =
-            artist.isEmpty ? track.title : '$artist - ${track.title}';
+        final query = artist.isEmpty ? track.title : '$artist - ${track.title}';
         final ofTotal = single ? '' : ' (${i + 1} из ${tracks.length})';
         final base = i / tracks.length;
         final step = 1 / tracks.length;
@@ -928,6 +1009,7 @@ class ImporterService {
   Future<void> _importDirectUrl({
     required String url,
     required void Function(ImportProgress) onProgress,
+    ImportControl? control,
   }) async {
     onProgress(const ImportProgress(
       status: ImportStatus.fetchingMeta,
@@ -937,6 +1019,22 @@ class ImporterService {
     final fileName = url.split('/').last.split('?').first;
     final id = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
     final savePath = await _getTrackPath(fileName);
+
+    // Тегов до скачивания нет, сравнить можно только имя файла
+    final guessTitle = p.basenameWithoutExtension(fileName);
+    final (guessArtist, guessName) = splitArtistTitle(guessTitle);
+    if (!await (control?.allowDuplicate([
+          (guessTitle, ''),
+          if (guessArtist != null) (guessName, guessArtist),
+        ]) ??
+        Future.value(true))) {
+      onProgress(ImportProgress(
+        status: ImportStatus.done,
+        message: '«$guessTitle» уже есть в медиатеке — не добавлен',
+        progress: 1.0,
+      ));
+      return;
+    }
 
     onProgress(const ImportProgress(
       status: ImportStatus.downloading,
@@ -1138,8 +1236,7 @@ class ImporterService {
         await LibraryDatabase.instance.insertTrack(LibraryTrack(
           id: id,
           title: tags.title ?? track.title ?? nameTitle,
-          artist:
-              tags.artist ?? track.artist ?? nameArtist ?? 'Unknown Artist',
+          artist: tags.artist ?? track.artist ?? nameArtist ?? 'Unknown Artist',
           album: tags.album ?? track.album ?? 'На телефоне',
           filePath: track.path,
           coverPath: await _saveLocalCover(id, tags),
