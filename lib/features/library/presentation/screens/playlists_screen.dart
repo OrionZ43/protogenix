@@ -1,8 +1,9 @@
 import '../../data/library_database.dart';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+
+import '../../../../core/utils/plural_ru.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,7 +16,7 @@ import '../../../player/presentation/providers/player_provider.dart';
 import '../../../player/presentation/widgets/protogenix_background.dart';
 import '../../../player/presentation/widgets/glass_card.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/cover_placeholder.dart';
+import '../../../../core/widgets/glass_panel.dart';
 import '../../../../core/widgets/track_cover.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -79,9 +80,12 @@ class PlaylistsScreen extends ConsumerWidget {
                     gridDelegate:
                     const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.1,
+                      crossAxisSpacing: 18,
+                      mainAxisSpacing: 26,
+                      // Высота от содержимого, а не от ширины: при
+                      // childAspectRatio 1.1 на телефоне ячейка выходила
+                      // ниже плитки, и «21 трек» обрезало нижним краем
+                      mainAxisExtent: 196,
                     ),
                     delegate: SliverChildBuilderDelegate(
                           (context, i) => PlaylistCard(
@@ -230,314 +234,202 @@ class _EmptyPlaylists extends StatelessWidget {
 
 // ── Playlist Cover Collage ────────────────────────────────────────────────────
 
-class _PlaylistCoverCollage extends StatefulWidget {
-  const _PlaylistCoverCollage({
+/// Обложка плейлиста: обложки треков стопкой, с наклоном — как колода карт.
+///
+/// Так это выглядит не с первого раза. Сначала здесь были круглые «спутники»
+/// на орбитах вокруг главной обложки, соединённые линиями: отзыв Orion
+/// 2026-09-27 — «мне не нравится эта паутина, кринж какой-то». Потом была
+/// мозаика 2×2, как у всех, — «скучно, надо что-то поинтереснее».
+///
+/// Веер читается как подборка, а не как одна картинка, и остаётся спокойным:
+/// две карточки позади с наклоном и приглушением, третья — прямо и в фокусе.
+/// Один трек — просто его обложка, без наклонов.
+///
+/// Статично, без тикеров: у прежней паутины на каждую карточку крутился свой
+/// `AnimationController` на 36 секунд, а карточек на экране столько же,
+/// сколько плейлистов (`performance.md`).
+class PlaylistCover extends StatelessWidget {
+  const PlaylistCover({
+    super.key,
     required this.tracks,
-    required this.diameter,
-    this.animate = true,
-    this.glowColor,
+    required this.size,
+    this.radius = 14,
+    this.spread = 0,
   });
 
   final List<LibraryTrack> tracks;
-  final double diameter;
-  final bool animate;
-  final Color? glowColor;
+  final double size;
+  final double radius;
 
-  @override
-  State<_PlaylistCoverCollage> createState() => _PlaylistCoverCollageState();
-}
-
-class _PlaylistCoverCollageState extends State<_PlaylistCoverCollage>
-    with SingleTickerProviderStateMixin {
-  // Один общий медленный цикл (0..1, по кругу), из которого выводятся фазы
-  // орбит спутников, "дыхание" главной обложки и точки соединительных линий.
-  late AnimationController _animCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _animCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 36),
-    );
-    if (widget.animate) {
-      _animCtrl.repeat();
-    }
-  }
-
-  @override
-  void didUpdateWidget(_PlaylistCoverCollage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.animate && !oldWidget.animate) {
-      _animCtrl.repeat();
-    } else if (!widget.animate && oldWidget.animate) {
-      _animCtrl.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _animCtrl.dispose();
-    super.dispose();
-  }
-
-  Widget _cover(String? path, {BoxFit fit = BoxFit.cover}) {
-    final image = path == null
-        ? Image(image: kCoverPlaceholder, fit: fit)
-        : Image(
-      image: ResizeImage(FileImage(File(path)), width: 200),
-      fit: fit,
-    );
-    return SizedBox.expand(child: image);
-  }
-
-  Widget _emptyState() {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [
-            AppColors.neonPurple.withValues(alpha: 0.35),
-            AppColors.neonCyan.withValues(alpha: 0.15),
-          ],
-          center: Alignment.topLeft,
-          radius: 1.2,
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          Icons.queue_music_rounded,
-          color: Colors.white.withValues(alpha: 0.5),
-          size: widget.diameter * 0.4,
-        ),
-      ),
-    );
-  }
-
-  Widget _satelliteCover(String? coverPath, double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipOval(child: _cover(coverPath)),
-    );
-  }
-
-  /// Созвездие: главная обложка в центре, спутники летают по орбитам вокруг
-  /// и могут выходить за пределы блока, соединённые тонкими линиями —
-  /// с главной обложкой и друг с другом.
-  Widget _buildConstellation(List<String?> covers) {
-    final d = widget.diameter;
-    final mainSize = d * 0.56;
-    final satSize = d * 0.30;
-    // Орбита шире самого блока — спутники "выплывают" за края.
-    final orbitRadius = d * 0.62;
-    // Видимая область больше diameter, чтобы спутники не подрезались layout'ом.
-    final boundsSize = d * 1.6;
-    final center = boundsSize / 2;
-
-    final satellites = covers.skip(1).take(3).toList();
-
-    final phases = [0.0, 0.34, 0.67];
-    final speeds = [0.07, -0.09, 0.05];
-    final bobs = [d * 0.05, d * 0.07, d * 0.04];
-    final radii = [orbitRadius, orbitRadius * 0.92, orbitRadius * 1.05];
-
-    return SizedBox(
-      width: boundsSize,
-      height: boundsSize,
-      child: AnimatedBuilder(
-        animation: _animCtrl,
-        builder: (context, _) {
-          // Считаем позиции спутников один раз за кадр — используются и для
-          // линий (CustomPaint), и для самих картинок (Positioned).
-          final positions = <Offset>[];
-          for (var i = 0; i < satellites.length; i++) {
-            final t = (_animCtrl.value * speeds[i % speeds.length] +
-                phases[i % phases.length]) %
-                1.0;
-            final angle = t * 2 * math.pi;
-            final r = radii[i % radii.length];
-            final dx = math.cos(angle) * r;
-            final dy = math.sin(angle) * r * 0.55; // эллиптическая орбита
-            final bob = math.sin(angle * 2) * bobs[i % bobs.length];
-            positions.add(Offset(center + dx, center + dy + bob));
-          }
-
-          final breathe =
-              1.0 + 0.035 * math.sin(_animCtrl.value * 2 * math.pi);
-
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // Линии-связи: рисуются за обложками.
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _ConstellationPainter(
-                    center: Offset(center, center),
-                    satellitePositions: positions,
-                    color: (widget.glowColor ?? AppColors.neonPurple),
-                  ),
-                ),
-              ),
-              // Главная обложка — крупно в центре, с лёгким "дыханием".
-              Positioned(
-                left: center - (mainSize * breathe) / 2,
-                top: center - (mainSize * breathe) / 2,
-                width: mainSize * breathe,
-                height: mainSize * breathe,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: (widget.glowColor ?? AppColors.neonPurple)
-                            .withValues(alpha: 0.3),
-                        blurRadius: 24,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(child: _cover(covers[0])),
-                ),
-              ),
-              // Спутники летают по орбитам.
-              for (var i = 0; i < satellites.length; i++)
-                Positioned(
-                  left: positions[i].dx - satSize / 2,
-                  top: positions[i].dy - satSize / 2,
-                  width: satSize,
-                  height: satSize,
-                  child: _satelliteCover(satellites[i], satSize),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
+  /// 0 — стопка сложена, 1 — разложена. Под мышью плитка плавно
+  /// переезжает к 1 (`PlaylistCard`).
+  final double spread;
 
   @override
   Widget build(BuildContext context) {
-    final covers = widget.tracks
-        .where((t) => t.coverPath != null)
-        .map((t) => t.coverPath)
-        .toList();
-    if (covers.isEmpty && widget.tracks.isNotEmpty) {
-      covers.add(null); // Fallback to mock cover if no covers at all
+    final covers = <String>[];
+    for (final track in tracks) {
+      final path = track.coverPath;
+      if (path == null || path.isEmpty) continue;
+      if (covers.contains(path)) continue; // у альбома обложки повторяются
+      covers.add(path);
+      if (covers.length == 3) break;
     }
 
-    final simple = covers.length <= 1;
+    // Передняя карточка меньше всей области: наклонённым задним нужно место
+    final front = size * 0.78;
 
-    return RepaintBoundary(
-      child: SizedBox(
-        width: widget.diameter,
-        height: widget.diameter,
-        // OverflowBox позволяет созвездию визуально выходить за пределы
-        // отведённого диаметра без изменения занимаемого места в layout'е.
-        child: simple
-            ? Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: widget.glowColor != null
-                ? [
-              BoxShadow(
-                color: widget.glowColor!.withValues(alpha: 0.4),
-                blurRadius: 30,
-                spreadRadius: 5,
+    return SizedBox(
+      width: size,
+      height: size,
+      child: covers.isEmpty
+          ? Center(child: _empty(front))
+          : Stack(
+              alignment: Alignment.center,
+              children: [
+                // Мягкое свечение под стопкой — как у фона приложения
+                Center(
+                  child: SizedBox(
+                    width: size,
+                    height: size,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          colors: [
+                            AppColors.neonPurple.withValues(alpha: 0.22),
+                            AppColors.neonPurple.withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (covers.length > 2)
+                  _card(covers[2], front,
+                      angle: -0.14 - 0.10 * spread,
+                      shift: -front * (0.16 + 0.12 * spread),
+                      opacity: 0.55 + 0.2 * spread),
+                if (covers.length > 1)
+                  _card(covers[1], front,
+                      angle: 0.10 + 0.08 * spread,
+                      shift: front * (0.13 + 0.11 * spread),
+                      opacity: 0.8 + 0.2 * spread),
+                _card(covers[0], front, angle: 0, shift: 0, opacity: 1),
+              ],
+            ),
+    );
+  }
+
+  Widget _card(
+    String path,
+    double side, {
+    required double angle,
+    required double shift,
+    required double opacity,
+  }) {
+    return Transform.translate(
+      offset: Offset(shift, 0),
+      child: Transform.rotate(
+        angle: angle,
+        child: Opacity(
+          opacity: opacity,
+          child: Container(
+            width: side,
+            height: side,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius - 1),
+              // Декодирование под размер карточки (`track_cover.dart`)
+              child: Image(
+                image: ResizeImage(
+                  FileImage(File(path)),
+                  width: (side * 2).round(),
+                  policy: ResizeImagePolicy.fit,
+                ),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _empty(side),
               ),
-            ]
-                : null,
-          ),
-          child: ClipOval(
-            child: covers.isEmpty
-                ? _emptyState()
-                : AnimatedBuilder(
-              animation: _animCtrl,
-              builder: (context, child) {
-                final breathe = 1.0 +
-                    0.05 *
-                        math.sin(_animCtrl.value * 2 * math.pi);
-                return Transform.scale(
-                    scale: breathe, child: child);
-              },
-              child: _cover(covers[0]),
             ),
           ),
-        )
-            : OverflowBox(
-          maxWidth: widget.diameter * 1.6,
-          maxHeight: widget.diameter * 1.6,
-          child: _buildConstellation(covers),
         ),
+      ),
+    );
+  }
+
+  /// Пустой плейлист или треки без обложек.
+  Widget _empty(double side) => Container(
+        width: side,
+        height: side,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.neonPurple.withValues(alpha: 0.30),
+              AppColors.neonCyan.withValues(alpha: 0.12),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Icon(
+            Icons.queue_music_rounded,
+            color: Colors.white.withValues(alpha: 0.45),
+            size: side * 0.36,
+          ),
+        ),
+      );
+}
+
+/// Кнопка поверх обложки плейлиста: иконка на тёмном кружке, чтобы её было
+/// видно на любой картинке.
+class _CardAction extends StatelessWidget {
+  const _CardAction({required this.icon, required this.onPressed});
+
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withValues(alpha: 0.45),
+        ),
+        child: Icon(icon, color: Colors.white70, size: 15),
       ),
     );
   }
 }
 
-/// Рисует тонкие соединительные линии: от центра к каждому спутнику и между
-/// соседними спутниками — лёгкий эффект "созвездия".
-class _ConstellationPainter extends CustomPainter {
-  _ConstellationPainter({
-    required this.center,
-    required this.satellitePositions,
-    required this.color,
-  });
-
-  final Offset center;
-  final List<Offset> satellitePositions;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (satellitePositions.isEmpty) return;
-
-    final toCenterPaint = Paint()
-      ..color = color.withValues(alpha: 0.35)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-
-    final betweenPaint = Paint()
-      ..color = color.withValues(alpha: 0.18)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-
-    for (final pos in satellitePositions) {
-      canvas.drawLine(center, pos, toCenterPaint);
-    }
-
-    for (var i = 0; i < satellitePositions.length; i++) {
-      final next = satellitePositions[(i + 1) % satellitePositions.length];
-      if (satellitePositions.length > 1) {
-        canvas.drawLine(satellitePositions[i], next, betweenPaint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ConstellationPainter oldDelegate) {
-    return oldDelegate.satellitePositions != satellitePositions ||
-        oldDelegate.center != center ||
-        oldDelegate.color != color;
-  }
-}
-
-// ── Playlist card ─────────────────────────────────────────────────────────────
-
-class PlaylistCard extends ConsumerWidget {
+/// Плитка плейлиста: стопка обложек, под ней название и число треков.
+///
+/// **Без рамки и без стекла** (решение Orion 2026-09-27): раньше плитка была
+/// обведена `GlassCard`, и сетка выглядела как таблица. Теперь границ нет,
+/// плитки разделяет воздух, а «карточка» — это сама стопка обложек.
+///
+/// Мышью видно, что это колода: при наведении стопка раскладывается шире.
+/// На телефоне наведения нет, поэтому стопка просто стоит как есть.
+///
+/// Переименование и удаление — в меню: на ПК «⋮» появляется при наведении,
+/// на телефоне работает долгое нажатие. Раньше карандаш и корзина висели
+/// поверх обложки всегда и лезли в глаза (а на мозаике ещё и терялись).
+class PlaylistCard extends ConsumerStatefulWidget {
   const PlaylistCard({
     super.key,
     required this.playlist,
@@ -552,72 +444,81 @@ class PlaylistCard extends ConsumerWidget {
   final VoidCallback onRename;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final playlistAsync = ref.watch(playlistTracksProvider(playlist.id));
+  ConsumerState<PlaylistCard> createState() => _PlaylistCardState();
+}
+
+class _PlaylistCardState extends ConsumerState<PlaylistCard> {
+  bool _hovered = false;
+
+  void _openMenu() {
+    HapticFeedback.lightImpact();
+    showPlaylistMenu(
+      context,
+      name: widget.playlist.name,
+      onRename: widget.onRename,
+      onDelete: widget.onDelete,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final playlistAsync =
+        ref.watch(playlistTracksProvider(widget.playlist.id));
     final tracks = playlistAsync.valueOrNull ?? [];
 
-    return GestureDetector(
-      onTap: onTap,
-      child: GlassCard(
-        borderRadius: 20,
-        padding: EdgeInsets.zero,
-        child: Stack(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onLongPress: _openMenu,
+        onSecondaryTap: _openMenu,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Stack(
+              alignment: Alignment.topRight,
               children: [
-                const SizedBox(height: 16),
-                _PlaylistCoverCollage(
-                  tracks: tracks,
-                  diameter: 100,
-                  animate: true,
+                // Стопка раскладывается под мышью — видно, что это колода
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: _hovered ? 1 : 0),
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, spread, _) => PlaylistCover(
+                    tracks: tracks,
+                    size: 128,
+                    spread: spread,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    playlist.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                // На телефоне наведения нет — там долгое нажатие
+                if (_hovered)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, right: 2),
+                    child: _CardAction(
+                      icon: Icons.more_horiz_rounded,
+                      onPressed: _openMenu,
                     ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${tracks.length} треков',
-                  style: const TextStyle(
-                    color: Colors.white38,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 16),
               ],
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit_rounded, color: Colors.white38, size: 16),
-                    onPressed: onRename,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.white38, size: 16),
-                    onPressed: onDelete,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  ),
-                ],
+            const SizedBox(height: 10),
+            Text(
+              widget.playlist.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
               ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              trackCountLabel(tracks.length),
+              style: const TextStyle(color: Colors.white38, fontSize: 11),
             ),
           ],
         ),
@@ -626,7 +527,104 @@ class PlaylistCard extends ConsumerWidget {
   }
 }
 
-// ── Create/Rename Playlist Sheet ──────────────────────────────────────────────
+/// Меню плейлиста: переименовать или удалить. Та же шторка, что у треков
+/// (`track_context_menu.dart`).
+void showPlaylistMenu(
+  BuildContext context, {
+  required String name,
+  required VoidCallback onRename,
+  required VoidCallback onDelete,
+}) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => GlassPanel(
+      borderRadius: 24,
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Divider(color: Colors.white.withAlpha(20), height: 1),
+            const SizedBox(height: 8),
+            _PlaylistMenuItem(
+              icon: Icons.edit_rounded,
+              label: 'Переименовать',
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                onRename();
+              },
+            ),
+            _PlaylistMenuItem(
+              icon: Icons.delete_outline_rounded,
+              label: 'Удалить плейлист',
+              iconColor: Colors.redAccent,
+              labelColor: Colors.redAccent,
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                onDelete();
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _PlaylistMenuItem extends StatelessWidget {
+  const _PlaylistMenuItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.iconColor,
+    this.labelColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? iconColor;
+  final Color? labelColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor ?? Colors.white70, size: 22),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(
+                color: labelColor ?? Colors.white,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 Future<void> showCreatePlaylistSheet(
     BuildContext context,
@@ -1135,12 +1133,7 @@ class _PlaylistHeroSection extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 40),
-              _PlaylistCoverCollage(
-                tracks: tracks,
-                diameter: 160,
-                animate: true,
-                glowColor: AppColors.neonPurple,
-              ),
+              PlaylistCover(tracks: tracks, size: 200, radius: 18),
               const SizedBox(height: 20),
               Text(
                 playlist.name,
@@ -1152,7 +1145,7 @@ class _PlaylistHeroSection extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               Text(
-                '${tracks.length} треков',
+                trackCountLabel(tracks.length),
                 style: const TextStyle(fontSize: 13, color: Colors.white38),
               ),
             ],

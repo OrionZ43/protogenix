@@ -27,6 +27,7 @@ import 'device_music.dart';
 import 'local_tags.dart';
 import '../domain/import_collection.dart';
 import '../domain/youtube_playlist_link.dart';
+import '../domain/youtube_title.dart';
 import 'spotify_page.dart';
 import 'imported_tracks_index.dart';
 import 'yandex_music.dart';
@@ -1482,14 +1483,7 @@ class ImporterService {
   }
 
   String _cleanYouTubeTitle(String title) {
-    return title
-        .replaceAll(RegExp(r'\(Official.*?\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\[.*?\]'), '')
-        .replaceAll(RegExp(r'\(Lyrics.*?\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\(Audio.*?\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\(HD.*?\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\s{2,}'), ' ')
-        .trim();
+    return cleanYoutubeTitle(title);
   }
 
   Future<String> _getTrackPath(String fileName) async {

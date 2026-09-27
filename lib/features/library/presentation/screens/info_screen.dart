@@ -12,6 +12,8 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:flutter/material.dart';
+
+import '../../../../core/utils/plural_ru.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -69,14 +71,6 @@ int _bytesOnDisk(List<String> paths, String cacheDir) {
     }
   } catch (_) {}
   return total;
-}
-
-String _plural(int n, String one, String few, String many) {
-  final mod10 = n % 10;
-  final mod100 = n % 100;
-  if (mod10 == 1 && mod100 != 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
 }
 
 String _formatDuration(int totalMs) {
@@ -588,7 +582,7 @@ class _LibraryCard extends ConsumerWidget {
           )
         else ...[
           _Stat('${tracks.length}',
-              _plural(tracks.length, 'трек', 'трека', 'треков')),
+              pluralRu(tracks.length, 'трек', 'трека', 'треков')),
           _Stat(_formatDuration(totalMs), 'музыки'),
           _Stat(
             storage.when(
@@ -617,7 +611,7 @@ class _LibraryCard extends ConsumerWidget {
                     ),
                     TextSpan(
                       text: ' · ${top.value} '
-                          '${_plural(top.value, 'трек', 'трека', 'треков')}',
+                          '${pluralRu(top.value, 'трек', 'трека', 'треков')}',
                       style: TextStyle(color: Colors.white.withAlpha(130)),
                     ),
                   ],
