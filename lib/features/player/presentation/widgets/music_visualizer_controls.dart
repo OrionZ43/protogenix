@@ -5,17 +5,21 @@
 //   • Реактивно через isFavoriteProvider — мгновенный отклик без перезагрузки
 //   • Интегрирован HapticFeedback для премиального ощущения
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/track_model.dart';
 import '../../domain/player_state.dart' as ps;
+import '../providers/envelope_provider.dart';
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
 import '../../../library/presentation/playlist_provider.dart';
 import '../../../library/presentation/widgets/add_to_playlist_sheet.dart';
 import '../../../../core/utils/haptic_patterns.dart';
+import 'player_metrics.dart';
 import 'waveform_progress_bar.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -40,17 +44,20 @@ class MusicVisualizerControls extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final player = ref.watch(playerProvider);
+    // Здесь — только то, от чего и правда меняется обложка с названием.
+    // Позиция живёт в _ProgressBar, состояние кнопок — в _Controls, громкость
+    // — в своём Consumer: раньше весь этот кусок экрана (обложка, кнопки,
+    // ползунки) пересобирался на каждое обновление позиции (performance.md).
     final notifier = ref.read(playerProvider.notifier);
     final palette = ref.watch(paletteProvider);
 
-    final track = player.currentTrack as TrackModel?;
+    final track =
+        ref.watch(playerProvider.select((s) => s.currentTrack)) as TrackModel?;
     if (track == null) return const SizedBox.shrink();
 
     if (compact) {
       return _CompactLayout(
         track: track,
-        player: player,
         notifier: notifier,
         palette: palette,
         showFavorite: showFavorite,
@@ -61,7 +68,6 @@ class MusicVisualizerControls extends ConsumerWidget {
 
     return _FullLayout(
       track: track,
-      player: player,
       notifier: notifier,
       palette: palette,
       showFavorite: showFavorite,
@@ -76,14 +82,12 @@ class MusicVisualizerControls extends ConsumerWidget {
 class _FullLayout extends StatelessWidget {
   const _FullLayout({
     required this.track,
-    required this.player,
     required this.notifier,
     required this.palette,
     required this.showFavorite,
   });
 
   final TrackModel track;
-  final ps.ProtogenixPlayerState player;
   final PlayerNotifier notifier;
   final PaletteState palette;
   final bool showFavorite;
@@ -104,16 +108,10 @@ class _FullLayout extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Flexible(
-            child: LiveWaveformProgressBar(
-              progress: player.progress,
-              accentColor: palette.primary,
-              onSeek: notifier.seekToProgress,
-              position: player.position,
-              total: player.total,
-            ),
+            child: _ProgressBar(notifier: notifier, palette: palette),
           ),
           const SizedBox(height: 16),
-          _Controls(player: player, notifier: notifier, palette: palette),
+          _Controls(notifier: notifier, palette: palette),
         ],
       ),
     );
@@ -127,7 +125,6 @@ class _FullLayout extends StatelessWidget {
 class _CompactLayout extends StatelessWidget {
   const _CompactLayout({
     required this.track,
-    required this.player,
     required this.notifier,
     required this.palette,
     required this.showFavorite,
@@ -136,7 +133,6 @@ class _CompactLayout extends StatelessWidget {
   });
 
   final TrackModel track;
-  final ps.ProtogenixPlayerState player;
   final PlayerNotifier notifier;
   final PaletteState palette;
   final bool showFavorite;
@@ -151,42 +147,56 @@ class _CompactLayout extends StatelessWidget {
       children: [
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _CoverArt(track: track, size: 200),
-                const SizedBox(height: 16),
-                _TrackInfo(
-                  track: track,
-                  palette: palette,
-                  compact: true,
-                  showFavorite: showFavorite,
-                ),
-                const SizedBox(height: 16),
-                LiveWaveformProgressBar(
-                  progress: player.progress,
-                  accentColor: palette.primary,
-                  onSeek: notifier.seekToProgress,
-                  position: player.position,
-                  total: player.total,
-                  height: 40,
-                  barCount: 60,
-                ),
-                const SizedBox(height: 12),
-                _Controls(
-                  player: player,
-                  notifier: notifier,
-                  palette: palette,
-                  compact: true,
-                ),
-                const SizedBox(height: 10),
-                _VolumeSlider(
-                  volume: player.volume,
-                  accentColor: palette.primary,
-                  onChanged: notifier.setVolume,
-                ),
-              ],
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Обложка была прибита к 200 логическим пикселям, и на
+                // нынешних телефонах пол-экрана оставалось пустым, отчего вся
+                // страница читалась мелкой. Теперь она по месту: треть высоты,
+                // но не шире колонки и не больше 300 — на планшете и
+                // разложенном Fold иначе получался плакат
+                final cover = math.min(
+                  constraints.maxWidth,
+                  (constraints.maxHeight * 0.34).clamp(150.0, 300.0),
+                );
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _CoverArt(track: track, size: cover),
+                    const SizedBox(height: 16),
+                    _TrackInfo(
+                      track: track,
+                      palette: palette,
+                      compact: true,
+                      showFavorite: showFavorite,
+                    ),
+                    const SizedBox(height: 16),
+                    _ProgressBar(
+                      notifier: notifier,
+                      palette: palette,
+                      height: 40,
+                      barCount: 60,
+                    ),
+                    // Свободного места на телефоне вагон, а ряд управления
+                    // жался к полосе прогресса
+                    SizedBox(height: pscale(18)),
+                    _Controls(
+                      notifier: notifier,
+                      palette: palette,
+                      compact: true,
+                    ),
+                    SizedBox(height: pscale(16)),
+                    Consumer(
+                      builder: (context, ref, _) => _VolumeSlider(
+                        volume:
+                            ref.watch(playerProvider.select((s) => s.volume)),
+                        accentColor: palette.primary,
+                        onChanged: notifier.setVolume,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -264,9 +274,10 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
           scale: _isHovered ? 1.05 : 1.0,
           duration: const Duration(milliseconds: 150),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            padding: EdgeInsets.symmetric(
+                horizontal: pscale(14), vertical: pscale(11)),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(pscale(22)),
               color: _isHovered
                   ? Colors.white.withAlpha(25)
                   : Colors.white.withAlpha(18),
@@ -275,14 +286,14 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(widget.icon, color: widget.color, size: 17),
-                const SizedBox(width: 6),
+                Icon(widget.icon, color: widget.color, size: pscale(17)),
+                SizedBox(width: pscale(6)),
                 Flexible(
                   child: Text(widget.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: Colors.white60, fontSize: 13)),
+                      style: TextStyle(
+                          color: Colors.white60, fontSize: pscale(13))),
                 ),
               ],
             ),
@@ -371,10 +382,10 @@ class _TrackInfo extends ConsumerWidget {
 
     return Row(
       children: [
-        // Сердечко слева (занимает 40px → текст остаётся по центру)
+        // Сердечко слева (занимает свою ширину → текст остаётся по центру)
         if (showFavorite)
           SizedBox(
-            width: 40,
+            width: pscale(40),
             child: GestureDetector(
               onTap: () {
                 HapticFeedback.mediumImpact();
@@ -391,13 +402,13 @@ class _TrackInfo extends ConsumerWidget {
                       : Icons.favorite_outline_rounded,
                   key: ValueKey(isFav),
                   color: isFav ? Colors.redAccent : Colors.white38,
-                  size: 22,
+                  size: pscale(22),
                 ),
               ),
             ),
           )
         else
-          const SizedBox(width: 40),
+          SizedBox(width: pscale(40)),
 
         // Название + артист — центрированы
         Expanded(
@@ -427,7 +438,7 @@ class _TrackInfo extends ConsumerWidget {
         // противовес). Просили в отзывах: без «⋮» и выбора пунктов
         if (showFavorite)
           SizedBox(
-            width: 40,
+            width: pscale(40),
             child: Tooltip(
               message: 'В плейлист',
               child: GestureDetector(
@@ -436,13 +447,13 @@ class _TrackInfo extends ConsumerWidget {
                   showAddToPlaylistSheet(context, [track.id]);
                 },
                 behavior: HitTestBehavior.opaque,
-                child: const Icon(Icons.playlist_add_rounded,
-                    color: Colors.white38, size: 24),
+                child: Icon(Icons.playlist_add_rounded,
+                    color: Colors.white38, size: pscale(24)),
               ),
             ),
           )
         else
-          const SizedBox(width: 40),
+          SizedBox(width: pscale(40)),
       ],
     );
   }
@@ -452,121 +463,192 @@ class _TrackInfo extends ConsumerWidget {
 // CONTROLS ROW
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _Controls extends StatelessWidget {
+/// Полоса прогресса — единственное место экрана плеера, которому нужна
+/// позиция. Остальное её не смотрит и от тиков не перестраивается.
+class _ProgressBar extends ConsumerWidget {
+  const _ProgressBar({
+    required this.notifier,
+    required this.palette,
+    this.height = 56.0,
+    this.barCount = 80,
+  });
+
+  final PlayerNotifier notifier;
+  final PaletteState palette;
+  final double height;
+  final int barCount;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progress = ref.watch(playerProvider.select((s) => (
+          value: s.progress,
+          position: s.position,
+          total: s.total,
+        )));
+    // Настоящая громкость трека, если посчиталась (envelope_provider.dart)
+    final envelope = ref.watch(currentEnvelopeProvider);
+
+    return LiveWaveformProgressBar(
+      envelope: envelope,
+      progress: progress.value,
+      accentColor: palette.primary,
+      onSeek: notifier.seekToProgress,
+      position: progress.position,
+      total: progress.total,
+      height: height,
+      barCount: barCount,
+    );
+  }
+}
+
+class _Controls extends ConsumerWidget {
   const _Controls({
-    required this.player,
     required this.notifier,
     required this.palette,
     this.compact = false,
   });
 
-  final ps.ProtogenixPlayerState player;
   final PlayerNotifier notifier;
   final PaletteState palette;
   final bool compact;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Кнопкам нужны только эти три поля, не позиция
+    final player = ref.watch(playerProvider.select((s) => (
+          isPlaying: s.isPlaying,
+          isShuffle: s.isShuffle,
+          repeatMode: s.repeatMode,
+        )));
     final playing = player.isPlaying;
-    final iconSize = compact ? 20.0 : 24.0;
-    final playSize = compact ? 52.0 : 64.0;
+    // Размеры кнопок — через общий множитель (`player_metrics.dart`)
+    final iconSize = pscale(compact ? 20.0 : 24.0);
+    final playSize = pscale(compact ? 52.0 : 64.0);
 
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _CtrlButton(
-            tooltip: 'Shuffle',
-            icon: Icons.shuffle_rounded,
-            color: player.isShuffle ? palette.primary : Colors.white38,
-            size: iconSize,
-            onTap: () {
-              player.isShuffle
-                  ? HapticPatterns.shuffleOff()
-                  : HapticPatterns.shuffleOn();
-              notifier.toggleShuffle();
-            },
-          ),
-          const SizedBox(width: 16),
-          _CtrlButton(
-            tooltip: 'Previous',
-            icon: Icons.skip_previous_rounded,
-            color: Colors.white,
-            size: iconSize + 4,
-            onTap: () {
-              HapticPatterns.previous();
-              notifier.previous();
-            },
-          ),
-          const SizedBox(width: 16),
-          Tooltip(
-            message: playing ? 'Pause' : 'Play',
-            decoration: BoxDecoration(
-              color: Colors.black.withAlpha(200),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            textStyle: const TextStyle(color: Colors.white70, fontSize: 12),
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
+    // Кнопки расходятся по всей ширине, а не стоят кучкой по центру.
+    //
+    // Раньше ряд был `FittedBox(scaleDown)` вокруг `Row` с жёсткими
+    // промежутками — и на телефоне он **не влезал и ужимался**: кнопка паузы
+    // 65 логических пикселей приезжала на экран как 54. Увеличивать размеры
+    // было бессмысленно, всё съедал масштаб (отзыв Orion 2026-09-27: «как
+    // будто кнопки всё равно маленькие, ещё и прижаты друг к другу»).
+    //
+    // Ширину берём у `LayoutBuilder`, а **не** у `MediaQuery`: до ряда
+    // доходит заметно меньше экрана — отступы накладываются дважды, из
+    // `PlayerMainControls` и из компактной раскладки. На этом я и споткнулся:
+    // считал по ширине экрана, ряд снова не влезал и снова ужимался.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width =
+            constraints.maxWidth.isFinite ? constraints.maxWidth : 360.0;
+        // Что ряд занимает без промежутков. Если не влезает даже так —
+        // ужимаем сами, чтобы `spaceEvenly` остался честным
+        final intrinsic = pscale(compact ? 20.0 : 24.0) * 2 +
+            (pscale(compact ? 20.0 : 24.0) + 4) * 2 +
+            playSize +
+            pscale(10) * 8 +
+            pscale(7) * 2;
+        final fit = intrinsic > width ? width / intrinsic : 1.0;
+
+        return SizedBox(
+          width: width,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _CtrlButton(
+                tooltip: 'Shuffle',
+                icon: Icons.shuffle_rounded,
+                color: player.isShuffle ? palette.primary : Colors.white38,
+                size: iconSize * fit,
                 onTap: () {
-                  HapticPatterns.playPause();
-                  notifier.playPause();
+                  player.isShuffle
+                      ? HapticPatterns.shuffleOff()
+                      : HapticPatterns.shuffleOn();
+                  notifier.toggleShuffle();
                 },
-                child: Container(
-                  width: playSize,
-                  height: playSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: palette.primary,
-                    boxShadow: [
-                      BoxShadow(
-                        color: palette.primary.withAlpha(80),
-                        blurRadius: 16,
-                        spreadRadius: 2,
+              ),
+              _CtrlButton(
+                tooltip: 'Previous',
+                icon: Icons.skip_previous_rounded,
+                color: Colors.white,
+                size: (iconSize + 4) * fit,
+                onTap: () {
+                  HapticPatterns.previous();
+                  notifier.previous();
+                },
+              ),
+              Tooltip(
+                message: playing ? 'Pause' : 'Play',
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(200),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                textStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticPatterns.playPause();
+                      notifier.playPause();
+                    },
+                    child: Container(
+                      // Своё место вокруг паузы: она крупнее остальных, и при
+                      // равных промежутках «назад» и «вперёд» упираются в неё
+                      margin: EdgeInsets.symmetric(horizontal: pscale(7) * fit),
+                      width: playSize * fit,
+                      height: playSize * fit,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: palette.primary,
+                        boxShadow: [
+                          BoxShadow(
+                            color: palette.primary.withAlpha(80),
+                            blurRadius: 16,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Icon(
-                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: playSize * 0.5,
+                      child: Icon(
+                        playing
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: playSize * fit * 0.5,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              _CtrlButton(
+                tooltip: 'Next',
+                icon: Icons.skip_next_rounded,
+                color: Colors.white,
+                size: (iconSize + 4) * fit,
+                onTap: () {
+                  HapticPatterns.next();
+                  notifier.next();
+                },
+              ),
+              _CtrlButton(
+                tooltip: 'Repeat',
+                icon: switch (player.repeatMode) {
+                  ps.RepeatMode.none => Icons.repeat_rounded,
+                  ps.RepeatMode.all => Icons.repeat_rounded,
+                  ps.RepeatMode.one => Icons.repeat_one_rounded,
+                },
+                color: player.repeatMode != ps.RepeatMode.none
+                    ? palette.primary
+                    : Colors.white38,
+                size: iconSize * fit,
+                onTap: () {
+                  HapticPatterns.repeat();
+                  notifier.toggleRepeat();
+                },
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          _CtrlButton(
-            tooltip: 'Next',
-            icon: Icons.skip_next_rounded,
-            color: Colors.white,
-            size: iconSize + 4,
-            onTap: () {
-              HapticPatterns.next();
-              notifier.next();
-            },
-          ),
-          const SizedBox(width: 16),
-          _CtrlButton(
-            tooltip: 'Repeat',
-            icon: switch (player.repeatMode) {
-              ps.RepeatMode.none => Icons.repeat_rounded,
-              ps.RepeatMode.all => Icons.repeat_rounded,
-              ps.RepeatMode.one => Icons.repeat_one_rounded,
-            },
-            color: player.repeatMode != ps.RepeatMode.none
-                ? palette.primary
-                : Colors.white38,
-            size: iconSize,
-            onTap: () {
-              HapticPatterns.repeat();
-              notifier.toggleRepeat();
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -654,7 +736,10 @@ class _CtrlButtonState extends State<_CtrlButton> {
         scale: _isHovered ? 1.1 : 1.0,
         duration: const Duration(milliseconds: 150),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          // Мишень растёт вместе с иконкой, иначе крупная кнопка остаётся
+          // такой же мелкой на ощупь. Больше сюда закладывать нельзя: это
+          // «мёртвая» ширина, из-за неё ряд и упирался в край экрана
+          padding: EdgeInsets.all(pscale(10)),
           child: Icon(widget.icon, color: widget.color, size: widget.size),
         ),
       ),

@@ -14,6 +14,7 @@ import 'lyrics_search_sheet.dart';
 import '../../../importer/presentation/importer_sheet.dart';
 import 'sleep_timer_sheet.dart';
 import 'eq_sheet.dart';
+import 'player_metrics.dart';
 
 class PlayerMainControls extends ConsumerWidget {
   const PlayerMainControls({
@@ -34,7 +35,10 @@ class PlayerMainControls extends ConsumerWidget {
         _TopBar(onClose: onClose),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            // Было 32, и вместе с отступом компактной раскладки до ряда
+            // управления доходило всего ~300 логических пикселей — кнопкам
+            // негде было развернуться
+            padding: const EdgeInsets.symmetric(horizontal: 14.0),
             child: MusicVisualizerControls(
               compact: compact,
               showFavorite: true,
@@ -63,7 +67,7 @@ class _TopBar extends StatelessWidget {
     return SafeArea(
       bottom: false,
       child: SizedBox(
-        height: 56,
+        height: pscale(56),
         width: double.infinity,
         child: Stack(
           alignment: Alignment.center,
@@ -82,16 +86,16 @@ class _TopBar extends StatelessWidget {
                     }
                   },
                   child: Container(
-                    width: 36,
-                    height: 36,
+                    width: pscale(36),
+                    height: pscale(36),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white.withAlpha(20),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.keyboard_arrow_down_rounded,
                       color: Colors.white,
-                      size: 26,
+                      size: pscale(26),
                     ),
                   ),
                 ),
@@ -120,9 +124,9 @@ class _TopBar extends StatelessWidget {
                         HapticFeedback.lightImpact();
                         showEqSheet(context);
                       },
-                      child: const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: _EqIcon(),
+                      child: Padding(
+                        padding: EdgeInsets.all(pscale(8)),
+                        child: const _EqIcon(),
                       ),
                     ),
                 ],
@@ -144,7 +148,7 @@ class _EqIcon extends ConsumerWidget {
     final enabled = ref.watch(playerProvider.select((s) => s.eqEnabled));
     final accent = ref.watch(paletteProvider.select((p) => p.primary));
     return Icon(Icons.tune_rounded,
-        color: enabled ? accent : Colors.white54, size: 22);
+        color: enabled ? accent : Colors.white54, size: pscale(22));
   }
 }
 
