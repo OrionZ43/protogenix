@@ -35,6 +35,9 @@ class AppPaths {
   static String get lyricsDir => p.join(dataDir, 'lyrics');
   static String get audioCacheDir => p.join(dataDir, 'audio_cache');
 
+  /// Огибающие громкости треков: по 400 байт на трек ().
+  static String get waveformsDir => p.join(dataDir, 'waveforms');
+
   static Future<void> init() async {
     if (!Platform.isWindows && !Platform.isLinux) {
       databasesDir = await getDatabasesPath();

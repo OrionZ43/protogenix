@@ -1,12 +1,16 @@
 // lib/features/player/presentation/widgets/waveform_progress_bar.dart
 //
-// WaveformProgressBar v3 — красивая волна по таймеру, без привязки к аудио.
-// Убраны: bass, highs, volume — анимация полностью автономна.
+// Волна под прогрессом. Форма берётся из настоящей громкости трека
+// (`audio_envelope.dart`), колыхание — свой тикер, без привязки к звуку
+// в реальном времени. Если огибающей нет (формат не разобрали или она ещё
+// считается), форма синтетическая, как было раньше.
 
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+
+import '../../domain/audio_envelope.dart';
 import '../../../../core/utils/haptic_patterns.dart';
 
 typedef WaveformProgressBar = LiveWaveformProgressBar;
@@ -21,6 +25,7 @@ class LiveWaveformProgressBar extends StatefulWidget {
     this.total = Duration.zero,
     this.height = 56.0,
     this.barCount = 80,
+    this.envelope,
   });
 
   final double progress;
@@ -30,6 +35,11 @@ class LiveWaveformProgressBar extends StatefulWidget {
   final Duration total;
   final double height;
   final int barCount;
+
+  /// Настоящая громкость трека (`audio_envelope.dart`). null — рисуем
+  /// синтетическую волну, как раньше: формат файла не разобрали или
+  /// огибающая ещё считается.
+  final AudioEnvelope? envelope;
 
   @override
   State<LiveWaveformProgressBar> createState() =>
@@ -55,6 +65,24 @@ class _LiveWaveformProgressBarState extends State<LiveWaveformProgressBar>
   void _generateWaveform() {
     final n = widget.barCount;
     final rng = math.Random(widget.total.inSeconds ^ 0xDEADBEEF);
+
+    final envelope = widget.envelope;
+    if (envelope != null && !envelope.isEmpty) {
+      // Настоящая громкость трека: столбик — максимум огибающей на своём
+      // отрезке, чтобы удары не смазывались усреднением
+      final points = envelope.points;
+      _baseAmps = List.generate(n, (i) {
+        final from = i * points.length ~/ n;
+        final to = ((i + 1) * points.length ~/ n).clamp(from + 1, points.length);
+        var peak = 0;
+        for (var j = from; j < to; j++) {
+          if (points[j] > peak) peak = points[j];
+        }
+        return (peak / 255 * 0.94 + 0.06).clamp(0.06, 1.0);
+      });
+      _phaseOffsets = List.generate(n, (_) => rng.nextDouble() * math.pi * 2);
+      return;
+    }
 
     _baseAmps = List.generate(n, (i) {
       final t = i / n;
