@@ -110,7 +110,10 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
         return;
       }
       // Передаем ленивый Iterable. loadPlaylist сам вызовет toList() в микротаске.
-      await loadPlaylist(libraryTracks.map((t) => t.toTrackModel()));
+      // refresh: это тот же набор, а не выбор пользователя — перемешанный
+      // порядок сохраняется
+      await loadPlaylist(libraryTracks.map((t) => t.toTrackModel()),
+          refresh: true);
     } catch (e) {
       debugPrint('Error loading library into player: $e');
     }
@@ -179,9 +182,14 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   /// Новая очередь (медиатека, плейлист, избранное, «Играть»). При включённом
   /// перемешивании трек [initialIndex] встаёт первым, остальные — вразброс, а
   /// исходный порядок запоминается до выключения (queue_shuffle.dart).
+  ///
+  /// [refresh] — это не выбор пользователя, а обновление того же набора
+  /// (медиатеку перечитали после импорта). Тогда перемешанный порядок
+  /// **сохраняется**: см. `_load`.
   Future<void> loadPlaylist(Iterable<TrackModel> tracks,
-          {int initialIndex = 0}) =>
-      _load(tracks, initialIndex: initialIndex, applyShuffle: true);
+          {int initialIndex = 0, bool refresh = false}) =>
+      _load(tracks,
+          initialIndex: initialIndex, applyShuffle: true, refresh: refresh);
 
   /// Номер последней начатой загрузки очереди. Пока одна загрузка собирает
   /// источники, может начаться другая (перемешивание во время загрузки
@@ -195,7 +203,9 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     int initialIndex = 0,
     Duration? initialPosition,
     bool applyShuffle = false,
+    bool refresh = false,
   }) async {
+    // ignore: parameter_assignments — при обновлении позиция берётся текущая
     final generation = ++_loadGeneration;
     state = state.copyWith(isLoading: true);
 
@@ -206,10 +216,40 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     var tracksList = tracks is List<TrackModel> ? tracks : tracks.toList();
     var index = initialIndex;
     if (applyShuffle) {
+      final wasShuffled = List<TrackModel>.from(state.queue.cast<TrackModel>());
       _unshuffledQueue = state.isShuffle ? List.of(tracksList) : null;
       if (state.isShuffle && tracksList.length > 1) {
-        tracksList = shuffleAround(tracksList, index);
-        index = 0;
+        if (refresh && wasShuffled.length > 1) {
+          // Медиатеку перечитали (импорт, удаление) — порядок не трогаем,
+          // иначе проход по очереди начинается заново и уже сыгравшее
+          // выпадает снова (`queue_shuffle.dart`, отзыв Elian)
+          final merged = mergeShuffled(
+            shuffled: wasShuffled,
+            incoming: tracksList,
+            currentIndex: state.currentIndex,
+            key: (t) => t.id,
+          );
+          tracksList = merged.queue;
+          index = merged.index;
+        } else {
+          tracksList = shuffleAround(tracksList, index);
+          index = 0;
+        }
+      }
+    }
+
+    // Обновление — не повод начинать очередь сначала. Раньше
+    // reloadFromLibrary (удаление трека, правка тегов) сбрасывал
+    // воспроизведение на первый трек, поэтому импорт и боялся трогать
+    // очередь во время игры (`import_manager.dart`).
+    if (refresh) {
+      final playing = state.currentTrack as TrackModel?;
+      if (playing != null) {
+        final at = tracksList.indexWhere((t) => t.id == playing.id);
+        if (at >= 0) {
+          index = at;
+          initialPosition ??= state.position;
+        }
       }
     }
 
@@ -401,8 +441,34 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
       await skipToIndex(index);
       return;
     }
+    // При перемешивании порядок очереди свой, но набор тот же — нажали трек
+    // в том же списке. Перемешивать заново незачем: это сбрасывало проход по
+    // очереди и заодно давало заминку звука на перезагрузке
+    if (state.isShuffle && index >= 0 && index < list.length) {
+      final wanted = list[index].id;
+      final queue = state.queue;
+      if (_sameTracks(list)) {
+        final at = queue.indexWhere((t) => (t as TrackModel).id == wanted);
+        if (at >= 0) {
+          await skipToIndex(at);
+          await play();
+          return;
+        }
+      }
+    }
     await loadPlaylist(list, initialIndex: index);
     await play();
+  }
+
+  /// Тот же набор треков, порядок неважен — сравнение по id.
+  bool _sameTracks(List<TrackModel> tracks) {
+    final queue = state.queue;
+    if (queue.length != tracks.length || queue.isEmpty) return false;
+    final ids = {for (final t in queue) (t as TrackModel).id};
+    for (final track in tracks) {
+      if (!ids.contains(track.id)) return false;
+    }
+    return true;
   }
 
   /// Та же очередь и в том же порядке — сравнение по id, без обхода файлов.
