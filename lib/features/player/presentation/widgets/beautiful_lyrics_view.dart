@@ -42,6 +42,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../domain/glow_beam.dart';
 import '../../domain/advanced_lrc_parser.dart';
 import '../../domain/spring.dart';
 import 'audio_visualizer.dart';
@@ -641,14 +642,21 @@ class _SpringLineWidgetState extends State<_SpringLineWidget> {
         }
       }
 
+      // Ореол едет с голосом, а не висит на всём спетом (`glow_beam.dart`)
+      final beam =
+          beamAt(ms, syl.startMs.toDouble(), syl.endMs.toDouble());
+
       if (dt > 0) {
         final (s, y, g) = springs.step(dt.clamp(0.0, 0.1));
-        _vals[syl]!.value = GlowValues(scale: s, yOffset: y, glow: g);
+        _vals[syl]!.value =
+            GlowValues(scale: s, yOffset: y, glow: g, beam: beam * g);
       } else {
+        final g = springs.glow.position;
         _vals[syl]!.value = GlowValues(
           scale: springs.scale.position,
           yOffset: springs.yOffset.position,
-          glow: springs.glow.position,
+          glow: g,
+          beam: beam * g,
         );
       }
     }
@@ -972,14 +980,19 @@ class _EmphasizedSyllableState extends State<_EmphasizedSyllable> {
         }
       }
 
+      final beam = beamAt(ms, slot.startMs, slot.endMs);
+
       if (dt > 0) {
         final (s, y, g) = slot.springs.step(dt.clamp(0.0, 0.1));
-        slot.values.value = GlowValues(scale: s, yOffset: y, glow: g);
+        slot.values.value =
+            GlowValues(scale: s, yOffset: y, glow: g, beam: beam * g);
       } else {
+        final g = slot.springs.glow.position;
         slot.values.value = GlowValues(
           scale: slot.springs.scale.position,
           yOffset: slot.springs.yOffset.position,
-          glow: slot.springs.glow.position,
+          glow: g,
+          beam: beam * g,
         );
       }
     }

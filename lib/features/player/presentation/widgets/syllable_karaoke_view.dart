@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'dart:ui';
 
+import '../../domain/glow_beam.dart';
 import '../../domain/lyric_spline.dart';
 import '../../domain/spring.dart';
 import 'glow_letter.dart';
@@ -446,6 +447,13 @@ class _ActiveLineWidgetState extends ConsumerState<_ActiveLineWidget>
             ((lineTimeScale - sylStart) / sylDur).clamp(0.0, 1.0);
       }
 
+      // Ореол едет с голосом, а не висит на всём спетом (`glow_beam.dart`)
+      final beam = beamAt(
+        currentMs,
+        syl.startMs.toDouble(),
+        syl.endMs.toDouble(),
+      );
+
       springs.setAll(
         kScaleSpline.at(syllableTimeScale),
         kYOffsetSpline.at(syllableTimeScale),
@@ -454,12 +462,15 @@ class _ActiveLineWidgetState extends ConsumerState<_ActiveLineWidget>
 
       if (dt > 0) {
         final (s, y, g) = springs.step(dt.clamp(0.0, 0.1));
-        _values[syl]!.value = GlowValues(scale: s, yOffset: y, glow: g);
+        _values[syl]!.value =
+            GlowValues(scale: s, yOffset: y, glow: g, beam: beam * g);
       } else {
+        final g = springs.glow.position;
         _values[syl]!.value = GlowValues(
           scale: springs.scale.position,
           yOffset: springs.yOffset.position,
-          glow: springs.glow.position,
+          glow: g,
+          beam: beam * g,
         );
       }
 
@@ -480,10 +491,12 @@ class _ActiveLineWidgetState extends ConsumerState<_ActiveLineWidget>
               ((timeAlpha - lStart) / (lEnd - lStart)).clamp(0.0, 1.0);
           final glowTs =
               ((timeAlpha - lStart) / (1.0 - lStart)).clamp(0.0, 1.0);
+          final letterGlow = kGlowSpline.at(glowTs);
           letters[li].value = GlowValues(
             scale: kScaleSpline.at(letterTs),
             yOffset: kYOffsetSpline.at(letterTs) * 2,
-            glow: kGlowSpline.at(glowTs),
+            glow: letterGlow,
+            beam: beam * letterGlow,
           );
         }
       }

@@ -32,7 +32,8 @@ class GlowValues {
     required this.scale,
     required this.yOffset,
     required this.glow,
-  });
+    double? beam,
+  }) : beam = beam ?? glow;
 
   static const idle = GlowValues(scale: 1.0, yOffset: 0.0, glow: 0.0);
 
@@ -40,15 +41,21 @@ class GlowValues {
   final double yOffset;
   final double glow;
 
+  /// Насколько близко голос к этой букве прямо сейчас (`glow_beam.dart`).
+  /// Им управляется только ореол; цвет и размер по-прежнему от [glow].
+  /// Если не передать — равен [glow], то есть поведение как было.
+  final double beam;
+
   @override
   bool operator ==(Object other) =>
       other is GlowValues &&
       other.scale == scale &&
       other.yOffset == yOffset &&
-      other.glow == glow;
+      other.glow == glow &&
+      other.beam == beam;
 
   @override
-  int get hashCode => Object.hash(scale, yOffset, glow);
+  int get hashCode => Object.hash(scale, yOffset, glow, beam);
 }
 
 /// Как выглядит текст при свечении 0 и 1. Значения по умолчанию — вид
@@ -184,9 +191,10 @@ class RenderGlowLetter extends RenderBox {
 
   final TextPainter _painter = TextPainter(textDirection: TextDirection.ltr);
 
-  /// Свечение, с которым текст разложен сейчас: пока оно то же, TextPainter
-  /// трогать не нужно.
+  /// Свечение и луч, с которыми текст разложен сейчас: пока они те же,
+  /// TextPainter трогать не нужно.
   double? _paintedGlow;
+  double? _paintedBeam;
 
   /// Ширина, по которой разложен текст: длинная строка переносится так же,
   /// как переносил Text.
@@ -268,10 +276,16 @@ class RenderGlowLetter extends RenderBox {
 
   /// Цвет и тени зависят от свечения, размеры — нет, поэтому раскладка от
   /// анимации не меняется.
-  TextStyle _styleFor(double glow) {
+  ///
+  /// Цвет берётся у [glow] (спетая буква остаётся яркой), а ореол — у [beam],
+  /// то есть только пока голос рядом. Ореол — это вторая отрисовка глифов с
+  /// размытием, и держать его на всей спетой строке стоило половины кадра
+  /// (`glow_beam.dart`).
+  TextStyle _styleFor(double glow, double beam) {
     final g = glow.clamp(0.0, 1.0);
-    final shadowAlpha = (g * _style.shadowScale * 255).round();
-    final blurRadius = _style.blurBase + _style.blurSlope * g;
+    final b = beam.clamp(0.0, 1.0);
+    final shadowAlpha = (b * _style.shadowScale * 255).round();
+    final blurRadius = _style.blurBase + _style.blurSlope * b;
 
     return TextStyle(
       fontSize: _fontSize,
@@ -299,13 +313,14 @@ class RenderGlowLetter extends RenderBox {
     );
   }
 
-  void _layoutText(double glow) {
-    if (_paintedGlow == glow) return;
+  void _layoutText(double glow, double beam) {
+    if (_paintedGlow == glow && _paintedBeam == beam) return;
     _painter
-      ..text = TextSpan(text: _text, style: _styleFor(glow))
+      ..text = TextSpan(text: _text, style: _styleFor(glow, beam))
       ..textScaler = _textScaler
       ..layout(maxWidth: _maxWidth);
     _paintedGlow = glow;
+    _paintedBeam = beam;
   }
 
   @override
@@ -314,44 +329,45 @@ class RenderGlowLetter extends RenderBox {
     // а масштаб — преобразование при отрисовке, как и был Transform.scale
     _maxWidth = constraints.maxWidth;
     _paintedGlow = null;
-    _layoutText(0.0);
+    _paintedBeam = null;
+    _layoutText(0.0, 0.0);
     size = constraints.constrain(_painter.size);
   }
 
   @override
   double computeMinIntrinsicWidth(double height) {
-    _layoutText(0.0);
+    _layoutText(0.0, 0.0);
     return _painter.minIntrinsicWidth;
   }
 
   @override
   double computeMaxIntrinsicWidth(double height) {
-    _layoutText(0.0);
+    _layoutText(0.0, 0.0);
     return _painter.maxIntrinsicWidth;
   }
 
   @override
   double computeMinIntrinsicHeight(double width) {
-    _layoutText(0.0);
+    _layoutText(0.0, 0.0);
     return _painter.height;
   }
 
   @override
   double computeMaxIntrinsicHeight(double width) {
-    _layoutText(0.0);
+    _layoutText(0.0, 0.0);
     return _painter.height;
   }
 
   @override
   double? computeDistanceToActualBaseline(TextBaseline baseline) {
-    _layoutText(_paintedGlow ?? 0.0);
+    _layoutText(_paintedGlow ?? 0.0, _paintedBeam ?? 0.0);
     return _painter.computeDistanceToActualBaseline(baseline);
   }
 
   @override
   Size computeDryLayout(BoxConstraints constraints) {
     final painter = TextPainter(
-      text: TextSpan(text: _text, style: _styleFor(0.0)),
+      text: TextSpan(text: _text, style: _styleFor(0.0, 0.0)),
       textDirection: TextDirection.ltr,
       textScaler: _textScaler,
     )..layout(maxWidth: constraints.maxWidth);
@@ -363,7 +379,7 @@ class RenderGlowLetter extends RenderBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     final v = _values.value;
-    _layoutText(v.glow.clamp(0.0, 1.0));
+    _layoutText(v.glow.clamp(0.0, 1.0), v.beam.clamp(0.0, 1.0));
 
     final canvas = context.canvas;
     canvas.save();
