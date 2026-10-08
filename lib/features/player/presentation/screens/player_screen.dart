@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../../../core/widgets/sheet_cover.dart';
 import '../providers/karaoke_provider.dart';
 import '../providers/player_provider.dart';
 import '../../domain/track_model.dart';
@@ -13,11 +14,28 @@ import '../widgets/protogenix_background.dart';
 import '../widgets/player_main_controls.dart';
 import '../../../importer/presentation/importer_sheet.dart';
 
-class PlayerScreen extends ConsumerWidget {
+class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
+}
+
+class _PlayerScreenState extends ConsumerState<PlayerScreen> {
+  /// Шторка с текстом песни закрывает экран плеера целиком: пока она
+  /// раскрыта, плеер под ней не рисуется, а её стекло показывает снимок
+  /// отсюда (`core/widgets/sheet_cover.dart`, `performance.md`).
+  final _lyricsCover = SheetCover();
+  final _boundary = GlobalKey();
+
+  @override
+  void dispose() {
+    _lyricsCover.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Караоке остаётся живым, но экран от него больше не перестраивается:
     // karaokeProvider сам слушает playerProvider и ищет текст заранее, а
     // watch заставлял пересобирать весь экран на каждую смену строки.
@@ -29,15 +47,26 @@ class PlayerScreen extends ConsumerWidget {
     final track =
         ref.watch(playerProvider.select((s) => s.currentTrack)) as TrackModel?;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: ProtogenixBackground(
-        child: track != null
-            ? (Platform.isWindows || Platform.isLinux || Platform.isMacOS
-                ? DragToMoveArea(
-                    child: PlayerMainControls(track: track, compact: true))
-                : PlayerMainControls(track: track, compact: true))
-            : const _EmptyLibraryScreen(),
+    return SheetCoverScope(
+      cover: _lyricsCover,
+      boundary: _boundary,
+      child: HiddenUnderSheet(
+        covered: _lyricsCover,
+        child: RepaintBoundary(
+          key: _boundary,
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: ProtogenixBackground(
+              child: track != null
+                  ? (Platform.isWindows || Platform.isLinux || Platform.isMacOS
+                      ? DragToMoveArea(
+                          child:
+                              PlayerMainControls(track: track, compact: true))
+                      : PlayerMainControls(track: track, compact: true))
+                  : const _EmptyLibraryScreen(),
+            ),
+          ),
+        ),
       ),
     );
   }

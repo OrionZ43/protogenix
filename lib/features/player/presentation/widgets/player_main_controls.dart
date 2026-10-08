@@ -1,9 +1,10 @@
 import 'dart:io';
-import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:protogenix/core/utils/system_insets.dart';
+import 'package:protogenix/core/widgets/sheet_cover.dart';
 
 import '../providers/palette_provider.dart';
 import '../providers/player_provider.dart';
@@ -240,6 +241,9 @@ class _BottomRow extends ConsumerWidget {
   }
 
   void _showLyricsSheet(BuildContext context, WidgetRef ref, TrackModel track) {
+    // Экран плеера под шторкой: пока она раскрыта, он прячется, а стекло
+    // показывает его снимок (`core/widgets/sheet_cover.dart`)
+    final cover = SheetCoverScope.maybeOf(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -250,8 +254,15 @@ class _BottomRow extends ConsumerWidget {
           backgroundColor: Colors.transparent,
           body: ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Consumer(
+              // Сменился трек — под шторкой другая обложка, снимок заново
+              builder: (context, ref, child) => FrozenGlass(
+                sigma: 20,
+                scope: cover,
+                refreshKey: ref.watch(
+                    playerProvider.select((s) => s.currentTrack?.id)),
+                child: child!,
+              ),
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.black.withAlpha(160),

@@ -29,6 +29,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/utils/fold_layout.dart';
+import '../core/widgets/sheet_cover.dart';
 import '../features/library/presentation/screens/library_screen.dart';
 import '../features/search/presentation/screens/search_screen.dart';
 import '../features/player/presentation/widgets/mini_player.dart';
@@ -140,6 +141,25 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
   /// анимация открытия (`performance.md`).
   bool _playerOpen = false;
 
+  /// Плеер раскрыт целиком и его не тянут: оболочки под ним не видно.
+  ///
+  /// Тогда она и не рисуется. Шторка — не непрозрачный маршрут, поэтому
+  /// Flutter рисует под ней всё, а у Impeller нет кэша растеризации: даже
+  /// замершая главная (`TickerMode` выше) перерисовывается каждый кадр
+  /// целиком — со своим фоном и стеклом нижней панели, которое каждый раз
+  /// заново размывает то, что под ним. Замер (`performance.md`): на Redmi
+  /// Note 8 это 31 мс из 40 на кадр экрана плеера, на Samsung A53 — 8,5 из
+  /// 11,4. Флаг выставляет сама шторка (`CoveringSheet`) по своей
+  /// анимации: стоит потянуть её вниз — оболочка снова на месте
+  /// (`core/widgets/sheet_cover.dart`).
+  final _shellCovered = SheetCover();
+
+  @override
+  void dispose() {
+    _shellCovered.dispose();
+    super.dispose();
+  }
+
   void _openPlayer(BuildContext context) {
     setState(() => _playerOpen = true);
     showModalBottomSheet(
@@ -147,7 +167,7 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       useSafeArea: true, // ← Bug 3: было false
-      builder: (_) => const _FullPlayerSheet(),
+      builder: (_) => _FullPlayerSheet(coversShell: _shellCovered),
     ).whenComplete(() {
       if (mounted) setState(() => _playerOpen = false);
     });
@@ -181,39 +201,45 @@ class _CompactShellState extends ConsumerState<_CompactShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF080810),
-      body: TickerMode(
-        // Плеер открыт поверх — под ним анимировать нечего
-        enabled: !_playerOpen,
-        child: UpdateBannerLayout(
-          child: IndexedStack(
-            index: tabIndex,
-            children: _tabScreens(tabIndex),
+      body: HiddenUnderSheet(
+        covered: _shellCovered,
+        child: TickerMode(
+          // Плеер открыт поверх — под ним анимировать нечего
+          enabled: !_playerOpen,
+          child: UpdateBannerLayout(
+            child: IndexedStack(
+              index: tabIndex,
+              children: _tabScreens(tabIndex),
+            ),
           ),
         ),
       ),
 
       // MiniPlayer + BottomNavigationBar в одной колонке
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Мини-плеер (виден только если есть трек)
-          if (hasTrack)
-            GestureDetector(
-              onTap: () => _openPlayer(context),
-              onVerticalDragEnd: (d) {
-                if (d.primaryVelocity != null && d.primaryVelocity! < -200) {
-                  _openPlayer(context);
-                }
-              },
-              child: MiniPlayer(onTap: () => _openPlayer(context)),
-            ),
+      bottomNavigationBar: HiddenUnderSheet(
+        covered: _shellCovered,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Мини-плеер (виден только если есть трек)
+            if (hasTrack)
+              GestureDetector(
+                onTap: () => _openPlayer(context),
+                onVerticalDragEnd: (d) {
+                  if (d.primaryVelocity != null && d.primaryVelocity! < -200) {
+                    _openPlayer(context);
+                  }
+                },
+                child: MiniPlayer(onTap: () => _openPlayer(context)),
+              ),
 
-          // Нижняя навигация
-          _BottomBar(
-            currentIndex: tabIndex,
-            onTap: (i) => ref.read(_tabIndexProvider.notifier).state = i,
-          ),
-        ],
+            // Нижняя навигация
+            _BottomBar(
+              currentIndex: tabIndex,
+              onTap: (i) => ref.read(_tabIndexProvider.notifier).state = i,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -482,13 +508,16 @@ class _RailIconState extends State<_RailIcon> {
 /// PlayerScreen теперь сам содержит кнопку закрытия в _TopBar.
 /// Это устраняет наложение кнопок друг на друга на складных экранах.
 class _FullPlayerSheet extends StatelessWidget {
-  const _FullPlayerSheet();
+  const _FullPlayerSheet({required this.coversShell});
+
+  /// Сюда шторка сообщает, закрывает ли она оболочку целиком.
+  final SheetCover coversShell;
 
   @override
   Widget build(BuildContext context) {
     // Просто возвращаем PlayerScreen — без дополнительных Positioned-слоёв.
     // SafeArea внутри PlayerScreen корректно обрабатывает отступы.
-    return const PlayerScreen();
+    return CoveringSheet(cover: coversShell, child: const PlayerScreen());
   }
 }
 
