@@ -57,8 +57,12 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     // bufferedPositionStream не слушаем: state.buffered никто не читает, а
     // событие приходило до двух раз в секунду и будило всех слушателей.
 
+    // Длину знает не всякий источник: MP3 без VBR-заголовка ExoPlayer с
+    // точной перемоткой (`track_model.dart`) отдаёт без длины. Тогда берём её
+    // у трека — для MP3 она посчитана по кадрам (`mp3_duration.dart`). Раньше
+    // null просто пропускался, и оставалась длина прошлого трека или ноль
     _player.durationStream.listen((dur) {
-      if (mounted && dur != null) state = state.copyWith(total: dur);
+      if (mounted) state = state.copyWith(total: dur ?? _trackDuration());
     });
 
     _player.playerStateStream.listen((playerState) {
@@ -75,7 +79,12 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
       if (!mounted || index == null || index >= state.queue.length) return;
 
       final track = state.queue[index] as TrackModel;
-      state = state.copyWith(currentIndex: index, currentTrack: track);
+      state = state.copyWith(
+        currentIndex: index,
+        currentTrack: track,
+        // Пока плеер не сообщил длину нового трека — длина из медиатеки
+        total: _player.duration ?? track.duration,
+      );
       _updatePalette(track);
 
       // Stop After Track: остановить по окончании трека
@@ -105,6 +114,9 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
   }
 
   Future<void> reloadFromLibrary() async => _loadLibrary();
+
+  Duration _trackDuration() =>
+      (state.currentTrack as TrackModel?)?.duration ?? Duration.zero;
 
   Future<void> _loadLibrary() async {
     try {

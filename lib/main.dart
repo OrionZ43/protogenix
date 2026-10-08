@@ -32,6 +32,7 @@ Future<void> main(List<String> args) async {
   // Один раз после обновления: теги своих файлов, добавленных до 1.1.
   // До загрузки плеера — чтобы очередь сразу получила новые названия.
   await LocalTagsMigration.runOnce();
+  await LocalTagsMigration.fixMp3DurationsOnce();
 
   if (Platform.isAndroid || Platform.isIOS) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

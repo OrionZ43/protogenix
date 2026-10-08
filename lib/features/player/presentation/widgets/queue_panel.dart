@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/track_time.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/track_model.dart';
@@ -170,11 +171,7 @@ class _QueueItem extends StatelessWidget {
     );
   }
 
-  String _formatDuration(Duration d) {
-    final m = d.inMinutes.toString().padLeft(2, '0');
-    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
+  String _formatDuration(Duration d) => formatTrackTime(d);
 }
 
 /// Анимированные полоски "сейчас играет"

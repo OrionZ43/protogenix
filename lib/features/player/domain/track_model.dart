@@ -87,6 +87,22 @@ class TrackModel {
 
     // ── Локальный файл ────────────────────────────────────────────────────
     if (path != null && await File(path).exists()) {
+      // MP3 — с точной перемоткой по индексу кадров. Без неё ExoPlayer
+      // переводит время в место в файле по битрейту первого кадра, и у MP3
+      // без VBR-заголовка (склеенные сборники) и длина, и перемотка врут в
+      // разы: «сборник на 2 часа — 43 минуты», перемотка на середину уводит
+      // почти в конец. Длины такой источник может не знать — тогда плеер
+      // берёт её у трека (`player_provider.dart`)
+      if (path.toLowerCase().endsWith('.mp3')) {
+        return ProgressiveAudioSource(
+          Uri.file(path),
+          options: const ProgressiveAudioSourceOptions(
+            androidExtractorOptions: AndroidExtractorOptions(
+              mp3Flags: AndroidExtractorOptions.flagMp3EnableIndexSeeking,
+            ),
+          ),
+        );
+      }
       return AudioSource.file(path);
     }
 

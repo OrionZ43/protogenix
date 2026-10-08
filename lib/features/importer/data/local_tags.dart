@@ -14,6 +14,8 @@ import 'dart:typed_data';
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 import 'package:crypto/crypto.dart';
 
+import 'mp3_duration.dart';
+
 /// Форматы своих файлов, которые принимает импорт (в нижнем регистре).
 /// Все их играют и ExoPlayer на Android, и mpv на ПК.
 const kLocalAudioExtensions = [
@@ -63,7 +65,12 @@ LocalTags readLocalTagsSync(String path) {
         break;
       }
     }
-    final duration = meta.duration;
+    var duration = meta.duration;
+    // MP3 без VBR-заголовка или со склейкой: оценка по первому кадру врёт
+    // в разы (сборник на два часа — «43 минуты»), считаем по кадрам
+    if (path.toLowerCase().endsWith('.mp3')) {
+      duration = exactMp3DurationIfNeeded(path) ?? duration;
+    }
     return LocalTags(
       title: _clean(meta.title),
       artist: _clean(meta.artist) ?? _clean(meta.albumArtist),

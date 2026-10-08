@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import '../../../../core/utils/track_time.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -935,11 +936,7 @@ class _TrackTile extends ConsumerWidget {
     );
   }
 
-  String _fmtDuration(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
+  String _fmtDuration(Duration d) => formatTrackTime(d);
 }
 
 // ── Кнопка играть всё ─────────────────────────────────────────────────────────

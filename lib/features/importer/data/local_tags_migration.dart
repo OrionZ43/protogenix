@@ -17,6 +17,7 @@ import '../../../core/services/app_settings_store.dart';
 import '../../library/data/library_database.dart';
 import '../../library/domain/library_track.dart';
 import 'local_tags.dart';
+import 'mp3_duration.dart';
 
 class LocalTagsMigration {
   LocalTagsMigration._();
@@ -57,6 +58,49 @@ class LocalTagsMigration {
       await settings.set(_doneKey, true);
     } catch (e) {
       debugPrint('[Tags] Не удалось перечитать теги: $e');
+    }
+  }
+
+  static const _mp3DoneKey = 'mp3DurationsFixed';
+
+  /// Один раз: точная длина у уже добавленных MP3 (`mp3_duration.dart`).
+  ///
+  /// До 2026-10-08 длина MP3 без VBR-заголовка считалась по битрейту первого
+  /// кадра, и сборник на два часа лёг в медиатеку как «43 минуты». Без этого
+  /// прохода он так бы и остался — пришлось бы удалять и добавлять заново.
+  /// Нормальные MP3 с верным заголовком не сканируются: проверка — несколько
+  /// килобайт в начале файла.
+  static Future<void> fixMp3DurationsOnce() async {
+    final settings = AppSettingsStore();
+    try {
+      if (await settings.get<bool>(_mp3DoneKey) == true) return;
+      final tracks = await LibraryDatabase.instance.getAllTracks();
+      final candidates = [
+        for (final track in tracks)
+          if (track.filePath.toLowerCase().endsWith('.mp3')) track,
+      ];
+      if (candidates.isNotEmpty) {
+        final jobs = [
+          for (final track in candidates) (id: track.id, path: track.filePath),
+        ];
+        final exact = await Isolate.run(() => {
+              for (final job in jobs)
+                if (exactMp3DurationIfNeeded(job.path) case final d?)
+                  job.id: d.inMilliseconds,
+            });
+        var updated = 0;
+        for (final track in candidates) {
+          final ms = exact[track.id];
+          if (ms == null || (ms - track.durationMs).abs() < 1000) continue;
+          await LibraryDatabase.instance
+              .updateTrack(track.copyWith(durationMs: ms));
+          updated++;
+        }
+        debugPrint('[Tags] Длина MP3 исправлена: $updated из ${candidates.length}');
+      }
+      await settings.set(_mp3DoneKey, true);
+    } catch (e) {
+      debugPrint('[Tags] Не удалось пересчитать длину MP3: $e');
     }
   }
 

@@ -8,6 +8,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../../../core/utils/track_time.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../domain/audio_envelope.dart';
@@ -131,11 +132,7 @@ class _LiveWaveformProgressBarState extends State<LiveWaveformProgressBar>
     super.dispose();
   }
 
-  String _fmt(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
+  String _fmt(Duration d) => formatTrackTime(d);
 
   @override
   Widget build(BuildContext context) {
