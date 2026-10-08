@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
 import 'app/demo_mode.dart';
 import 'core/services/app_paths.dart';
+import 'core/utils/frame_report.dart';
 import 'features/importer/data/local_tags_migration.dart';
 import 'features/listen/presentation/listen_links.dart';
 import 'features/player/data/audio_handler.dart';
@@ -75,6 +76,9 @@ Future<void> main(List<String> args) async {
 
   // Инициализируем фоновое воспроизведение ПЕРЕД runApp
   await initAudioService();
+
+  // Сколько стоит кадр — только в профильной сборке (frame_report.dart)
+  startFrameReport();
 
   runApp(
     const ProviderScope(
