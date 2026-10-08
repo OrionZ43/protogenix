@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -44,5 +45,31 @@ void main() {
 
     await store.set('lyricsLinesOnly', true);
     expect(await AppSettingsStore(path).get<bool>('lyricsLinesOnly'), isTrue);
+  });
+
+  // Раньше у каждого провайдера был свой экземпляр со своим кэшем, и
+  // последний записавший затирал чужие ключи
+  test('два set подряд без ожидания не теряют друг друга', () async {
+    final store = AppSettingsStore(path);
+    await Future.wait([
+      store.set('shuffle', true),
+      store.set('repeatMode', 'all'),
+      store.set('lyricsLinesOnly', true),
+    ]);
+    final reopened = AppSettingsStore(path);
+    expect(await reopened.get<bool>('shuffle'), isTrue);
+    expect(await reopened.get<String>('repeatMode'), 'all');
+    expect(await reopened.get<bool>('lyricsLinesOnly'), isTrue);
+  });
+
+  test('запись после записи — в файле последнее состояние', () async {
+    final store = AppSettingsStore(path);
+    for (var i = 0; i < 20; i++) {
+      unawaited(store.set('counter', i));
+    }
+    await store.set('done', true);
+    final reopened = AppSettingsStore(path);
+    expect(await reopened.get<int>('counter'), 19);
+    expect(await reopened.get<bool>('done'), isTrue);
   });
 }

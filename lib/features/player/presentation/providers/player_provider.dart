@@ -7,11 +7,13 @@
 // 4. Таймер сна (Sleep Timer / Stop after track)
 
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show ImageProvider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+import '../../../../core/services/app_settings_store.dart';
 import '../../../../core/services/app_visibility.dart';
 import '../../data/audio_handler.dart';
 import '../../data/eq_settings_store.dart';
@@ -97,6 +99,8 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
       }
     });
 
+    // Перемешивание и повтор — до загрузки очереди: она перемешивается сразу
+    await _restorePlaybackModes();
     await _loadLibrary();
   }
 
@@ -109,11 +113,17 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
         state = state.copyWith(queue: [], currentTrack: null, isLoading: false);
         return;
       }
+      // Первая загрузка при включённом перемешивании — со случайного трека.
+      // Иначе первым всегда вставал последний скачанный, и его приходилось
+      // пропускать руками (отзыв Elian, 2026-10-08)
+      final start = state.queue.isEmpty && state.isShuffle
+          ? math.Random().nextInt(libraryTracks.length)
+          : 0;
       // Передаем ленивый Iterable. loadPlaylist сам вызовет toList() в микротаске.
       // refresh: это тот же набор, а не выбор пользователя — перемешанный
       // порядок сохраняется
       await loadPlaylist(libraryTracks.map((t) => t.toTrackModel()),
-          refresh: true);
+          initialIndex: start, refresh: true);
     } catch (e) {
       debugPrint('Error loading library into player: $e');
     }
@@ -378,6 +388,7 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
     unawaited(_handler.setShuffleMode(
       shuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
     ));
+    unawaited(_settings.set(_kShuffleKey, shuffle));
     final queue = List<TrackModel>.from(state.queue.cast<TrackModel>());
     final current = state.currentTrack;
     final currentIndex = state.currentIndex;
@@ -493,12 +504,44 @@ class PlayerNotifier extends StateNotifier<ProtogenixPlayerState> {
       RepeatMode.all => RepeatMode.one,
       RepeatMode.one => RepeatMode.none,
     };
-    _handler.setRepeatMode(switch (next) {
+    _applyRepeat(next);
+    if (mounted) state = state.copyWith(repeatMode: next);
+    unawaited(_settings.set(_kRepeatKey, next.name));
+  }
+
+  void _applyRepeat(RepeatMode mode) {
+    _handler.setRepeatMode(switch (mode) {
       RepeatMode.none => AudioServiceRepeatMode.none,
       RepeatMode.all => AudioServiceRepeatMode.all,
       RepeatMode.one => AudioServiceRepeatMode.one,
     });
-    if (mounted) state = state.copyWith(repeatMode: next);
+  }
+
+  // ── Перемешивание и повтор между запусками ────────────────────────────────
+  //
+  // Отзыв Elian (2026-10-08): «было бы удобно, если бы кнопочка перемешки
+  // сохранялась». Оба режима живут в settings.json (`AppSettingsStore`).
+
+  static const _kShuffleKey = 'shuffle';
+  static const _kRepeatKey = 'repeatMode';
+
+  final _settings = AppSettingsStore();
+
+  Future<void> _restorePlaybackModes() async {
+    final shuffle = await _settings.get<bool>(_kShuffleKey) ?? false;
+    final repeatName = await _settings.get<String>(_kRepeatKey);
+    final repeat = RepeatMode.values
+            .where((mode) => mode.name == repeatName)
+            .firstOrNull ??
+        RepeatMode.none;
+
+    if (shuffle) {
+      unawaited(_handler.setShuffleMode(AudioServiceShuffleMode.all));
+    }
+    if (repeat != RepeatMode.none) _applyRepeat(repeat);
+    if (mounted) {
+      state = state.copyWith(isShuffle: shuffle, repeatMode: repeat);
+    }
   }
 
   // ── Эквалайзер ─────────────────────────────────────────────────────────────
