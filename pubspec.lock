@@ -1529,8 +1529,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: cf8f881ae059220bb37f7358b465babd54021b1a
-      resolved-ref: cf8f881ae059220bb37f7358b465babd54021b1a
+      ref: "4fad0ff599d3e07dbdda206ec94d3ab20ece9ae1"
+      resolved-ref: "4fad0ff599d3e07dbdda206ec94d3ab20ece9ae1"
       url: "https://github.com/OrionZ43/youtube_explode_dart.git"
     source: git
     version: "3.1.0"
