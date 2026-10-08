@@ -20,20 +20,13 @@
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 
-/// Раскодированный звук: моно, значения −1..1.
-class PcmAudio {
-  const PcmAudio({required this.samples, required this.sampleRate});
-
-  final Float32List samples;
-  final int sampleRate;
-
-  int get durationMs =>
-      sampleRate <= 0 ? 0 : (samples.length * 1000 / sampleRate).round();
-}
+/// Кусок раскодированного звука: моно, значения −1..1.
+typedef PcmChunk = void Function(Float32List samples, int sampleRate);
 
 /// Для спектра хватает 22050 Гц: выше 11 кГц на картинке всё равно ничего не
 /// показываем, а памяти и времени уходит вдвое меньше.
@@ -46,18 +39,23 @@ const _timeout = Duration(seconds: 90);
 bool get pcmDecodingSupported =>
     Platform.isWindows || Platform.isAndroid || Platform.isLinux;
 
-/// [filePath] в PCM, или null, если не получилось (формат, битый файл,
-/// нет libmpv). Исключений не бросает: спектр — украшение, без него
-/// визуализатор просто ровно дышит.
+/// Раскодировать [filePath] и отдать звук кусками в [onChunk]. false — не
+/// получилось (формат, битый файл, нет libmpv). Исключений не бросает: спектр —
+/// украшение, без него визуализатор просто ровно дышит.
+///
+/// **Кусками, а не массивом:** двухчасовой сборник — это 320 МБ WAV и ещё
+/// 640 МБ отсчётов, если держать их в памяти целиком; на телефоне это вылет.
+/// WAV по-прежнему пишется на диск целиком (столько же места, на время
+/// разбора), но в память читается блоками по 64 КБ.
 ///
 /// [scratchDir] — куда положить временный WAV. На Android системная temp
 /// приложению доступна, но папку лучше задавать явно.
-PcmAudio? decodePcm(String filePath, {String? scratchDir}) {
-  if (!pcmDecodingSupported) return null;
-  if (!File(filePath).existsSync()) return null;
+bool decodePcm(String filePath, PcmChunk onChunk, {String? scratchDir}) {
+  if (!pcmDecodingSupported) return false;
+  if (!File(filePath).existsSync()) return false;
 
   final mpv = _openMpv();
-  if (mpv == null) return null;
+  if (mpv == null) return false;
 
   final dir = Directory(scratchDir ?? Directory.systemTemp.path);
   final name = 'pg_pcm_${pid}_${DateTime.now().microsecondsSinceEpoch}.wav';
@@ -65,9 +63,10 @@ PcmAudio? decodePcm(String filePath, {String? scratchDir}) {
 
   try {
     dir.createSync(recursive: true);
-    return _decodeWith(mpv, filePath, wav);
+    if (!_decodeWith(mpv, filePath, wav)) return false;
+    return readWavChunks(wav, onChunk);
   } catch (_) {
-    return null;
+    return false;
   } finally {
     try {
       if (wav.existsSync()) wav.deleteSync();
@@ -75,9 +74,10 @@ PcmAudio? decodePcm(String filePath, {String? scratchDir}) {
   }
 }
 
-PcmAudio? _decodeWith(_Mpv mpv, String filePath, File wav) {
+/// mpv пишет [filePath] в [wav]. true — дописал до конца.
+bool _decodeWith(_Mpv mpv, String filePath, File wav) {
   final handle = mpv.create();
-  if (handle == nullptr) return null;
+  if (handle == nullptr) return false;
 
   try {
     // Без картинки и без колонок — только декодировать в файл
@@ -98,9 +98,9 @@ PcmAudio? _decodeWith(_Mpv mpv, String filePath, File wav) {
     for (final option in options.entries) {
       mpv.setOption(handle, option.key, option.value);
     }
-    if (mpv.initialize(handle) != 0) return null;
+    if (mpv.initialize(handle) != 0) return false;
 
-    if (mpv.command(handle, ['loadfile', filePath]) != 0) return null;
+    if (mpv.command(handle, ['loadfile', filePath]) != 0) return false;
 
     final watch = Stopwatch()..start();
     var finished = false;
@@ -110,65 +110,89 @@ PcmAudio? _decodeWith(_Mpv mpv, String filePath, File wav) {
       final id = event.ref.eventId;
       if (id == _eventEndFile || id == _eventShutdown) finished = true;
     }
-    if (!finished) return null;
+    if (!finished) return false;
   } finally {
     // Закрыть mpv надо до чтения файла: он дописывает размер в заголовок
     mpv.destroy(handle);
   }
 
-  if (!wav.existsSync()) return null;
-  return _readWav(wav.readAsBytesSync());
+  return wav.existsSync();
 }
 
-/// WAV от mpv в моно −1..1. Заголовок разбираем по чанкам, а не по смещению 44:
-/// у mpv формат бывает WAVE_FORMAT_EXTENSIBLE, и тогда `fmt ` длиннее.
-PcmAudio? _readWav(Uint8List bytes) {
-  if (bytes.length < 44) return null;
-  final view = ByteData.sublistView(bytes);
-  if (_tag(bytes, 0) != 'RIFF' || _tag(bytes, 8) != 'WAVE') return null;
+/// Размер блока при чтении WAV: в памяти одновременно только он.
+const _kChunkBytes = 64 * 1024;
 
-  var channels = 1;
-  var rate = kDecodeSampleRate;
-  var bits = 16;
-  var dataStart = -1;
-  var dataLength = 0;
+/// WAV от mpv кусками в моно −1..1. false — не WAV или пустой.
+///
+/// Заголовок разбираем по чанкам, а не по смещению 44: у mpv формат бывает
+/// WAVE_FORMAT_EXTENSIBLE, и тогда `fmt ` длиннее.
+@visibleForTesting
+bool readWavChunks(File wav, PcmChunk onChunk) {
+  final file = wav.openSync();
+  try {
+    final length = file.lengthSync();
+    final head = file.readSync(math.min(length, 4096));
+    if (head.length < 44) return false;
+    final view = ByteData.sublistView(head);
+    if (_tag(head, 0) != 'RIFF' || _tag(head, 8) != 'WAVE') return false;
 
-  var offset = 12;
-  while (offset + 8 <= bytes.length) {
-    final id = _tag(bytes, offset);
-    final size = view.getUint32(offset + 4, Endian.little);
-    final body = offset + 8;
-    if (id == 'fmt ' && body + 16 <= bytes.length) {
-      channels = view.getUint16(body + 2, Endian.little);
-      rate = view.getUint32(body + 4, Endian.little);
-      bits = view.getUint16(body + 14, Endian.little);
-    } else if (id == 'data') {
-      dataStart = body;
-      // mpv дописывает размер в конце; если не успел — берём остаток файла
-      dataLength = (size == 0 || body + size > bytes.length)
-          ? bytes.length - body
-          : size;
-      break;
+    var channels = 1;
+    var rate = kDecodeSampleRate;
+    var bits = 16;
+    var dataStart = -1;
+    var dataLength = 0;
+
+    var offset = 12;
+    while (offset + 8 <= head.length) {
+      final id = _tag(head, offset);
+      final size = view.getUint32(offset + 4, Endian.little);
+      final body = offset + 8;
+      if (id == 'fmt ' && body + 16 <= head.length) {
+        channels = view.getUint16(body + 2, Endian.little);
+        rate = view.getUint32(body + 4, Endian.little);
+        bits = view.getUint16(body + 14, Endian.little);
+      } else if (id == 'data') {
+        dataStart = body;
+        // mpv дописывает размер в конце; если не успел — берём остаток файла
+        dataLength =
+            (size == 0 || body + size > length) ? length - body : size;
+        break;
+      }
+      if (size == 0) break;
+      offset = body + size + (size.isOdd ? 1 : 0);
     }
-    if (size == 0) break;
-    offset = body + size + (size.isOdd ? 1 : 0);
-  }
 
-  if (dataStart < 0 || dataLength <= 0) return null;
-  if (bits != 16 || channels < 1 || rate <= 0) return null;
+    if (dataStart < 0 || dataLength <= 0) return false;
+    if (bits != 16 || channels < 1 || rate <= 0) return false;
 
-  final frames = dataLength ~/ (2 * channels);
-  if (frames <= 0) return null;
-  final samples = Float32List(frames);
-  for (var i = 0; i < frames; i++) {
-    var sum = 0;
-    final base = dataStart + i * 2 * channels;
-    for (var c = 0; c < channels; c++) {
-      sum += view.getInt16(base + c * 2, Endian.little);
+    final frameBytes = 2 * channels;
+    final blockBytes = _kChunkBytes ~/ frameBytes * frameBytes;
+    var left = dataLength ~/ frameBytes * frameBytes;
+    if (left <= 0) return false;
+
+    file.setPositionSync(dataStart);
+    while (left > 0) {
+      final block = file.readSync(math.min(blockBytes, left));
+      final frames = block.length ~/ frameBytes;
+      if (frames == 0) break;
+      left -= block.length;
+
+      final data = ByteData.sublistView(block);
+      final samples = Float32List(frames);
+      for (var i = 0; i < frames; i++) {
+        var sum = 0;
+        final base = i * frameBytes;
+        for (var c = 0; c < channels; c++) {
+          sum += data.getInt16(base + c * 2, Endian.little);
+        }
+        samples[i] = sum / channels / 32768.0;
+      }
+      onChunk(samples, rate);
     }
-    samples[i] = sum / channels / 32768.0;
+    return true;
+  } finally {
+    file.closeSync();
   }
-  return PcmAudio(samples: samples, sampleRate: rate);
 }
 
 String _tag(Uint8List bytes, int offset) => offset + 4 <= bytes.length

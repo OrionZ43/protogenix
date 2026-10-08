@@ -147,4 +147,50 @@ void main() {
       expect(value, 0.0, reason: 'из тишины визуализатор ничего не выдумывает');
     }
   });
+
+  // Трек целиком считается кусками, по мере чтения WAV (SpectrumAnalyzer):
+  // иначе двухчасовой сборник занимал около гигабайта памяти. Результат обязан
+  // совпадать с проходом по всему массиву байт в байт, как бы ни резали.
+  test('по кускам — то же самое, что одним массивом', () {
+    final rng = math.Random(7);
+    final samples = Float32List(_rate * 3 + 517);
+    for (var i = 0; i < samples.length; i++) {
+      final t = i / _rate;
+      samples[i] = 0.4 * math.sin(2 * math.pi * 120 * t) * (0.5 + 0.5 * math.sin(t * 5)) +
+          0.2 * (rng.nextDouble() - 0.5);
+    }
+    final whole = analyzeSpectrum(samples, sampleRate: _rate);
+
+    for (final sizes in [
+      [1],
+      [1023, 1, 2],
+      [882],
+      [4096, 37, 10000],
+      [samples.length],
+    ]) {
+      final analyzer = SpectrumAnalyzer(sampleRate: _rate);
+      var at = 0;
+      var i = 0;
+      while (at < samples.length) {
+        final size = sizes[i++ % sizes.length];
+        final end = math.min(at + size, samples.length);
+        analyzer.add(Float32List.sublistView(samples, at, end));
+        at = end;
+      }
+      final chunked = analyzer.finish();
+      expect(chunked.frames, whole.frames, reason: 'куски по $sizes');
+      expect(chunked.values, whole.values, reason: 'куски по $sizes');
+    }
+  });
+
+  test('короче одного окна — одно окно, как и раньше', () {
+    final short = tone(440, 0.02); // 441 отсчёт, окно — 1024
+    final whole = analyzeSpectrum(short, sampleRate: _rate);
+    final analyzer = SpectrumAnalyzer(sampleRate: _rate)
+      ..add(Float32List.sublistView(short, 0, 200))
+      ..add(Float32List.sublistView(short, 200));
+    final chunked = analyzer.finish();
+    expect(whole.frames, 1);
+    expect(chunked.values, whole.values);
+  });
 }

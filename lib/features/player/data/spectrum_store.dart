@@ -160,11 +160,19 @@ class SpectrumStore {
 }
 
 /// Считается в отдельном изоляте, поэтому верхнего уровня и без состояния.
+///
+/// Звук идёт в спектр кусками по мере чтения: трек целиком в памяти не
+/// лежит ни разу (`pcm_decoder.dart`, `SpectrumAnalyzer`).
 Uint8List? _computePacked(String filePath, String scratchDir) {
-  final pcm = decodePcm(filePath, scratchDir: scratchDir);
-  if (pcm == null || pcm.samples.isEmpty) return null;
-  final spectrum =
-      analyzeSpectrum(pcm.samples, sampleRate: pcm.sampleRate);
+  SpectrumAnalyzer? analyzer;
+  final decoded = decodePcm(
+    filePath,
+    (samples, sampleRate) =>
+        (analyzer ??= SpectrumAnalyzer(sampleRate: sampleRate)).add(samples),
+    scratchDir: scratchDir,
+  );
+  if (!decoded || analyzer == null) return null;
+  final spectrum = analyzer!.finish();
   if (spectrum.isEmpty) return null;
   return packSpectrogram(spectrum);
 }

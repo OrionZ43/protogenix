@@ -87,54 +87,123 @@ class Spectrogram {
 
 /// PCM (моно, [sampleRate] Гц, значения −1..1) → спектр по полосам.
 ///
-/// Отсчёты — `Float32List`: у десятиминутного трека это 53 МБ против 106 МБ,
-/// а точности для картинки хватает с запасом.
+/// Удобно для тестов и коротких отрывков; трек целиком считается кусками через
+/// [SpectrumAnalyzer], без массива на весь трек в памяти.
 Spectrogram analyzeSpectrum(
   Float32List samples, {
   required int sampleRate,
   int bands = kSpectrumBands,
   int fps = kSpectrumFps,
 }) {
-  if (samples.isEmpty || sampleRate <= 0) {
+  if (sampleRate <= 0) {
     return Spectrogram(values: Uint8List(0), bands: bands, frameMs: 1000 / fps);
   }
+  return (SpectrumAnalyzer(sampleRate: sampleRate, bands: bands, fps: fps)
+        ..add(samples))
+      .finish();
+}
 
-  final hop = math.max(1, sampleRate ~/ fps);
-  final frames = math.max(1, (samples.length - kFftSize) ~/ hop + 1);
-  final edges = _bandEdges(bands, sampleRate);
-  final window = _hann(kFftSize);
+/// Спектр, который считается по мере чтения звука.
+///
+/// Зачем кусками. Раньше трек раскодировался в один массив отсчётов, и для
+/// двухчасового сборника это было около 640 МБ `Float32List` плюс 320 МБ WAV,
+/// прочитанного в память целиком, — на телефоне легко поймать вылет. Теперь
+/// в памяти только хвост на одно окно FFT и значения полос: на два часа
+/// ~11 МБ. Результат тот же, что у прохода по всему массиву сразу.
+class SpectrumAnalyzer {
+  SpectrumAnalyzer({
+    required this.sampleRate,
+    this.bands = kSpectrumBands,
+    this.fps = kSpectrumFps,
+  })  : _hop = math.max(1, sampleRate ~/ fps),
+        _edges = _bandEdges(bands, sampleRate),
+        _window = _hann(kFftSize);
 
-  final real = Float64List(kFftSize);
-  final imag = Float64List(kFftSize);
-  final raw = Float64List(frames * bands);
+  final int sampleRate;
+  final int bands;
+  final int fps;
 
-  for (var f = 0; f < frames; f++) {
-    final start = f * hop;
+  final int _hop;
+  final List<int> _edges;
+  final Float64List _window;
+  final _real = Float64List(kFftSize);
+  final _imag = Float64List(kFftSize);
+
+  /// Отсчёты, которые ещё понадобятся: от начала следующего окна до конца
+  /// прочитанного.
+  Float32List _tail = Float32List(0);
+
+  /// Сколько отсчётов уже отброшено до [_tail].
+  int _dropped = 0;
+
+  /// С какого отсчёта начинается следующее окно.
+  int _nextStart = 0;
+
+  int _total = 0;
+  int _frames = 0;
+  Float32List _raw = Float32List(0);
+
+  void add(Float32List samples) {
+    if (samples.isEmpty) return;
+    _total += samples.length;
+
+    final data = Float32List(_tail.length + samples.length)
+      ..setAll(0, _tail)
+      ..setAll(_tail.length, samples);
+
+    while (_nextStart + kFftSize <= _dropped + data.length) {
+      _frame(data, _nextStart - _dropped);
+      _nextStart += _hop;
+    }
+
+    final keepFrom = math.min(_nextStart - _dropped, data.length);
+    _tail = Float32List.sublistView(data, keepFrom);
+    _dropped += keepFrom;
+  }
+
+  Spectrogram finish() {
+    // Короче одного окна — одно окно, добитое тишиной, как и раньше
+    if (_frames == 0 && _total > 0) {
+      _frame(_tail, 0);
+    }
+    if (_frames == 0) {
+      return Spectrogram(
+          values: Uint8List(0), bands: bands, frameMs: 1000 / fps);
+    }
+    return Spectrogram(
+      values: _normalize(_raw, _frames, bands),
+      bands: bands,
+      frameMs: 1000 * _hop / sampleRate,
+    );
+  }
+
+  void _frame(Float32List data, int start) {
     for (var i = 0; i < kFftSize; i++) {
       final index = start + i;
-      real[i] = index < samples.length ? samples[index] * window[i] : 0.0;
-      imag[i] = 0.0;
+      _real[i] = index < data.length ? data[index] * _window[i] : 0.0;
+      _imag[i] = 0.0;
     }
-    _fft(real, imag);
+    _fft(_real, _imag);
 
+    if ((_frames + 1) * bands > _raw.length) {
+      final grown = Float32List(math.max(bands * 1024, _raw.length * 2))
+        ..setAll(0, _raw);
+      _raw = grown;
+    }
     for (var b = 0; b < bands; b++) {
       var sum = 0.0;
       var count = 0;
-      for (var k = edges[b]; k < edges[b + 1]; k++) {
-        final re = real[k];
-        final im = imag[k];
+      for (var k = _edges[b]; k < _edges[b + 1]; k++) {
+        final re = _real[k];
+        final im = _imag[k];
         sum += math.sqrt(re * re + im * im);
         count++;
       }
-      raw[f * bands + b] = count == 0 ? 0.0 : sum / count * _magnitudeScale;
+      _raw[_frames * bands + b] =
+          count == 0 ? 0.0 : sum / count * _magnitudeScale;
     }
+    _frames++;
   }
-
-  return Spectrogram(
-    values: _normalize(raw, frames, bands),
-    bands: bands,
-    frameMs: 1000 * hop / sampleRate,
-  );
 }
 
 /// Границы полос по логарифму: низы узкие, верха широкие — как слышит ухо.
@@ -180,7 +249,7 @@ Float64List _hann(int size) {
 /// которая и в громких местах тише −58 дБ, гасится совсем (у трека просто нет
 /// таких частот), а пол не ближе 20 дБ к верхушке — иначе ровная полоса
 /// растянулась бы на весь экран из шума.
-Uint8List _normalize(Float64List raw, int frames, int bands) {
+Uint8List _normalize(Float32List raw, int frames, int bands) {
   const silenceDb = -70.0;
   const deadBandDb = -58.0;
   const minRangeDb = 20.0;
