@@ -71,7 +71,7 @@ jobs:
       # живым скачиванием без сборки у себя: распаковать и запустить
       # protogenix.exe, закрыв установленную версию (второй экземпляр сразу
       # закрывается). Данные у них общие.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: protogenix-windows-x64
           path: build/windows/x64/runner/Release/
